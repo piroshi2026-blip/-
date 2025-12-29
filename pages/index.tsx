@@ -1,4 +1,4 @@
-import { useState, useEffect, CSSProperties } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 
 const supabase = createClient(
@@ -105,8 +105,8 @@ export default function Home() {
     return true
   }
 
-  // --- スタイル設定 (Type Error修正版) ---
-  const styles: { [key: string]: CSSProperties | ((...args: any[]) => CSSProperties) } = {
+  // --- スタイル設定 (エラー対策済み決定版) ---
+  const styles = {
     container: { maxWidth: '600px', margin: '0 auto', padding: '20px 15px 100px', minHeight: '100vh', fontFamily: 'sans-serif', color: '#1f2937' },
     header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', padding: '10px 0' },
     logo: { fontSize: '20px', fontWeight: '900', background: 'linear-gradient(to right, #2563eb, #9333ea)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' },
@@ -114,11 +114,25 @@ export default function Home() {
     barRow: { marginBottom: '12px' },
     barLabelArea: { display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px', fontWeight: 'bold' },
     barTrack: { height: '12px', background: '#f3f4f6', borderRadius: '6px', overflow: 'hidden' },
-    barFill: (percent: number, idx: number) => ({ height: '100%', width: `${percent}%`, background: ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6'][idx % 5], transition: 'width 0.5s' }),
+    // ↓ 関数も型定義なしでそのまま書く
+    barFill: (percent: number, idx: number) => ({ 
+      height: '100%', 
+      width: `${percent}%`, 
+      background: ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6'][idx % 5], 
+      transition: 'width 0.5s' 
+    }),
     voteButton: { width: '100%', padding: '12px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', marginTop: '15px' },
     disabledButton: { width: '100%', padding: '12px', background: '#e5e7eb', color: '#9ca3af', border: 'none', borderRadius: '10px', fontWeight: 'bold', marginTop: '15px' },
-    navBar: { position: 'fixed' as const, bottom: 0, left: 0, right: 0, background: 'rgba(255,255,255,0.95)', borderTop: '1px solid #eee', display: 'flex', justifyContent: 'space-around', padding: '12px', zIndex: 100 },
-    // ↓ ここでエラーが出ていた箇所を修正しました
+    navBar: { 
+      position: 'fixed' as const, // as const で固定
+      bottom: 0, left: 0, right: 0, 
+      background: 'rgba(255,255,255,0.95)', 
+      borderTop: '1px solid #eee', 
+      display: 'flex', 
+      justifyContent: 'space-around', 
+      padding: '12px', 
+      zIndex: 100 
+    },
     navBtn: (isActive: boolean) => ({ 
       background: 'none', 
       border: 'none', 
@@ -126,7 +140,7 @@ export default function Home() {
       fontWeight: isActive ? 'bold' : 'normal', 
       fontSize: '10px', 
       display: 'flex', 
-      flexDirection: 'column' as const, // 重要: as constを追加
+      flexDirection: 'column' as const, // as const で固定
       alignItems: 'center' 
     }),
   }
@@ -136,7 +150,7 @@ export default function Home() {
       {markets.map((market) => {
         const isActive = isMarketActive(market)
         return (
-          <div key={market.id} style={styles.card as CSSProperties}>
+          <div key={market.id} style={styles.card as any}>
             {market.image_url && <img src={market.image_url} style={{ width: '100%', height: '140px', objectFit: 'cover', borderRadius: '10px', marginBottom: '12px' }} />}
             <h2 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '8px' }}>{market.title}</h2>
             <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '15px', display:'flex', gap:'10px' }}>
@@ -151,13 +165,13 @@ export default function Home() {
                 const odds = getOdds(market.total_pool, opt.pool)
                 const isWinner = market.result_option_id === opt.id
                 return (
-                  <div key={opt.id} style={styles.barRow as CSSProperties}>
-                    <div style={styles.barLabelArea as CSSProperties}>
+                  <div key={opt.id} style={styles.barRow as any}>
+                    <div style={styles.barLabelArea as any}>
                       <span>{isWinner ? '👑 ' : ''}{opt.name}</span>
                       <span>{odds ? `${odds.toFixed(1)}倍` : '--倍'} ({percent}%)</span>
                     </div>
-                    <div style={styles.barTrack as CSSProperties}>
-                      <div style={styles.barFill(percent, idx) as CSSProperties} />
+                    <div style={styles.barTrack as any}>
+                      <div style={styles.barFill(percent, idx) as any} />
                     </div>
                   </div>
                 )
@@ -182,10 +196,10 @@ export default function Home() {
                   </div>
                 </div>
               ) : (
-                <button onClick={() => { if(!session) return handleLogin(); setSelectedMarketId(market.id) }} style={styles.voteButton as CSSProperties}>⚡️ 投票する</button>
+                <button onClick={() => { if(!session) return handleLogin(); setSelectedMarketId(market.id) }} style={styles.voteButton as any}>⚡️ 投票する</button>
               )
             ) : (
-              <button disabled style={styles.disabledButton as CSSProperties}>🚫 受付終了</button>
+              <button disabled style={styles.disabledButton as any}>🚫 受付終了</button>
             )}
           </div>
         )
@@ -194,7 +208,7 @@ export default function Home() {
   )
 
   const renderRanking = () => (
-    <div style={styles.card as CSSProperties}>
+    <div style={styles.card as any}>
       <h3 style={{textAlign:'center', fontWeight:'900', marginBottom:'20px', fontSize:'18px'}}>🏆 投資家ランキング</h3>
       {ranking.map((user, idx) => (
         <div key={user.id} style={{ display: 'flex', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #f3f4f6' }}>
@@ -210,14 +224,14 @@ export default function Home() {
 
   const renderMyPage = () => (
     <div>
-      <div style={{...(styles.card as CSSProperties), background:'linear-gradient(135deg, #2563eb, #1e40af)', color:'white', textAlign:'center'}}>
+      <div style={{...(styles.card as any), background:'linear-gradient(135deg, #2563eb, #1e40af)', color:'white', textAlign:'center'}}>
         <div style={{fontSize:'14px', opacity:0.8}}>総資産ポイント</div>
         <div style={{fontSize:'32px', fontWeight:'900'}}>{profile?.point_balance.toLocaleString()} pt</div>
       </div>
       <h3 style={{fontWeight:'bold', marginLeft:'5px', marginBottom:'10px'}}>📜 投票履歴</h3>
       {myBets.length === 0 && <div style={{textAlign:'center', color:'#9ca3af', marginTop:'20px'}}>まだ投票履歴がありません</div>}
       {myBets.map((bet) => (
-        <div key={bet.id} style={{...(styles.card as CSSProperties), padding:'15px', marginBottom:'10px'}}>
+        <div key={bet.id} style={{...(styles.card as any), padding:'15px', marginBottom:'10px'}}>
           <div style={{fontSize:'12px', color:'#6b7280', marginBottom:'5px'}}>{bet.markets?.title}</div>
           <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
             <div style={{fontWeight:'bold', fontSize:'15px'}}>
@@ -235,9 +249,9 @@ export default function Home() {
   if (isLoading) return <div style={{display:'flex', justifyContent:'center', paddingTop:'50px'}}>読み込み中...</div>
 
   return (
-    <div style={styles.container as CSSProperties}>
-      <header style={styles.header as CSSProperties}>
-        <div style={styles.logo as CSSProperties}>🇯🇵 Polymarket JP</div>
+    <div style={styles.container as any}>
+      <header style={styles.header as any}>
+        <div style={styles.logo as any}>🇯🇵 Polymarket JP</div>
         {profile ? <div style={{fontWeight:'bold', fontSize:'14px'}}>💎 {profile.point_balance.toLocaleString()}</div> : <button onClick={handleLogin}>ログイン</button>}
       </header>
 
@@ -245,10 +259,10 @@ export default function Home() {
       {activeTab === 'ranking' && renderRanking()}
       {activeTab === 'mypage' && renderMyPage()}
 
-      <nav style={styles.navBar as CSSProperties}>
-        <button onClick={() => setActiveTab('home')} style={(styles.navBtn as any)(activeTab === 'home')}><span style={{fontSize:'20px'}}>🏠</span>ホーム</button>
-        <button onClick={() => setActiveTab('ranking')} style={(styles.navBtn as any)(activeTab === 'ranking')}><span style={{fontSize:'20px'}}>👑</span>ランキング</button>
-        <button onClick={() => { if(!session) handleLogin(); setActiveTab('mypage') }} style={(styles.navBtn as any)(activeTab === 'mypage')}><span style={{fontSize:'20px'}}>👤</span>マイページ</button>
+      <nav style={styles.navBar as any}>
+        <button onClick={() => setActiveTab('home')} style={styles.navBtn(activeTab === 'home') as any}><span style={{fontSize:'20px'}}>🏠</span>ホーム</button>
+        <button onClick={() => setActiveTab('ranking')} style={styles.navBtn(activeTab === 'ranking') as any}><span style={{fontSize:'20px'}}>👑</span>ランキング</button>
+        <button onClick={() => { if(!session) handleLogin(); setActiveTab('mypage') }} style={styles.navBtn(activeTab === 'mypage') as any}><span style={{fontSize:'20px'}}>👤</span>マイページ</button>
       </nav>
     </div>
   )
