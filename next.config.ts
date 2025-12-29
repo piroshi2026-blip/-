@@ -1,8 +1,8 @@
 import type { NextConfig } from "next";
-import { env } from "process";
 
 const nextConfig: NextConfig = {
-  allowedDevOrigins: [env.REPLIT_DOMAINS.split(",")[0]],
+  reactStrictMode: true,
+  /* Vercelでエラーになる設定を削除しました */
 };
 
-module.exports = nextConfig;
+export default nextConfig;
