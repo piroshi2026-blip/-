@@ -1,14 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, CSSProperties } from 'react'
 import { createClient } from '@supabase/supabase-js'
 
-// --- Supabase設定 ---
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 )
 
 export default function Home() {
-  // --- 状態管理 ---
   const [session, setSession] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const [markets, setMarkets] = useState<any[]>([])
@@ -16,13 +14,11 @@ export default function Home() {
   const [myBets, setMyBets] = useState<any[]>([])
   const [activeTab, setActiveTab] = useState<'home' | 'ranking' | 'mypage'>('home')
 
-  // 投票UI用
   const [voteAmount, setVoteAmount] = useState(100)
   const [selectedMarketId, setSelectedMarketId] = useState<number | null>(null)
   const [selectedOptionId, setSelectedOptionId] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  // --- 初期化 ---
   useEffect(() => {
     const init = async () => {
       const { data: { session } } = await supabase.auth.getSession()
@@ -35,12 +31,10 @@ export default function Home() {
     init()
   }, [])
 
-  // ユーザー情報＆履歴取得
   async function initUserData(userId: string) {
     const { data: profileData } = await supabase.from('profiles').select('*').eq('id', userId).single()
     if (profileData) setProfile(profileData)
 
-    // 履歴取得（どのマーケットの、どの選択肢に賭けたか）
     const { data: betsData } = await supabase
       .from('bets')
       .select('*, markets(title), market_options(name)')
@@ -49,7 +43,6 @@ export default function Home() {
     if (betsData) setMyBets(betsData)
   }
 
-  // マーケット一覧取得
   async function fetchMarkets() {
     const { data } = await supabase
       .from('markets')
@@ -57,7 +50,6 @@ export default function Home() {
       .order('created_at', { ascending: false })
 
     if (data) {
-      // 選択肢をID順にソート
       const sorted = data.map((m: any) => ({
         ...m,
         market_options: m.market_options.sort((a: any, b: any) => a.id - b.id)
@@ -66,13 +58,10 @@ export default function Home() {
     }
   }
 
-  // ランキング取得
   async function fetchRanking() {
     const { data } = await supabase.from('profiles').select('*').order('point_balance', { ascending: false }).limit(20)
     if (data) setRanking(data)
   }
-
-  // --- 機能ロジック ---
 
   const handleLogin = async () => {
     await supabase.auth.signInAnonymously()
@@ -100,27 +89,24 @@ export default function Home() {
     }
   }
 
-  // オッズ計算
   const getOdds = (marketTotal: number, optionPool: number) => {
     if (optionPool === 0) return 0
     return (marketTotal / optionPool)
   }
 
-  // 割合計算（グラフ用）
   const getPercent = (marketTotal: number, optionPool: number) => {
     if (marketTotal === 0) return 0
     return Math.round((optionPool / marketTotal) * 100)
   }
 
-  // 締切判定
   const isMarketActive = (market: any) => {
-    if (market.is_resolved) return false // 既に結果が出ている
-    if (new Date(market.end_date) < new Date()) return false // 日付を過ぎている
+    if (market.is_resolved) return false
+    if (new Date(market.end_date) < new Date()) return false
     return true
   }
 
-  // --- スタイル設定 ---
-  const styles = {
+  // --- スタイル設定 (Type Error修正版) ---
+  const styles: { [key: string]: CSSProperties | ((...args: any[]) => CSSProperties) } = {
     container: { maxWidth: '600px', margin: '0 auto', padding: '20px 15px 100px', minHeight: '100vh', fontFamily: 'sans-serif', color: '#1f2937' },
     header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', padding: '10px 0' },
     logo: { fontSize: '20px', fontWeight: '900', background: 'linear-gradient(to right, #2563eb, #9333ea)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' },
@@ -132,18 +118,25 @@ export default function Home() {
     voteButton: { width: '100%', padding: '12px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', marginTop: '15px' },
     disabledButton: { width: '100%', padding: '12px', background: '#e5e7eb', color: '#9ca3af', border: 'none', borderRadius: '10px', fontWeight: 'bold', marginTop: '15px' },
     navBar: { position: 'fixed' as const, bottom: 0, left: 0, right: 0, background: 'rgba(255,255,255,0.95)', borderTop: '1px solid #eee', display: 'flex', justifyContent: 'space-around', padding: '12px', zIndex: 100 },
-    navBtn: (isActive: boolean) => ({ background: 'none', border: 'none', color: isActive ? '#2563eb' : '#9ca3af', fontWeight: isActive ? 'bold' : 'normal', fontSize: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center' }),
+    // ↓ ここでエラーが出ていた箇所を修正しました
+    navBtn: (isActive: boolean) => ({ 
+      background: 'none', 
+      border: 'none', 
+      color: isActive ? '#2563eb' : '#9ca3af', 
+      fontWeight: isActive ? 'bold' : 'normal', 
+      fontSize: '10px', 
+      display: 'flex', 
+      flexDirection: 'column' as const, // 重要: as constを追加
+      alignItems: 'center' 
+    }),
   }
-
-  // --- 画面レンダリング ---
 
   const renderHome = () => (
     <div>
       {markets.map((market) => {
         const isActive = isMarketActive(market)
         return (
-          <div key={market.id} style={styles.card}>
-             {/* ヘッダー情報 */}
+          <div key={market.id} style={styles.card as CSSProperties}>
             {market.image_url && <img src={market.image_url} style={{ width: '100%', height: '140px', objectFit: 'cover', borderRadius: '10px', marginBottom: '12px' }} />}
             <h2 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '8px' }}>{market.title}</h2>
             <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '15px', display:'flex', gap:'10px' }}>
@@ -152,28 +145,24 @@ export default function Home() {
                 {market.is_resolved ? '🏁 結果確定' : (isActive ? `⏰ 締切: ${new Date(market.end_date).toLocaleDateString()}` : '🚫 受付終了')}
               </span>
             </div>
-
-            {/* 📊 グラフとオッズ一覧 */}
             <div>
               {market.market_options.map((opt: any, idx: number) => {
                 const percent = getPercent(market.total_pool, opt.pool)
                 const odds = getOdds(market.total_pool, opt.pool)
                 const isWinner = market.result_option_id === opt.id
                 return (
-                  <div key={opt.id} style={styles.barRow}>
-                    <div style={styles.barLabelArea}>
+                  <div key={opt.id} style={styles.barRow as CSSProperties}>
+                    <div style={styles.barLabelArea as CSSProperties}>
                       <span>{isWinner ? '👑 ' : ''}{opt.name}</span>
                       <span>{odds ? `${odds.toFixed(1)}倍` : '--倍'} ({percent}%)</span>
                     </div>
-                    <div style={styles.barTrack}>
-                      <div style={styles.barFill(percent, idx)} />
+                    <div style={styles.barTrack as CSSProperties}>
+                      <div style={styles.barFill(percent, idx) as CSSProperties} />
                     </div>
                   </div>
                 )
               })}
             </div>
-
-            {/* 投票アクション */}
             {isActive ? (
               selectedMarketId === market.id ? (
                 <div style={{ background: '#f9fafb', padding: '15px', borderRadius: '10px', marginTop: '15px', border:'1px solid #e5e7eb' }}>
@@ -193,10 +182,10 @@ export default function Home() {
                   </div>
                 </div>
               ) : (
-                <button onClick={() => { if(!session) return handleLogin(); setSelectedMarketId(market.id) }} style={styles.voteButton}>⚡️ 投票する</button>
+                <button onClick={() => { if(!session) return handleLogin(); setSelectedMarketId(market.id) }} style={styles.voteButton as CSSProperties}>⚡️ 投票する</button>
               )
             ) : (
-              <button disabled style={styles.disabledButton}>🚫 受付終了</button>
+              <button disabled style={styles.disabledButton as CSSProperties}>🚫 受付終了</button>
             )}
           </div>
         )
@@ -205,7 +194,7 @@ export default function Home() {
   )
 
   const renderRanking = () => (
-    <div style={styles.card}>
+    <div style={styles.card as CSSProperties}>
       <h3 style={{textAlign:'center', fontWeight:'900', marginBottom:'20px', fontSize:'18px'}}>🏆 投資家ランキング</h3>
       {ranking.map((user, idx) => (
         <div key={user.id} style={{ display: 'flex', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #f3f4f6' }}>
@@ -221,20 +210,19 @@ export default function Home() {
 
   const renderMyPage = () => (
     <div>
-      <div style={{...styles.card, background:'linear-gradient(135deg, #2563eb, #1e40af)', color:'white', textAlign:'center'}}>
+      <div style={{...(styles.card as CSSProperties), background:'linear-gradient(135deg, #2563eb, #1e40af)', color:'white', textAlign:'center'}}>
         <div style={{fontSize:'14px', opacity:0.8}}>総資産ポイント</div>
         <div style={{fontSize:'32px', fontWeight:'900'}}>{profile?.point_balance.toLocaleString()} pt</div>
       </div>
       <h3 style={{fontWeight:'bold', marginLeft:'5px', marginBottom:'10px'}}>📜 投票履歴</h3>
       {myBets.length === 0 && <div style={{textAlign:'center', color:'#9ca3af', marginTop:'20px'}}>まだ投票履歴がありません</div>}
       {myBets.map((bet) => (
-        <div key={bet.id} style={{...styles.card, padding:'15px', marginBottom:'10px'}}>
+        <div key={bet.id} style={{...(styles.card as CSSProperties), padding:'15px', marginBottom:'10px'}}>
           <div style={{fontSize:'12px', color:'#6b7280', marginBottom:'5px'}}>{bet.markets?.title}</div>
           <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
             <div style={{fontWeight:'bold', fontSize:'15px'}}>
               「{bet.market_options?.name}」に {bet.amount}pt
             </div>
-            {/* 結果が出ていれば表示、なければ待機中 */}
             <div style={{fontSize:'12px', padding:'2px 8px', borderRadius:'10px', background:'#f3f4f6', color:'#6b7280'}}>
                結果待ち
             </div>
@@ -247,9 +235,9 @@ export default function Home() {
   if (isLoading) return <div style={{display:'flex', justifyContent:'center', paddingTop:'50px'}}>読み込み中...</div>
 
   return (
-    <div style={styles.container}>
-      <header style={styles.header}>
-        <div style={styles.logo}>🇯🇵 Polymarket JP</div>
+    <div style={styles.container as CSSProperties}>
+      <header style={styles.header as CSSProperties}>
+        <div style={styles.logo as CSSProperties}>🇯🇵 Polymarket JP</div>
         {profile ? <div style={{fontWeight:'bold', fontSize:'14px'}}>💎 {profile.point_balance.toLocaleString()}</div> : <button onClick={handleLogin}>ログイン</button>}
       </header>
 
@@ -257,10 +245,10 @@ export default function Home() {
       {activeTab === 'ranking' && renderRanking()}
       {activeTab === 'mypage' && renderMyPage()}
 
-      <nav style={styles.navBar}>
-        <button onClick={() => setActiveTab('home')} style={styles.navBtn(activeTab === 'home')}><span style={{fontSize:'20px'}}>🏠</span>ホーム</button>
-        <button onClick={() => setActiveTab('ranking')} style={styles.navBtn(activeTab === 'ranking')}><span style={{fontSize:'20px'}}>👑</span>ランキング</button>
-        <button onClick={() => { if(!session) handleLogin(); setActiveTab('mypage') }} style={styles.navBtn(activeTab === 'mypage')}><span style={{fontSize:'20px'}}>👤</span>マイページ</button>
+      <nav style={styles.navBar as CSSProperties}>
+        <button onClick={() => setActiveTab('home')} style={(styles.navBtn as any)(activeTab === 'home')}><span style={{fontSize:'20px'}}>🏠</span>ホーム</button>
+        <button onClick={() => setActiveTab('ranking')} style={(styles.navBtn as any)(activeTab === 'ranking')}><span style={{fontSize:'20px'}}>👑</span>ランキング</button>
+        <button onClick={() => { if(!session) handleLogin(); setActiveTab('mypage') }} style={(styles.navBtn as any)(activeTab === 'mypage')}><span style={{fontSize:'20px'}}>👤</span>マイページ</button>
       </nav>
     </div>
   )
