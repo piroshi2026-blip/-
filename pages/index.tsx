@@ -71,7 +71,6 @@ export default function Home() {
         setProfile(profileData)
         setEditName(profileData.username || '名無しさん')
     }
-
     const { data: betsData } = await supabase
       .from('bets')
       .select('*, markets(title), market_options(name)')
@@ -81,7 +80,7 @@ export default function Home() {
   }
 
   async function fetchMarkets() {
-    const { data } = await supabase.from('markets').select('*, market_options(*)').order('end_date', { ascending: true })
+    const { data } = await supabase.from('markets').select('*, market_options(*)').order('created_at', { ascending: false })
     if (data) {
       const sorted = data.map((m: any) => ({
         ...m,
@@ -123,17 +122,11 @@ export default function Home() {
           setIsEditingName(false)
           initUserData(profile.id)
           fetchRanking()
-      } catch (e: any) {
-          alert('エラー: ' + e.message)
-      }
+      } catch (e: any) { alert(e.message) }
   }
 
   const handleGoogleLogin = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: window.location.origin },
-    })
-    if (error) alert(error.message)
+    await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } })
   }
 
   const handleEmailAuth = async () => {
@@ -172,13 +165,11 @@ export default function Home() {
     if (!session) return alert('ログインしてください')
     if (!selectedMarketId || !selectedOptionId) return
     if (voteAmount > (profile?.point_balance || 0)) return alert('ポイント不足です')
-
     const { error } = await supabase.rpc('place_bet', {
       market_id_input: selectedMarketId,
       option_id_input: selectedOptionId,
       amount_input: voteAmount
     })
-
     if (error) alert(error.message)
     else {
       alert('投票しました！')
@@ -207,16 +198,9 @@ export default function Home() {
     return Math.round((optionPool / marketTotal) * 100)
   }
 
-  const isMarketActive = (market: any) => {
-    if (market.is_resolved) return false
-    if (new Date(market.end_date) < new Date()) return false
-    return true
-  }
+  const isMarketActive = (market: any) => !market.is_resolved && new Date(market.end_date) > new Date()
 
-  const filteredMarkets = markets.filter(m => {
-    if (activeCategory === 'すべて') return true
-    return m.category === activeCategory
-  })
+  const filteredMarkets = markets.filter(m => activeCategory === 'すべて' ? true : m.category === activeCategory)
 
   const styles: any = {
     container: { maxWidth: '600px', margin: '0 auto', padding: '20px 15px 100px', minHeight: '100vh', fontFamily: 'sans-serif', color: '#1f2937' },
@@ -226,7 +210,7 @@ export default function Home() {
     pointBadge: { display: 'inline-block', marginTop: '8px', padding: '4px 12px', background: '#eff6ff', color: '#2563eb', borderRadius: '20px', fontSize: '14px', fontWeight: 'bold' },
     googleButton: { marginTop: '10px', padding: '10px 20px', background: 'white', color: '#333', border: '1px solid #ccc', borderRadius: '30px', fontSize: '14px', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer', width: 'fit-content', margin: '10px auto', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' },
     mailButton: { marginTop: '5px', padding: '8px 16px', background: '#f3f4f6', color: '#555', border: 'none', borderRadius: '30px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', width: 'fit-content', margin: '5px auto' },
-    inputField: { padding: '10px', border: '1px solid #ccc', borderRadius: '5px', width: '250px', marginBottom: '10px', fontSize: '14px' },
+    inputField: { padding: '10px', border: '1px solid #ccc', borderRadius: '5px', width: '250px', marginBottom: '10px', fontSize: '14px', color: 'black' },
     categoryScroll: { display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '10px', marginBottom: '20px' },
     categoryBtn: (isActive: boolean) => ({
       padding: '8px 16px', borderRadius: '20px', border: isActive ? 'none' : '1px solid #e5e7eb', background: isActive ? '#1f2937' : 'white', color: isActive ? 'white' : '#4b5563', fontSize: '13px', fontWeight: 'bold', whiteSpace: 'nowrap', cursor: 'pointer'
@@ -261,12 +245,9 @@ export default function Home() {
 
       {filteredMarkets.length === 0 && <div style={{textAlign:'center', padding:'40px', color:'#9ca3af', fontSize:'14px'}}>まだこのジャンルの質問はありません</div>}
 
-      // renderHome 関数内の market.map 部分を以下に差し替えてください
       {filteredMarkets.map((market) => {
         const isActive = isMarketActive(market)
-        const catInfo = (market.category && categoryMeta[market.category]) 
-          ? categoryMeta[market.category] 
-          : { icon: '🎲', color: '#6b7280' }
+        const catInfo = (market.category && categoryMeta[market.category]) ? categoryMeta[market.category] : { icon: '🎲', color: '#6b7280' }
 
         return (
           <div key={market.id} style={styles.card}>
@@ -287,20 +268,8 @@ export default function Home() {
                 </div>
             </div>
             <div style={styles.contentArea}>
-                {/* ★ 判断基準の表示エリアを確実に挿入 */}
                 {market.description && (
-                  <div style={{
-                      fontSize: '11px', 
-                      color: '#4b5563', 
-                      background: '#f9fafb', 
-                      padding: '12px', 
-                      borderRadius: '8px', 
-                      marginTop: '5px', 
-                      marginBottom: '15px', 
-                      lineHeight: '1.6', 
-                      border: '1px solid #f3f4f6', 
-                      whiteSpace: 'pre-wrap'
-                  }}>
+                  <div style={styles.descBox}>
                     <div style={{fontWeight:'bold', fontSize:'10px', marginBottom:'4px', color:'#2563eb'}}>【判定基準】</div>
                     <div dangerouslySetInnerHTML={{ __html: market.description.replace(/\n/g, '<br />') }} />
                   </div>
@@ -310,7 +279,6 @@ export default function Home() {
                   💰 投票総額: <span style={{fontSize:'14px', color:'#1f2937'}}>{market.total_pool.toLocaleString()} pt</span>
                 </div>
 
-                {/* 選択肢とグラフ */}
                 <div>
                   {market.market_options.map((opt: any, idx: number) => {
                     const percent = getPercent(market.total_pool, opt.pool)
@@ -320,7 +288,7 @@ export default function Home() {
                       <div key={opt.id} style={styles.barRow}>
                         <div style={styles.barLabelArea}>
                           <span>{isWinner ? '👑 ' : ''}{opt.name}</span>
-                          <span>{odds ? `${odds.toFixed(1)}倍` : '--倍'} ({percent}%)</span>
+                          <span>{odds ? `${Number(odds).toFixed(1)}倍` : '--倍'} ({percent}%)</span>
                         </div>
                         <div style={styles.barTrack}>
                           <div style={styles.barFill(percent, idx) as any} />
@@ -329,15 +297,13 @@ export default function Home() {
                     )
                   })}
                 </div>
-
-                {/* 投票ボタン等のロジックは維持 */}
                 {isActive ? (
                   selectedMarketId === market.id ? (
                     <div style={{ background: '#f9fafb', padding: '15px', borderRadius: '10px', marginTop: '15px', border:'1px solid #e5e7eb' }}>
                       <div style={{fontWeight:'bold', marginBottom:'10px', fontSize:'14px'}}>選択肢を選ぶ:</div>
                       <div style={{display:'flex', flexWrap:'wrap', gap:'8px', marginBottom:'15px'}}>
                         {market.market_options.map((opt: any) => (
-                          <button key={opt.id} onClick={() => setSelectedOptionId(opt.id)} style={{ padding: '8px 12px', borderRadius: '20px', border: selectedOptionId === opt.id ? '2px solid #2563eb' : '1px solid #d1d5db', background: selectedOptionId === opt.id ? '#eff6ff' : 'white', fontSize:'13px', fontWeight:'bold' }}>{opt.name}</button>
+                          <button key={opt.id} onClick={() => setSelectedOptionId(opt.id)} style={{ padding: '8px 12px', borderRadius: '20px', border: selectedOptionId === opt.id ? '2px solid #2563eb' : '1px solid #d1d5db', background: selectedOptionId === opt.id ? '#eff6ff' : 'white', fontSize:'13px', fontWeight:'bold', color: 'black' }}>{opt.name}</button>
                         ))}
                       </div>
                       <div style={{fontSize:'13px', marginBottom:'5px'}}>投票額: <strong>{voteAmount} pt</strong></div>
@@ -358,7 +324,6 @@ export default function Home() {
           </div>
         )
       })}
-
     </div>
   )
 
@@ -420,7 +385,7 @@ export default function Home() {
     <div style={styles.container}>
       <div style={styles.headerContainer}>
         <h1 style={styles.appTitle}>YOSOL</h1>
-        <p style={styles.appDesc}>未来を予想(よそ)る、ポイントで遊ぶ予測市場</p>
+        <p style={styles.appDesc}>未来をヨソル、ポイントで遊ぶ予測市場</p>
         <div>
            {profile ? (
              <span style={styles.pointBadge}>💎 {profile.point_balance.toLocaleString()} pt</span> 
@@ -434,13 +399,13 @@ export default function Home() {
                    </>
                ) : (
                    <div style={{marginTop:'10px', padding:'15px', background:'white', borderRadius:'10px', boxShadow:'0 2px 5px rgba(0,0,0,0.1)'}}>
-                       <div style={{fontSize:'12px', marginBottom:'5px'}}>メールアドレス</div>
+                       <div style={{fontSize:'12px', marginBottom:'5px', color:'black'}}>メールアドレス</div>
                        <input type="email" value={email} onChange={e=>setEmail(e.target.value)} style={styles.inputField} />
-                       <div style={{fontSize:'12px', marginBottom:'5px'}}>パスワード</div>
+                       <div style={{fontSize:'12px', marginBottom:'5px', color:'black'}}>パスワード</div>
                        <input type="password" value={password} onChange={e=>setPassword(e.target.value)} style={styles.inputField} />
                        <button onClick={handleEmailAuth} style={{...styles.voteButton, width:'100%', marginTop:'5px'}}>{isSignUp ? '登録してログイン' : 'ログイン'}</button>
                        <div style={{fontSize:'11px', marginTop:'10px', color:'#666'}}>{isSignUp ? 'すでにアカウントをお持ちですか？' : 'アカウントをお持ちでないですか？'} <span onClick={()=>setIsSignUp(!isSignUp)} style={{color:'blue', cursor:'pointer', marginLeft:'5px'}}>{isSignUp ? 'ログインへ' : '新規登録へ'}</span></div>
-                       <button onClick={()=>setShowEmailForm(false)} style={{marginTop:'10px', background:'none', border:'none', す</button>
+                       <button onClick={()=>setShowEmailForm(false)} style={{marginTop:'10px', background:'none', border:'none', fontSize:'11px', color:'#999'}}>キャンセル</button>
                    </div>
                )}
              </div>
@@ -459,7 +424,7 @@ export default function Home() {
       <nav style={styles.navBar}>
         <button onClick={() => setActiveTab('home')} style={styles.navBtn(activeTab === 'home')}><span style={{fontSize:'20px'}}>🏠</span>ホーム</button>
         <button onClick={() => setActiveTab('ranking')} style={styles.navBtn(activeTab === 'ranking')}><span style={{fontSize:'20px'}}>👑</span>ランキング</button>
-        <button onClick={() => { if(!session) handleGoogleLogin(); setActiveTab('mypage') }} style={styles.navBtn(activeTab === 'mypage')}><span style={{fontSize:'20px'}}>👤</span>マイページ</button>
+        <button onClick={() => { if(!session) handleGoogleLogin(); else setActiveTab('mypage') }} style={styles.navBtn(activeTab === 'mypage')}><span style={{fontSize:'20px'}}>👤</span>マイページ</button>
       </nav>
     </div>
   )
