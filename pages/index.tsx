@@ -290,13 +290,28 @@ export default function Home() {
             </div>
             <div style={styles.contentArea}>
                 {/* ★ 判断基準（説明文）の復活：確実に表示されるように位置を調整 */}
-                {market.description && (
-                  <div style={styles.descBox}>
-                    <div style={{fontWeight:'bold', fontSize:'10px', marginBottom:'4px', color:'#2563eb'}}>【判定基準】</div>
-                    <div dangerouslySetInnerHTML={{ __html: market.description.replace(/\n/g, '<br />') }} />
-                  </div>
-                )}
-
+              // 275行目付近の contentArea 内
+              <div style={styles.contentArea}>
+                  {/* ★判断基準（説明文）の表示エリア */}
+                  {market.description && (
+                    <div style={{
+                        fontSize: '11px', 
+                        color: '#4b5563', 
+                        background: '#f9fafb', 
+                        padding: '12px', 
+                        borderRadius: '8px', 
+                        marginTop: '5px', 
+                        marginBottom: '15px', 
+                        lineHeight: '1.6', 
+                        border: '1px solid #f3f4f6', 
+                        whiteSpace: 'pre-wrap'
+                    }}>
+                      <div style={{fontWeight:'bold', fontSize:'10px', marginBottom:'4px', color:'#2563eb'}}>【判定基準】</div>
+                      {/* 改行を反映して表示 */}
+                      <div dangerouslySetInnerHTML={{ __html: market.description.replace(/\n/g, '<br />') }} />
+                    </div>
+                  )}
+                  {/* 以下、投票総額やグラフが続きます */}
                 <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '15px', fontWeight:'bold' }}>
                   💰 投票総額: <span style={{fontSize:'14px', color:'#1f2937'}}>{market.total_pool.toLocaleString()} pt</span>
                 </div>
