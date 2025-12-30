@@ -117,6 +117,8 @@ export default function Home() {
     container: { maxWidth: '600px', margin: '0 auto', padding: '20px 15px 120px', fontFamily: 'sans-serif', color: '#1f2937' },
     header: { textAlign: 'center', marginBottom: '20px' },
     appTitle: { fontSize: '32px', fontWeight: '900', background: 'linear-gradient(to right, #2563eb, #9333ea)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0 },
+    appDesc: { fontSize: '12px', color: '#6b7280', marginTop: '5px', fontWeight: 'bold' },
+    pointBadge: { display: 'inline-block', marginTop: '8px', padding: '4px 12px', background: '#eff6ff', color: '#2563eb', borderRadius: '20px', fontSize: '14px', fontWeight: 'bold' },
     sortBar: { display: 'flex', justifyContent: 'center', gap: '15px', marginBottom: '20px' },
     sortBtn: (active: boolean) => ({ fontSize: '12px', padding: '6px 12px', borderRadius: '20px', border: 'none', background: active ? '#2563eb' : '#f3f4f6', color: active ? 'white' : '#9ca3af', fontWeight: 'bold', cursor: 'pointer' }),
     card: { background: 'white', borderRadius: '16px', marginBottom: '25px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', overflow: 'hidden', position: 'relative', border: '1px solid #f3f4f6' },
@@ -132,6 +134,9 @@ export default function Home() {
     <div style={styles.container}>
       <header style={styles.header}>
         <h1 style={styles.appTitle}>YOSOL</h1>
+        {/* ★タイトル下の説明文を復活 */}
+        <p style={styles.appDesc}>未来をヨソル、ポイントで遊ぶ予測市場</p>
+
         {profile && <div style={{marginTop:'5px', fontWeight:'bold', color:'#2563eb'}}>💎 {profile.point_balance.toLocaleString()} pt</div>}
         {!session && (
           <div style={{marginTop:'10px'}}>
@@ -183,7 +188,7 @@ export default function Home() {
                 </div>
 
                 <div style={{padding:'15px', position:'relative', zIndex:1}}>
-                  {/* ★ 復活：判断基準表示エリア */}
+                  {/* ★ 判断基準を表示する箇所を確実に復活 */}
                   {m.description && (
                     <div style={styles.descBox}>
                       <div style={{fontWeight:'bold', fontSize:'10px', color:'#2563eb', marginBottom:'4px'}}>【判定基準】</div>
@@ -234,7 +239,7 @@ export default function Home() {
               </div>
             )
           })}
-          {/* ★ 復活：画面下部の Admin Login リンク */}
+
           <div style={styles.adminLink}>
             <Link href="/admin" style={{color:'inherit', textDecoration:'none'}}>Admin Login</Link>
           </div>
