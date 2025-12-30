@@ -34,15 +34,6 @@ export default function Home() {
   const [password, setPassword] = useState('')
   const [isSignUp, setIsSignUp] = useState(false)
 
-  const categoryMeta: any = {
-    'こども': { icon: '🎒', color: '#f43f5e' },
-    '経済・政治': { icon: '🏛️', color: '#3b82f6' },
-    'エンタメ': { icon: '🎤', color: '#a855f7' },
-    'スポーツ': { icon: '⚽️', color: '#22c55e' },
-    'ライフ': { icon: '🌅', color: '#f59e0b' },
-    'その他': { icon: '🎲', color: '#6b7280' },
-  }
-
   useEffect(() => {
     const init = async () => {
       const { data: { session } } = await supabase.auth.getSession()
