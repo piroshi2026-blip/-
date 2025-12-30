@@ -267,17 +267,20 @@ export default function Home() {
 
       {filteredMarkets.length === 0 && <div style={{textAlign:'center', padding:'40px', color:'#9ca3af', fontSize:'14px'}}>まだこのジャンルの質問はありません</div>}
 
+   
+      // ... (中略) ...
       {filteredMarkets.map((market) => {
         const isActive = isMarketActive(market)
-        // ★ 修正：categoryMeta[market.category] が存在しない場合に備えてサイコロをデフォルトにする
-        const catInfo = (market.category && categoryMeta[market.category]) ? categoryMeta[market.category] : { icon: '🎲', color: '#6b7280' }
+        const catInfo = (market.category && categoryMeta[market.category]) 
+          ? categoryMeta[market.category] 
+          : { icon: '🎲', color: '#6b7280' }
 
         return (
           <div key={market.id} style={styles.card}>
             <div style={styles.watermark}>{catInfo.icon}</div>
             <div style={styles.imageArea}>
                 {market.image_url ? 
-                  <img src={market.image_url} style={styles.cardImage} /> : 
+                  <img src={market.image_url} style={styles.cardImage} alt="" /> : 
                   <div style={{width:'100%', height:'100%', background:'#eee', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'40px'}}>{catInfo.icon}</div>
                 }
                 <div style={styles.imageOverlay}>
@@ -291,10 +294,18 @@ export default function Home() {
                 </div>
             </div>
             <div style={styles.contentArea}>
-                {market.description && <div style={styles.descBox} dangerouslySetInnerHTML={{ __html: market.description.replace(/\\n/g, '<br />') }} />}
+                {/* ★ 判断基準（説明文）の復活箇所 */}
+                {market.description && (
+                  <div style={styles.descBox}>
+                    <div style={{fontWeight:'bold', fontSize:'10px', marginBottom:'4px', color:'#2563eb'}}>【判定基準】</div>
+                    <div dangerouslySetInnerHTML={{ __html: market.description.replace(/\n/g, '<br />') }} />
+                  </div>
+                )}
+
                 <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '15px', fontWeight:'bold' }}>
                   💰 投票総額: <span style={{fontSize:'14px', color:'#1f2937'}}>{market.total_pool.toLocaleString()} pt</span>
                 </div>
+                {/* ... (以下、投票ボタンなどは以前の「リッチ版」を維持) ... */}
                 <div>
                   {market.market_options.map((opt: any, idx: number) => {
                     const percent = getPercent(market.total_pool, opt.pool)
