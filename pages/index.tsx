@@ -24,17 +24,14 @@ export default function Home() {
   const [selectedOptionId, setSelectedOptionId] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  // 名前変更用のステート
   const [editName, setEditName] = useState('')
   const [isEditingName, setIsEditingName] = useState(false)
 
-  // メールログイン用のステート
   const [showEmailForm, setShowEmailForm] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isSignUp, setIsSignUp] = useState(false)
 
-  // カテゴリ管理用のステート
   const [categories, setCategories] = useState<string[]>(['すべて'])
   const [categoryMeta, setCategoryMeta] = useState<any>({})
 
@@ -43,7 +40,6 @@ export default function Home() {
       const { data: { session: currentSession } } = await supabase.auth.getSession()
       setSession(currentSession)
 
-      // 並列でデータを取得
       await Promise.all([
         fetchCategories(),
         fetchMarkets(),
@@ -106,7 +102,8 @@ export default function Home() {
   }
 
   async function fetchCategories() {
-    const { data } = await supabase.from('categories').select('*').order('id', { ascending: true })
+    // ★ 修正：display_order 順に取得するように変更
+    const { data } = await supabase.from('categories').select('*').order('display_order', { ascending: true })
     if (data) {
       const list = ['すべて', ...data.map((c: any) => c.name)]
       setCategories(list)
@@ -195,10 +192,8 @@ export default function Home() {
 
   const shareOnX = (market: any) => {
     const url = `${window.location.origin}/?id=${market.id}`
-    // 管理画面で保存したテンプレートを読み込む
     const template = localStorage.getItem('x_template') || '💰予測市場「YOSOL」に参加中！\n\nQ. {title}\n\nあなたも予想しよう！ #YOSOL'
     const text = template.replace('{title}', market.title)
-
     const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`
     window.open(twitterUrl, '_blank')
   }
@@ -267,7 +262,7 @@ export default function Home() {
 
       {filteredMarkets.length === 0 && <div style={{textAlign:'center', padding:'40px', color:'#9ca3af', fontSize:'14px'}}>まだこのジャンルの質問はありません</div>}
 
-  
+
       {filteredMarkets.map((market) => {
         const isActive = isMarketActive(market)
         const catInfo = (market.category && categoryMeta[market.category]) 
@@ -276,6 +271,7 @@ export default function Home() {
 
         return (
           <div key={market.id} style={styles.card}>
+            {/* ★ 修正：catInfo.icon を安全に参照 */}
             <div style={styles.watermark}>{catInfo.icon}</div>
             <div style={styles.imageArea}>
                 {market.image_url ? 
@@ -293,20 +289,9 @@ export default function Home() {
                 </div>
             </div>
             <div style={styles.contentArea}>
-                {/* ★ 判断基準（説明文）の復活箇所 */}
+                {/* ★ 判断基準（説明文）の復活：確実に表示されるように位置を調整 */}
                 {market.description && (
-                  <div style={{
-                      fontSize: '11px', 
-                      color: '#4b5563', 
-                      background: '#f9fafb', 
-                      padding: '12px', 
-                      borderRadius: '8px', 
-                      marginTop: '5px', 
-                      marginBottom: '15px', 
-                      lineHeight: '1.6', 
-                      border: '1px solid #f3f4f6', 
-                      whiteSpace: 'pre-wrap'
-                  }}>
+                  <div style={styles.descBox}>
                     <div style={{fontWeight:'bold', fontSize:'10px', marginBottom:'4px', color:'#2563eb'}}>【判定基準】</div>
                     <div dangerouslySetInnerHTML={{ __html: market.description.replace(/\n/g, '<br />') }} />
                   </div>
@@ -315,7 +300,7 @@ export default function Home() {
                 <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '15px', fontWeight:'bold' }}>
                   💰 投票総額: <span style={{fontSize:'14px', color:'#1f2937'}}>{market.total_pool.toLocaleString()} pt</span>
                 </div>
-                {/* ... (以下、投票ボタンなどは以前の「リッチ版」を維持) ... */}
+
                 <div>
                   {market.market_options.map((opt: any, idx: number) => {
                     const percent = getPercent(market.total_pool, opt.pool)
