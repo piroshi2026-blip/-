@@ -34,8 +34,6 @@ export default function Home() {
   const [password, setPassword] = useState('')
   const [isSignUp, setIsSignUp] = useState(false)
 
-  const categories = ['すべて', 'こども', '経済・政治', 'エンタメ', 'スポーツ', 'ライフ', 'その他']
-
   const categoryMeta: any = {
     'こども': { icon: '🎒', color: '#f43f5e' },
     '経済・政治': { icon: '🏛️', color: '#3b82f6' },
