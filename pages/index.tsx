@@ -292,7 +292,6 @@ export default function Home() {
                     <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: 'white', margin: 0, lineHeight: '1.3', textShadow:'0 2px 4px rgba(0,0,0,0.5)' }}>{market.title}</h2>
                 </div>
             </div>
-            // pages/index.tsx の renderHome 関数内、contentArea の冒頭に追加・修正
             <div style={styles.contentArea}>
                 {/* ★ 判断基準（説明文）の復活箇所 */}
                 {market.description && (
