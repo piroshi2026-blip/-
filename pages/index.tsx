@@ -178,8 +178,8 @@ export default function Home() {
 
     card: { background: 'white', borderRadius: '16px', padding: '20px', marginBottom: '20px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' },
 
-    // 説明文エリア
-    descBox: { fontSize: '11px', color: '#4b5563', background: '#f9fafb', padding: '12px', borderRadius: '8px', marginTop: '10px', marginBottom: '15px', whiteSpace: 'pre-wrap' as const, lineHeight: '1.6', border: '1px solid #f3f4f6' },
+    // 説明文エリア (文字としての\nを強制的に改行タグに変換して表示する裏技スタイル)
+    descBox: { fontSize: '11px', color: '#4b5563', background: '#f9fafb', padding: '12px', borderRadius: '8px', marginTop: '10px', marginBottom: '15px', lineHeight: '1.6', border: '1px solid #f3f4f6', whiteSpace: 'pre-wrap' as const },
 
     barRow: { marginBottom: '12px' },
     barLabelArea: { display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px', fontWeight: 'bold' },
@@ -222,11 +222,9 @@ export default function Home() {
 
             <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '8px', lineHeight: '1.4' }}>{market.title}</h2>
 
-            {/* 説明文・判定基準の表示 */}
+            {/* 説明文・判定基準の表示 (\nを強制的に<br>に変換) */}
             {market.description && (
-              <div style={styles.descBox}>
-                {market.description}
-              </div>
+              <div style={styles.descBox} dangerouslySetInnerHTML={{ __html: market.description.replace(/\\n/g, '<br />') }} />
             )}
 
             <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '15px', display:'flex', gap:'10px', alignItems:'center' }}>

@@ -12,30 +12,30 @@ export default function Admin() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [isReady, setIsReady] = useState(false)
 
-  // カテゴリの選択肢 (アプリ側のタブと合わせる)
   const categories = ['経済・政治', 'エンタメ', 'スポーツ', 'ライフ', 'こども', 'その他']
+
+  // ソート用のステートを追加
+  const [sortType, setSortType] = useState<'created_at' | 'end_date' | 'category'>('created_at')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc') // desc=降順(新しい順), asc=昇順(古い順)
 
   // 新規作成用
   const [newTitle, setNewTitle] = useState('')
   const [newImage, setNewImage] = useState('')
   const [newOptions, setNewOptions] = useState('') 
   const [newEndDate, setNewEndDate] = useState('')
-  const [newCategory, setNewCategory] = useState('経済・政治') // デフォルト
-  const [newDescription, setNewDescription] = useState('') // 詳細・判定基準
+  const [newCategory, setNewCategory] = useState('経済・政治')
+  const [newDescription, setNewDescription] = useState('')
 
   // 編集用
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editForm, setEditForm] = useState({ title: '', image_url: '', end_date: '', category: '', description: '' })
 
   useEffect(() => {
-    // 1. ログイン状態の復元
     const storedAuth = localStorage.getItem('isAdmin')
     if (storedAuth === 'true') setIsAdmin(true)
 
-    // 2. 日付の初期値 (7日後)
     const d = new Date()
     d.setDate(d.getDate() + 7)
-    // JSTを意識してフォーマット (簡易版)
     const yyyy = d.getFullYear()
     const MM = ('0' + (d.getMonth() + 1)).slice(-2)
     const dd = ('0' + d.getDate()).slice(-2)
@@ -43,15 +43,25 @@ export default function Admin() {
     const mm = ('0' + d.getMinutes()).slice(-2)
     setNewEndDate(`${yyyy}-${MM}-${dd}T${hh}:${mm}`)
 
-    fetchMarkets()
+    // 初回ロード時はステートの初期値で取得
+    fetchMarkets(sortType, sortOrder)
     setIsReady(true)
   }, [])
 
-  async function fetchMarkets() {
+  // ソート条件が変わったら再取得
+  useEffect(() => {
+    if (isAdmin) {
+        fetchMarkets(sortType, sortOrder)
+    }
+  }, [sortType, sortOrder, isAdmin])
+
+
+  // 引数でソート順を受け取るように変更
+  async function fetchMarkets(column: string, order: 'asc' | 'desc') {
     const { data } = await supabase
       .from('markets')
       .select('*, market_options(*)')
-      .order('created_at', { ascending: false })
+      .order(column, { ascending: order === 'asc' })
 
     if (data) {
       const sorted = data.map((m: any) => ({
@@ -62,10 +72,20 @@ export default function Admin() {
     }
   }
 
+  const handleSortChange = (e: any) => {
+      const value = e.target.value;
+      switch(value) {
+          case 'newest': setSortType('created_at'); setSortOrder('desc'); break;
+          case 'closest_deadline': setSortType('end_date'); setSortOrder('asc'); break;
+          case 'category': setSortType('category'); setSortOrder('asc'); break;
+      }
+  }
+
+
   const handleLogin = () => {
     if (password === 'admin1234') {
       setIsAdmin(true)
-      localStorage.setItem('isAdmin', 'true') // 記憶する
+      localStorage.setItem('isAdmin', 'true')
     } else {
       alert('パスワードが違います')
     }
@@ -73,7 +93,7 @@ export default function Admin() {
 
   const handleLogout = () => {
     setIsAdmin(false)
-    localStorage.removeItem('isAdmin') // 記憶を消す
+    localStorage.removeItem('isAdmin')
     window.location.href = '/'
   }
 
@@ -81,7 +101,6 @@ export default function Admin() {
   const createMarket = async () => {
     if (!newTitle || !newOptions || !newEndDate) return alert('必須項目が空です')
     try {
-      // 1. マーケット作成
       const { data: marketData, error: marketError } = await supabase
         .from('markets')
         .insert({ 
@@ -95,7 +114,6 @@ export default function Admin() {
 
       if (marketError) throw marketError
 
-      // 2. 選択肢作成
       const optionsList = newOptions.split(',').map(s => s.trim()).filter(s => s)
       const optionsToInsert = optionsList.map(name => ({
         market_id: marketData.id, name: name, pool: 0
@@ -105,12 +123,8 @@ export default function Admin() {
       if (optionError) throw optionError
 
       alert('作成しました！')
-      // リセット
-      setNewTitle('')
-      setNewImage('')
-      setNewOptions('')
-      setNewDescription('')
-      fetchMarkets()
+      setNewTitle(''); setNewImage(''); setNewOptions(''); setNewDescription('');
+      fetchMarkets(sortType, sortOrder)
 
     } catch (e: any) { alert(e.message) }
   }
@@ -118,7 +132,6 @@ export default function Admin() {
   // --- 編集開始 ---
   const startEdit = (market: any) => {
     setEditingId(market.id)
-    // 日時をinput用に変換
     const localDate = new Date(market.end_date)
     const offset = localDate.getTimezoneOffset()
     const adjusted = new Date(localDate.getTime() - (offset * 60 * 1000))
@@ -145,35 +158,31 @@ export default function Admin() {
       }).eq('id', editingId)
 
       if (error) throw error
-      alert('更新しました！')
-      setEditingId(null)
-      fetchMarkets()
+      alert('更新しました！'); setEditingId(null); 
+      fetchMarkets(sortType, sortOrder)
     } catch (e: any) { alert(e.message) }
   }
 
-  // --- 削除 ---
   const deleteMarket = async (id: number) => {
     if (!confirm('本当に削除しますか？\n投票データなども全て消えます。')) return
     try {
       await supabase.from('bets').delete().eq('market_id', id)
       await supabase.from('market_options').delete().eq('market_id', id)
       await supabase.from('markets').delete().eq('id', id)
-      alert('削除しました🗑️')
-      fetchMarkets()
+      alert('削除しました🗑️'); 
+      fetchMarkets(sortType, sortOrder)
     } catch (e: any) { alert(e.message) }
   }
 
-  // --- 結果判定 ---
   const resolve = async (marketId: number, optionId: number, name: string) => {
     if (!confirm(`「${name}」の勝ちで確定しますか？`)) return
     const { error } = await supabase.rpc('resolve_market_multi', { market_id_input: marketId, winning_option_id_input: optionId })
     if (error) alert(error.message)
-    else { alert('配当を配布しました！'); fetchMarkets() }
+    else { alert('配当を配布しました！'); fetchMarkets(sortType, sortOrder) }
   }
 
-  if (!isReady) return null // 初期化待ち
+  if (!isReady) return null
 
-  // ログイン画面
   if (!isAdmin) {
     return (
       <div style={{ padding: '40px', textAlign: 'center', fontFamily: 'sans-serif' }}>
@@ -196,10 +205,8 @@ export default function Admin() {
       <div style={{ background: '#f0f9ff', padding: '20px', borderRadius: '12px', marginBottom: '30px', border:'1px solid #bae6fd' }}>
         <h3>📝 新規作成</h3>
         <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
-
           <label style={{fontSize:'12px', fontWeight:'bold'}}>タイトル</label>
           <input placeholder="例: M-1グランプリ優勝は？" value={newTitle} onChange={e=>setNewTitle(e.target.value)} style={{padding:'8px', border:'1px solid #ccc', borderRadius:'4px'}} />
-
           <div style={{display:'flex', gap:'10px'}}>
             <div style={{flex:1}}>
               <label style={{fontSize:'12px', fontWeight:'bold'}}>カテゴリ</label>
@@ -212,51 +219,50 @@ export default function Admin() {
               <input type="datetime-local" value={newEndDate} onChange={e=>setNewEndDate(e.target.value)} style={{width:'100%', padding:'8px', border:'1px solid #ccc', borderRadius:'4px'}} />
             </div>
           </div>
-
           <label style={{fontSize:'12px', fontWeight:'bold'}}>詳細・判定基準</label>
+          {/* ↓ここが編集エリアです */}
           <textarea placeholder="例: 公式サイトの発表に基づきます" value={newDescription} onChange={e=>setNewDescription(e.target.value)} style={{padding:'8px', height:'60px', border:'1px solid #ccc', borderRadius:'4px'}} />
-
           <label style={{fontSize:'12px', fontWeight:'bold'}}>画像URL (任意)</label>
           <input placeholder="https://..." value={newImage} onChange={e=>setNewImage(e.target.value)} style={{padding:'8px', border:'1px solid #ccc', borderRadius:'4px'}} />
-
           <label style={{fontSize:'12px', fontWeight:'bold'}}>選択肢 (カンマ区切り)</label>
           <input placeholder="A, B, C" value={newOptions} onChange={e=>setNewOptions(e.target.value)} style={{padding:'8px', border:'1px solid #ccc', borderRadius:'4px'}} />
-
           <button onClick={createMarket} style={{background:'#0284c7', color:'white', padding:'10px', border:'none', borderRadius:'5px', marginTop:'10px', fontWeight:'bold', cursor:'pointer'}}>公開する</button>
         </div>
       </div>
 
-      {/* マーケット一覧 */}
-      <h3>📊 マーケット管理</h3>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+        <h3>📊 マーケット管理</h3>
+        {/* ▼▼▼ ソート機能追加 ▼▼▼ */}
+        <select onChange={handleSortChange} style={{padding:'5px', borderRadius:'5px', border:'1px solid #ccc'}}>
+            <option value="newest">作成順（新着）</option>
+            <option value="closest_deadline">締切が近い順</option>
+            <option value="category">カテゴリ順</option>
+        </select>
+        {/* ▲▲▲▲▲▲ */}
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginTop:'10px' }}>
         {markets.map((m) => (
           <div key={m.id} style={{ border: '1px solid #ddd', padding: '20px', borderRadius: '8px', background: m.is_resolved ? '#f3f4f6' : 'white', position:'relative' }}>
-
-             {/* 削除ボタン */}
              <button onClick={() => deleteMarket(m.id)} style={{ position:'absolute', top:'15px', right:'15px', background:'#fee2e2', color:'#dc2626', border:'none', padding:'5px 10px', borderRadius:'5px', fontWeight:'bold', cursor:'pointer'}}>削除</button>
 
              {editingId === m.id ? (
                // --- 編集モード ---
                <div style={{background:'#fffbeb', padding:'15px', borderRadius:'8px', marginTop:'30px', border:'2px solid #fcd34d'}}>
                  <h4 style={{marginTop:0}}>✏️ 編集中</h4>
-
                  <label style={{fontSize:'12px'}}>タイトル</label>
                  <input value={editForm.title} onChange={e=>setEditForm({...editForm, title: e.target.value})} style={{width:'100%', marginBottom:'5px', padding:'5px'}} />
-
                  <label style={{fontSize:'12px'}}>カテゴリ</label>
                  <select value={editForm.category} onChange={e=>setEditForm({...editForm, category: e.target.value})} style={{width:'100%', marginBottom:'5px', padding:'5px'}}>
                     {categories.map(c => <option key={c} value={c}>{c}</option>)}
                  </select>
-
+                 {/* ↓ここが編集エリアです */}
                  <label style={{fontSize:'12px'}}>詳細・判定基準</label>
                  <textarea value={editForm.description} onChange={e=>setEditForm({...editForm, description: e.target.value})} style={{width:'100%', marginBottom:'5px', padding:'5px', height:'80px'}} />
-
                  <label style={{fontSize:'12px'}}>締切</label>
                  <input type="datetime-local" value={editForm.end_date} onChange={e=>setEditForm({...editForm, end_date: e.target.value})} style={{width:'100%', marginBottom:'5px', padding:'5px'}} />
-
                  <label style={{fontSize:'12px'}}>画像URL</label>
                  <input value={editForm.image_url} onChange={e=>setEditForm({...editForm, image_url: e.target.value})} style={{width:'100%', marginBottom:'10px', padding:'5px'}} />
-
                  <div style={{display:'flex', gap:'10px'}}>
                    <button onClick={saveEdit} style={{background:'#059669', color:'white', border:'none', padding:'8px 16px', borderRadius:'5px', cursor:'pointer', fontWeight:'bold'}}>保存する</button>
                    <button onClick={()=>setEditingId(null)} style={{background:'#9ca3af', color:'white', border:'none', padding:'8px 16px', borderRadius:'5px', cursor:'pointer', fontWeight:'bold'}}>キャンセル</button>
@@ -266,18 +272,14 @@ export default function Admin() {
                // --- 通常表示 ---
                <>
                  <button onClick={() => startEdit(m)} style={{position:'absolute', top:'15px', right:'70px', background:'#e0f2fe', color:'#0284c7', border:'none', padding:'5px 10px', borderRadius:'5px', fontWeight:'bold', cursor:'pointer'}}>編集</button>
-
                  <div style={{marginBottom:'5px'}}>
                    <span style={{background:'#e5e7eb', fontSize:'10px', padding:'2px 6px', borderRadius:'4px', color:'#374151', marginRight:'5px'}}>{m.category || '未設定'}</span>
                    <span style={{fontWeight:'bold', color: m.is_resolved ? 'green' : 'red', fontSize:'12px'}}>
                       {m.is_resolved ? '✅ 終了済み' : '🔥 受付中'}
                    </span>
                  </div>
-
                  <div style={{fontWeight:'bold', fontSize:'18px', paddingRight:'120px'}}>{m.title}</div>
                  <div style={{fontSize:'12px', color:'#666', marginTop:'5px', marginBottom:'10px'}}>締切: {new Date(m.end_date).toLocaleString()}</div>
-
-                 {/* 判定ボタン */}
                  <div style={{display:'flex', gap:'5px', flexWrap:'wrap', alignItems:'center'}}>
                    <span style={{fontSize:'12px', fontWeight:'bold'}}>勝者判定:</span>
                    {m.market_options.map((opt:any) => (
