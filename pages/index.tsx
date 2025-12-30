@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
-import Link from 'next/link' // ← これを追加しました！
+import Link from 'next/link'
+import { useRouter } from 'next/router' // URL操作用
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -8,15 +9,14 @@ const supabase = createClient(
 )
 
 export default function Home() {
+  const router = useRouter() // URL情報を取得
   const [session, setSession] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const [markets, setMarkets] = useState<any[]>([])
   const [ranking, setRanking] = useState<any[]>([])
   const [myBets, setMyBets] = useState<any[]>([])
 
-  // 画面タブ
   const [activeTab, setActiveTab] = useState<'home' | 'ranking' | 'mypage'>('home')
-  // ジャンルタブ
   const [activeCategory, setActiveCategory] = useState('すべて')
 
   const [voteAmount, setVoteAmount] = useState(100)
@@ -24,7 +24,6 @@ export default function Home() {
   const [selectedOptionId, setSelectedOptionId] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  // カテゴリ一覧
   const categories = ['すべて', 'こども', '経済・政治', 'エンタメ', 'スポーツ', 'ライフ', 'その他']
 
   useEffect(() => {
@@ -38,6 +37,21 @@ export default function Home() {
     }
     init()
   }, [])
+
+  // URLに ?id=123 があったら、自動でそのマーケットを開く
+  useEffect(() => {
+    if (!router.isReady || markets.length === 0) return
+    const { id } = router.query
+    if (id) {
+      const marketId = Number(id)
+      const target = markets.find(m => m.id === marketId)
+      if (target) {
+        setSelectedMarketId(marketId)
+        // 必要ならカテゴリも切り替える
+        if (target.category) setActiveCategory(target.category)
+      }
+    }
+  }, [router.isReady, router.query, markets])
 
   async function initUserData(userId: string) {
     const { data: profileData } = await supabase.from('profiles').select('*').eq('id', userId).single()
@@ -55,7 +69,8 @@ export default function Home() {
     const { data } = await supabase
       .from('markets')
       .select('*, market_options(*)')
-      .order('created_at', { ascending: false })
+      // ★ここを変更: 締切が近い順 (昇順) に並べる
+      .order('end_date', { ascending: true })
 
     if (data) {
       const sorted = data.map((m: any) => ({
@@ -76,6 +91,21 @@ export default function Home() {
     window.location.reload()
   }
 
+  // マーケットを選択した時、URLも書き換える（シェア用）
+  const openMarket = (marketId: number) => {
+    if (!session) return handleLogin()
+    setSelectedMarketId(marketId)
+    // URLを書き換え (履歴に残さない shallow routing)
+    router.push(`/?id=${marketId}`, undefined, { shallow: true })
+  }
+
+  // 閉じる時、URLを元に戻す
+  const closeMarket = () => {
+    setSelectedMarketId(null)
+    setSelectedOptionId(null)
+    router.push('/', undefined, { shallow: true })
+  }
+
   const handleVote = async () => {
     if (!session) return alert('ログインしてください')
     if (!selectedMarketId || !selectedOptionId) return
@@ -90,11 +120,20 @@ export default function Home() {
     if (error) alert(error.message)
     else {
       alert('投票しました！')
-      setSelectedMarketId(null)
+      // 投票後は閉じずに、シェアを促すUIにするのもアリだが一旦閉じて更新
+      closeMarket()
       fetchMarkets()
       initUserData(session.user.id)
       fetchRanking()
     }
+  }
+
+  // Xでシェアする機能
+  const shareOnX = (market: any) => {
+    const url = `${window.location.origin}/?id=${market.id}`
+    const text = `💰予測市場「Polymarket JP」に参加中！\n\nQ. ${market.title}\n\nあなたも予想しよう！ #PolymarketJP`
+    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`
+    window.open(twitterUrl, '_blank')
   }
 
   const getOdds = (marketTotal: number, optionPool: number) => {
@@ -145,6 +184,7 @@ export default function Home() {
     barTrack: { height: '12px', background: '#f3f4f6', borderRadius: '6px', overflow: 'hidden' },
     barFill: (percent: number, idx: number) => ({ height: '100%', width: `${percent}%`, background: ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6'][idx % 5], transition: 'width 0.5s' }),
     voteButton: { width: '100%', padding: '12px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', marginTop: '15px' },
+    shareButton: { width: '100%', padding: '10px', background: 'black', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', marginTop: '10px', fontSize: '13px' },
     disabledButton: { width: '100%', padding: '12px', background: '#e5e7eb', color: '#9ca3af', border: 'none', borderRadius: '10px', fontWeight: 'bold', marginTop: '15px' },
     navBar: { position: 'fixed' as const, bottom: 0, left: 0, right: 0, background: 'rgba(255,255,255,0.95)', borderTop: '1px solid #eee', display: 'flex', justifyContent: 'space-around', padding: '12px', zIndex: 100 },
     navBtn: (isActive: boolean) => ({ background: 'none', border: 'none', color: isActive ? '#2563eb' : '#9ca3af', fontWeight: isActive ? 'bold' : 'normal', fontSize: '10px', display: 'flex', flexDirection: 'column' as const, alignItems: 'center' }),
@@ -154,7 +194,7 @@ export default function Home() {
     <div>
       <div style={styles.categoryScroll}>
         {categories.map(cat => (
-          <button key={cat} onClick={() => setActiveCategory(cat)} style={styles.categoryBtn(activeCategory === cat)}>
+          <button key={cat} onClick={() => { setActiveCategory(cat); router.push('/', undefined, { shallow: true }) }} style={styles.categoryBtn(activeCategory === cat)}>
             {cat}
           </button>
         ))}
@@ -201,6 +241,8 @@ export default function Home() {
                 )
               })}
             </div>
+
+            {/* 投票エリア */}
             {isActive ? (
               selectedMarketId === market.id ? (
                 <div style={{ background: '#f9fafb', padding: '15px', borderRadius: '10px', marginTop: '15px', border:'1px solid #e5e7eb' }}>
@@ -216,11 +258,14 @@ export default function Home() {
                   <input type="range" min="10" max={profile?.point_balance} step="10" value={voteAmount} onChange={e=>setVoteAmount(Number(e.target.value))} style={{width:'100%', marginBottom:'15px'}} />
                   <div style={{display:'flex', gap:'10px'}}>
                     <button onClick={handleVote} style={{flex:1, padding:'10px', background:'#2563eb', color:'white', border:'none', borderRadius:'8px', fontWeight:'bold'}}>投票する</button>
-                    <button onClick={()=>{setSelectedMarketId(null); setSelectedOptionId(null)}} style={{flex:1, padding:'10px', background:'#e5e7eb', color:'#374151', border:'none', borderRadius:'8px'}}>やめる</button>
+                    <button onClick={closeMarket} style={{flex:1, padding:'10px', background:'#e5e7eb', color:'#374151', border:'none', borderRadius:'8px'}}>やめる</button>
                   </div>
                 </div>
               ) : (
-                <button onClick={() => { if(!session) return handleLogin(); setSelectedMarketId(market.id) }} style={styles.voteButton}>⚡️ 投票する</button>
+                <div style={{display:'flex', gap:'10px'}}>
+                  <button onClick={() => openMarket(market.id)} style={{...styles.voteButton, marginTop:'15px', flex:2}}>⚡️ 投票する</button>
+                  <button onClick={() => shareOnX(market)} style={{...styles.shareButton, marginTop:'15px', background:'black', flex:1}}>𝕏 シェア</button>
+                </div>
               )
             ) : (
               <button disabled style={styles.disabledButton}>🚫 受付終了</button>
@@ -283,7 +328,6 @@ export default function Home() {
       {activeTab === 'ranking' && renderRanking()}
       {activeTab === 'mypage' && renderMyPage()}
 
-      {/* ↓ ここを修正しました（Linkタグを使用） */}
       <div style={{ textAlign: 'center', paddingBottom: '80px', fontSize: '12px', color: '#ccc' }}>
         <Link href="/admin" style={{ textDecoration: 'none', color: '#e5e7eb' }}>Admin Login</Link>
       </div>
