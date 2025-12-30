@@ -117,13 +117,15 @@ export default function Home() {
     container: { maxWidth: '600px', margin: '0 auto', padding: '20px 15px 120px', fontFamily: 'sans-serif', color: '#1f2937' },
     header: { textAlign: 'center', marginBottom: '20px' },
     appTitle: { fontSize: '32px', fontWeight: '900', background: 'linear-gradient(to right, #2563eb, #9333ea)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0 },
-    appDesc: { fontSize: '12px', color: '#6b7280', marginTop: '5px', fontWeight: 'bold' },
-    pointBadge: { display: 'inline-block', marginTop: '8px', padding: '4px 12px', background: '#eff6ff', color: '#2563eb', borderRadius: '20px', fontSize: '14px', fontWeight: 'bold' },
+    appDesc: { fontSize: '13px', color: '#6b7280', marginTop: '8px', fontWeight: 'bold', lineHeight: '1.4' },
+    pointBadge: { display: 'inline-block', marginTop: '10px', padding: '6px 14px', background: '#eff6ff', color: '#2563eb', borderRadius: '20px', fontSize: '14px', fontWeight: 'bold' },
     sortBar: { display: 'flex', justifyContent: 'center', gap: '15px', marginBottom: '20px' },
     sortBtn: (active: boolean) => ({ fontSize: '12px', padding: '6px 12px', borderRadius: '20px', border: 'none', background: active ? '#2563eb' : '#f3f4f6', color: active ? 'white' : '#9ca3af', fontWeight: 'bold', cursor: 'pointer' }),
     card: { background: 'white', borderRadius: '16px', marginBottom: '25px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', overflow: 'hidden', position: 'relative', border: '1px solid #f3f4f6' },
     watermark: { position: 'absolute', top: '-10px', right: '-10px', fontSize: '80px', opacity: 0.1, pointerEvents: 'none', transform: 'rotate(15deg)', zIndex: 0 },
-    descBox: { fontSize: '11px', color: '#4b5563', background: '#f9fafb', padding: '12px', borderRadius: '8px', marginBottom: '15px', lineHeight: '1.6', border: '1px solid #f3f4f6', whiteSpace: 'pre-wrap' },
+    contentArea: { padding: '15px 20px 20px', position: 'relative', zIndex: 1 },
+    // 判定基準ボックスのスタイル
+    descBox: { fontSize: '11px', color: '#64748b', background: '#f8fafc', padding: '10px', borderRadius: '8px', marginBottom: '12px', lineHeight: '1.5', border: '1px solid #f1f5f9', whiteSpace: 'pre-wrap' },
     nav: { position: 'fixed', bottom: 0, left: 0, right: 0, background: 'rgba(255,255,255,0.95)', borderTop: '1px solid #eee', display: 'flex', justifyContent: 'space-around', padding: '12px', zIndex: 100 },
     adminLink: { textAlign: 'center', marginTop: '40px', fontSize: '11px', color: '#e5e7eb' }
   }
@@ -134,32 +136,15 @@ export default function Home() {
     <div style={styles.container}>
       <header style={styles.header}>
         <h1 style={styles.appTitle}>YOSOL</h1>
-        {/* ★タイトル下の説明文を復活 */}
         <p style={styles.appDesc}>未来をヨソル、ポイントで遊ぶ予測市場</p>
-
-        {profile && <div style={{marginTop:'5px', fontWeight:'bold', color:'#2563eb'}}>💎 {profile.point_balance.toLocaleString()} pt</div>}
-        {!session && (
-          <div style={{marginTop:'10px'}}>
-             {!showEmailForm ? <>
-               <button onClick={handleGoogleLogin} style={{padding:'8px 16px', borderRadius:'20px', border:'1px solid #ccc', background:'white', cursor:'pointer', fontWeight:'bold'}}>Googleでログイン</button>
-               <button onClick={()=>setShowEmailForm(true)} style={{marginLeft:'10px', fontSize:'11px', color:'#666', background:'none', border:'none', textDecoration:'underline'}}>メールログイン</button>
-               <button onClick={handleAnonLogin} style={{display:'block', margin:'5px auto', fontSize:'10px', color:'#999', background:'none', border:'none'}}>アカウントなしで試す</button>
-             </> : <div style={{background:'white', padding:'15px', borderRadius:'10px', boxShadow:'0 2px 5px rgba(0,0,0,0.1)', maxWidth:'300px', margin:'0 auto'}}>
-               <input placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} style={{width:'100%', padding:'8px', marginBottom:'5px', border:'1px solid #ccc', borderRadius:'4px', color:'black'}} />
-               <input type="password" placeholder="Pass" value={password} onChange={e=>setPassword(e.target.value)} style={{width:'100%', padding:'8px', marginBottom:'10px', border:'1px solid #ccc', borderRadius:'4px', color:'black'}} />
-               <button onClick={handleEmailAuth} style={{width:'100%', padding:'10px', background:'#2563eb', color:'white', border:'none', borderRadius:'5px'}}>{isSignUp ? '新規登録' : 'ログイン'}</button>
-               <button onClick={()=>setIsSignUp(!isSignUp)} style={{fontSize:'10px', marginTop:'10px', color:'blue', background:'none', border:'none'}}>{isSignUp ? 'ログインへ' : '新規登録はこちら'}</button>
-               <button onClick={()=>setShowEmailForm(false)} style={{display:'block', margin:'10px auto', fontSize:'10px', color:'#999', background:'none', border:'none'}}>キャンセル</button>
-             </div>}
-          </div>
-        )}
+        {profile && <div style={styles.pointBadge}>💎 {profile.point_balance.toLocaleString()} pt</div>}
       </header>
 
       {activeTab === 'home' && (
         <>
-          <div style={{display:'flex', gap:'10px', overflowX:'auto', marginBottom:'15px', paddingBottom:'5px'}}>
+          <div style={{display:'flex', gap:'10px', overflowX:'auto', marginBottom:'15px', paddingBottom:'8px'}}>
             {categories.map(cat => (
-              <button key={cat} onClick={()=>setActiveCategory(cat)} style={{padding:'8px 16px', borderRadius:'20px', background:activeCategory===cat?'#1f2937':'white', color:activeCategory===cat?'white':'#4b5563', whiteSpace:'nowrap', border:'1px solid #ddd', fontWeight:'bold', cursor:'pointer'}}>{cat}</button>
+              <button key={cat} onClick={()=>setActiveCategory(cat)} style={{padding:'8px 18px', borderRadius:'25px', background:activeCategory===cat?'#1f2937':'white', color:activeCategory===cat?'white':'#4b5563', whiteSpace:'nowrap', border:'1px solid #ddd', fontWeight:'bold', cursor:'pointer'}}>{cat}</button>
             ))}
           </div>
 
@@ -174,41 +159,56 @@ export default function Home() {
             return (
               <div key={m.id} style={styles.card}>
                 <div style={styles.watermark}>{catInfo.icon}</div>
-                <div style={{height:'180px', position:'relative', background:'#eee'}}>
+                <div style={{height:'180px', position:'relative', background:'#f3f4f6'}}>
                   {m.image_url ? <img src={m.image_url} style={{width:'100%', height:'100%', objectFit:'cover'}} alt="" /> : <div style={{textAlign:'center', paddingTop:'60px', fontSize:'40px'}}>{catInfo.icon}</div>}
                   <div style={{position:'absolute', bottom:0, left:0, right:0, height:'80%', background:'linear-gradient(to top, rgba(0,0,0,0.8), transparent)', display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'15px'}}>
-                    <div style={{display:'flex', gap:'5px', marginBottom:'5px'}}>
-                      <span style={{fontSize:'10px', background:catInfo.color, color:'white', padding:'2px 8px', borderRadius:'4px'}}>{m.category}</span>
-                      <span style={{fontSize:'10px', background:active?'rgba(255,255,255,0.9)':'#ef4444', color:active?'#059669':'white', padding:'2px 8px', borderRadius:'4px', fontWeight:'bold'}}>
+                    <div style={{display:'flex', gap:'6px', marginBottom:'6px'}}>
+                      <span style={{fontSize:'10px', background:catInfo.color, color:'white', padding:'3px 10px', borderRadius:'6px', fontWeight:'bold'}}>{m.category}</span>
+                      <span style={{fontSize:'10px', background:active?'rgba(255,255,255,0.9)':'#ef4444', color:active?'#059669':'white', padding:'3px 10px', borderRadius:'6px', fontWeight:'bold'}}>
                         {m.is_resolved ? '結果確定' : (active ? `あと ${Math.ceil((new Date(m.end_date).getTime() - new Date().getTime())/(1000*60*60*24))}日` : '終了')}
                       </span>
                     </div>
-                    <h2 style={{color:'white', margin:0, fontSize:'18px', textShadow:'0 2px 4px rgba(0,0,0,0.5)'}}>{m.title}</h2>
+                    <h2 style={{color:'white', margin:0, fontSize:'19px', fontWeight:'bold', textShadow:'0 2px 4px rgba(0,0,0,0.5)'}}>{m.title}</h2>
                   </div>
                 </div>
 
-                <div style={{padding:'15px', position:'relative', zIndex:1}}>
-                  {/* ★ 判断基準を表示する箇所を確実に復活 */}
-                  {m.description && (
-                    <div style={styles.descBox}>
-                      <div style={{fontWeight:'bold', fontSize:'10px', color:'#2563eb', marginBottom:'4px'}}>【判定基準】</div>
-                      <div dangerouslySetInnerHTML={{ __html: m.description.replace(/\n/g, '<br />') }} />
+                // pages/index.tsx の該当箇所
+                <div style={styles.contentArea}>
+                    {/* 判定基準：写真やグラデーションに被らないよう、白い背景エリアの先頭に配置 */}
+                    {market.description && (
+                      <div style={{
+                          fontSize: '11px', 
+                          color: '#4b5563', 
+                          background: '#f9fafb', 
+                          padding: '12px', 
+                          borderRadius: '8px', 
+                          marginBottom: '15px', 
+                          lineHeight: '1.6', 
+                          border: '1px solid #f3f4f6', 
+                          whiteSpace: 'pre-wrap',
+                          position: 'relative',
+                          zIndex: 10
+                      }}>
+                        <div style={{fontWeight:'bold', fontSize:'10px', marginBottom:'4px', color:'#2563eb'}}>【判定基準】</div>
+                        <div dangerouslySetInnerHTML={{ __html: market.description.replace(/\n/g, '<br />') }} />
+                      </div>
+                    )}
+
+                    <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '15px', fontWeight:'bold' }}>
+                      💰 投票総額: <span style={{fontSize:'14px', color:'#1f2937'}}>{market.total_pool.toLocaleString()} pt</span>
                     </div>
-                  )}
-
-                  <div style={{fontSize:'12px', fontWeight:'bold', marginBottom:'15px'}}>💰 投票総額: {m.total_pool.toLocaleString()} pt</div>
-
+                    {/* ...以下、選択肢とボタン */}
                   {m.market_options.map((opt: any, idx: number) => {
                     const pct = m.total_pool === 0 ? 0 : Math.round((opt.pool / m.total_pool) * 100)
                     const odds = opt.pool === 0 ? '1.0' : (m.total_pool / opt.pool).toFixed(1)
                     return (
-                      <div key={opt.id} style={{marginBottom:'10px'}}>
-                        <div style={{display:'flex', justifyContent:'space-between', fontSize:'13px', fontWeight:'bold'}}>
+                      <div key={opt.id} style={{marginBottom:'12px'}}>
+                        <div style={{display:'flex', justifyContent:'space-between', fontSize:'14px', fontWeight:'bold', marginBottom:'4px'}}>
                           <span>{m.result_option_id === opt.id ? '👑 ' : ''}{opt.name}</span>
-                          <span>{odds}倍 ({pct}%)</span>
+                          <span style={{color:'#2563eb'}}>{odds}倍 ({pct}%)</span>
                         </div>
-                        <div style={{height:'8px', background:'#f3f4f6', borderRadius:'4px', overflow:'hidden'}}>
-                          <div style={{width:`${pct}%`, height:'100%', background:['#3b82f6','#ef4444','#10b981','#f59e0b'][idx%4]}} />
+                        <div style={{height:'10px', background:'#f3f4f6', borderRadius:'5px', overflow:'hidden'}}>
+                          <div style={{width:`${pct}%`, height:'100%', background:['#3b82f6','#ef4444','#10b981','#f59e0b'][idx%4], transition:'width 0.5s ease-out'}} />
                         </div>
                       </div>
                     )
@@ -216,25 +216,26 @@ export default function Home() {
 
                   {active ? (
                     selectedMarketId === m.id ? (
-                      <div style={{marginTop:'15px', padding:'15px', background:'#f9fafb', borderRadius:'10px', border:'1px solid #e5e7eb'}}>
-                        <div style={{display:'flex', gap:'8px', flexWrap:'wrap', marginBottom:'10px'}}>
+                      <div style={{marginTop:'15px', padding:'15px', background:'#f9fafb', borderRadius:'12px', border:'1px solid #e5e7eb'}}>
+                        <div style={{display:'flex', gap:'8px', flexWrap:'wrap', marginBottom:'12px'}}>
                           {m.market_options.map((o: any) => (
-                            <button key={o.id} onClick={()=>setSelectedOptionId(o.id)} style={{padding:'8px 12px', borderRadius:'20px', border:selectedOptionId===o.id?'2px solid #2563eb':'1px solid #ccc', background:selectedOptionId===o.id?'#eff6ff':'white', color:'black', fontWeight:'bold', cursor:'pointer'}}>{o.name}</button>
+                            <button key={o.id} onClick={()=>setSelectedOptionId(o.id)} style={{padding:'10px 14px', borderRadius:'25px', border:selectedOptionId===o.id?'2px solid #2563eb':'1px solid #ddd', background:selectedOptionId===o.id?'#eff6ff':'white', color:'black', fontWeight:'bold', cursor:'pointer'}}>{o.name}</button>
                           ))}
                         </div>
-                        <input type="range" min="10" max={profile?.point_balance || 1000} step="10" value={voteAmount} onChange={e=>setVoteAmount(Number(e.target.value))} style={{width:'100%', marginBottom:'10px'}} />
-                        <div style={{display:'flex', gap:'10px'}}>
-                          <button onClick={handleVote} style={{flex:1, padding:'12px', background:'#2563eb', color:'white', border:'none', borderRadius:'10px', fontWeight:'bold', cursor:'pointer'}}>{voteAmount}pt 投票</button>
-                          <button onClick={()=>setSelectedMarketId(null)} style={{flex:1, background:'#ddd', border:'none', borderRadius:'10px', cursor:'pointer'}}>やめる</button>
+                        <div style={{fontSize:'13px', marginBottom:'8px', fontWeight:'bold'}}>投票額: {voteAmount} pt</div>
+                        <input type="range" min="10" max={profile?.point_balance || 1000} step="10" value={voteAmount} onChange={e=>setVoteAmount(Number(e.target.value))} style={{width:'100%', marginBottom:'15px'}} />
+                        <div style={{display:'flex', gap:'12px'}}>
+                          <button onClick={handleVote} style={{flex:1, padding:'14px', background:'#2563eb', color:'white', border:'none', borderRadius:'10px', fontWeight:'bold', cursor:'pointer'}}>投票する</button>
+                          <button onClick={()=>setSelectedMarketId(null)} style={{flex:1, background:'#ddd', border:'none', borderRadius:'10px', fontWeight:'bold', cursor:'pointer'}}>中止</button>
                         </div>
                       </div>
                     ) : (
                       <div style={{display:'flex', gap:'10px', marginTop:'15px'}}>
-                        <button onClick={()=>openMarket(m.id)} style={{flex:2, padding:'12px', background:'#2563eb', color:'white', border:'none', borderRadius:'10px', fontWeight:'bold', cursor:'pointer'}}>⚡️ 予想に参加</button>
-                        <button onClick={()=>shareOnX(m)} style={{flex:1, background:'black', color:'white', border:'none', borderRadius:'10px', fontWeight:'bold', cursor:'pointer'}}>𝕏 シェア</button>
+                        <button onClick={()=>openMarket(m.id)} style={{flex:2, padding:'14px', background:'#2563eb', color:'white', border:'none', borderRadius:'12px', fontWeight:'bold', cursor:'pointer', fontSize:'15px'}}>⚡️ 予想に参加</button>
+                        <button onClick={()=>shareOnX(m)} style={{flex:1, background:'black', color:'white', border:'none', borderRadius:'12px', fontWeight:'bold', cursor:'pointer', fontSize:'15px'}}>𝕏 シェア</button>
                       </div>
                     )
-                  ) : <div style={{textAlign:'center', padding:'12px', background:'#f3f4f6', color:'#9ca3af', borderRadius:'10px', marginTop:'15px', fontWeight:'bold'}}>受付終了</div>}
+                  ) : <div style={{textAlign:'center', padding:'15px', background:'#f8fafc', color:'#94a3b8', borderRadius:'12px', marginTop:'15px', fontWeight:'bold', fontSize:'14px'}}>受付終了</div>}
                 </div>
               </div>
             )
@@ -246,14 +247,15 @@ export default function Home() {
         </>
       )}
 
+      {/* ランキング・マイページ等のロジックは以前のまま維持 */}
       {activeTab === 'ranking' && (
-        <div style={{background:'white', borderRadius:'16px', padding:'20px', boxShadow:'0 4px 10px rgba(0,0,0,0.05)'}}>
-           <h3 style={{textAlign:'center', marginBottom:'20px'}}>🏆 投資家ランキング</h3>
+        <div style={{background:'white', borderRadius:'16px', padding:'24px', boxShadow:'0 4px 20px rgba(0,0,0,0.05)'}}>
+           <h3 style={{textAlign:'center', marginBottom:'24px', fontSize:'20px', fontWeight:'bold'}}>🏆 投資家ランキング</h3>
            {ranking.map((u, i) => (
-             <div key={u.id} style={{display:'flex', padding:'12px 0', borderBottom:'1px solid #f3f4f6', alignItems:'center'}}>
-               <div style={{width:'30px', fontWeight:'bold', color:i<3?'#d97706':'#9ca3af'}}>{i+1}</div>
-               <div style={{flex:1, fontSize:'14px'}}>{u.id===session?.user?.id ? <strong>{u.username} (自分)</strong> : u.username}</div>
-               <div style={{fontWeight:'bold', color:'#2563eb'}}>{u.point_balance.toLocaleString()} pt</div>
+             <div key={u.id} style={{display:'flex', padding:'14px 0', borderBottom:'1px solid #f1f5f9', alignItems:'center'}}>
+               <div style={{width:'36px', fontWeight:'bold', fontSize:'18px', color:i<3?'#f59e0b':'#cbd5e1'}}>{i+1}</div>
+               <div style={{flex:1, fontSize:'15px'}}>{u.id===session?.user?.id ? <strong>{u.username} (自分)</strong> : u.username}</div>
+               <div style={{fontWeight:'bold', color:'#2563eb', fontSize:'16px'}}>{u.point_balance.toLocaleString()} pt</div>
              </div>
            ))}
         </div>
@@ -261,30 +263,35 @@ export default function Home() {
 
       {activeTab === 'mypage' && (
         <div>
-           <div style={{background:'linear-gradient(135deg, #2563eb, #1e40af)', color:'white', padding:'30px 20px', borderRadius:'16px', textAlign:'center', marginBottom:'20px'}}>
-              <div style={{fontSize:'14px', opacity:0.8}}>総資産</div>
-              <div style={{fontSize:'36px', fontWeight:'900'}}>{profile?.point_balance.toLocaleString()} pt</div>
-              <div style={{marginTop:'15px'}}>
-                {!isEditingName ? <div onClick={()=>setIsEditingName(true)} style={{cursor:'pointer'}}>👤 {profile?.username || '名無しさん'} ✎</div>
-                : <div style={{display:'flex', justifyContent:'center', gap:'5px'}}><input value={editName} onChange={e=>setEditName(e.target.value)} style={{color:'black', padding:'5px', borderRadius:'4px', border:'none'}} /><button onClick={handleUpdateName} style={{background:'#22c55e', color:'white', border:'none', padding:'5px 10px', borderRadius:'4px'}}>保存</button></div>}
+           <div style={{background:'linear-gradient(135deg, #2563eb, #1e40af)', color:'white', padding:'35px 25px', borderRadius:'20px', textAlign:'center', marginBottom:'25px', boxShadow:'0 10px 20px rgba(37,99,235,0.2)'}}>
+              <div style={{fontSize:'14px', opacity:0.8, marginBottom:'5px'}}>あなたの総資産</div>
+              <div style={{fontSize:'40px', fontWeight:'900'}}>{profile?.point_balance.toLocaleString()} pt</div>
+              <div style={{marginTop:'20px'}}>
+                {!isEditingName ? <div onClick={()=>setIsEditingName(true)} style={{cursor:'pointer', fontSize:'16px', background:'rgba(255,255,255,0.1)', display:'inline-block', padding:'6px 15px', borderRadius:'20px'}}>👤 {profile?.username || '名無しさん'} ✎</div>
+                : <div style={{display:'flex', justifyContent:'center', gap:'8px'}}><input value={editName} onChange={e=>setEditName(e.target.value)} style={{color:'black', padding:'8px', borderRadius:'6px', border:'none', width:'140px'}} /><button onClick={handleUpdateName} style={{background:'#22c55e', color:'white', border:'none', padding:'8px 15px', borderRadius:'6px', fontWeight:'bold'}}>保存</button></div>}
               </div>
            </div>
-           <h3 style={{marginBottom:'10px'}}>📜 投票履歴</h3>
-           {myBets.length === 0 && <div style={{textAlign:'center', color:'#9ca3af', padding:'20px'}}>履歴がありません</div>}
+           <h3 style={{marginBottom:'15px', fontSize:'18px', fontWeight:'bold'}}>📜 投票履歴</h3>
            {myBets.map(b => (
-             <div key={b.id} style={{background:'white', padding:'15px', borderRadius:'12px', marginBottom:'10px', border:'1px solid #eee'}}>
-               <div style={{fontSize:'11px', color:'#666'}}>{b.markets?.title}</div>
-               <div style={{fontWeight:'bold', fontSize:'14px'}}>「{b.market_options?.name}」に {b.amount}pt</div>
+             <div key={b.id} style={{background:'white', padding:'18px', borderRadius:'16px', marginBottom:'12px', border:'1px solid #f1f5f9'}}>
+               <div style={{fontSize:'12px', color:'#64748b', marginBottom:'6px'}}>{b.markets?.title}</div>
+               <div style={{fontWeight:'bold', fontSize:'15px'}}>「{b.market_options?.name}」に {b.amount}pt</div>
              </div>
            ))}
-           <button onClick={()=>supabase.auth.signOut().then(()=>window.location.reload())} style={{width:'100%', padding:'12px', background:'none', border:'1px solid #eee', borderRadius:'10px', marginTop:'20px', color:'#9ca3af', cursor:'pointer'}}>ログアウト</button>
+           <button onClick={()=>supabase.auth.signOut().then(()=>window.location.reload())} style={{width:'100%', padding:'14px', background:'none', border:'1px solid #e2e8f0', borderRadius:'12px', marginTop:'30px', color:'#94a3b8', cursor:'pointer', fontWeight:'bold'}}>ログアウト</button>
         </div>
       )}
 
       <nav style={styles.nav}>
-        <button onClick={()=>setActiveTab('home')} style={{background:'none', border:'none', color:activeTab==='home'?'#2563eb':'#9ca3af', cursor:'pointer'}}>🏠<br/><span style={{fontSize:'10px'}}>ホーム</span></button>
-        <button onClick={()=>setActiveTab('ranking')} style={{background:'none', border:'none', color:activeTab==='ranking'?'#2563eb':'#9ca3af', cursor:'pointer'}}>👑<br/><span style={{fontSize:'10px'}}>ランク</span></button>
-        <button onClick={()=>{if(!session)handleGoogleLogin(); else setActiveTab('mypage')}} style={{background:'none', border:'none', color:activeTab==='mypage'?'#2563eb':'#9ca3af', cursor:'pointer'}}>👤<br/><span style={{fontSize:'10px'}}>マイページ</span></button>
+        <button onClick={()=>setActiveTab('home')} style={{background:'none', border:'none', color:activeTab==='home'?'#2563eb':'#94a3b8', cursor:'pointer', textAlign:'center'}}>
+          <span style={{fontSize:'22px'}}>🏠</span><br/><span style={{fontSize:'11px', fontWeight:'bold'}}>ホーム</span>
+        </button>
+        <button onClick={()=>setActiveTab('ranking')} style={{background:'none', border:'none', color:activeTab==='ranking'?'#2563eb':'#94a3b8', cursor:'pointer', textAlign:'center'}}>
+          <span style={{fontSize:'22px'}}>👑</span><br/><span style={{fontSize:'11px', fontWeight:'bold'}}>ランク</span>
+        </button>
+        <button onClick={()=>{if(!session)handleGoogleLogin(); else setActiveTab('mypage')}} style={{background:'none', border:'none', color:activeTab==='mypage'?'#2563eb':'#94a3b8', cursor:'pointer', textAlign:'center'}}>
+          <span style={{fontSize:'22px'}}>👤</span><br/><span style={{fontSize:'11px', fontWeight:'bold'}}>マイページ</span>
+        </button>
       </nav>
     </div>
   )
