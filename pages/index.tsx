@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
-import { useRouter } from 'next/router' // URL操作用
+import { useRouter } from 'next/router'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -9,7 +9,7 @@ const supabase = createClient(
 )
 
 export default function Home() {
-  const router = useRouter() // URL情報を取得
+  const router = useRouter()
   const [session, setSession] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const [markets, setMarkets] = useState<any[]>([])
@@ -38,7 +38,7 @@ export default function Home() {
     init()
   }, [])
 
-  // URLに ?id=123 があったら、自動でそのマーケットを開く
+  // URL連動 (Deep Link)
   useEffect(() => {
     if (!router.isReady || markets.length === 0) return
     const { id } = router.query
@@ -47,7 +47,6 @@ export default function Home() {
       const target = markets.find(m => m.id === marketId)
       if (target) {
         setSelectedMarketId(marketId)
-        // 必要ならカテゴリも切り替える
         if (target.category) setActiveCategory(target.category)
       }
     }
@@ -69,8 +68,7 @@ export default function Home() {
     const { data } = await supabase
       .from('markets')
       .select('*, market_options(*)')
-      // ★ここを変更: 締切が近い順 (昇順) に並べる
-      .order('end_date', { ascending: true })
+      .order('end_date', { ascending: true }) // 締切が近い順
 
     if (data) {
       const sorted = data.map((m: any) => ({
@@ -91,15 +89,12 @@ export default function Home() {
     window.location.reload()
   }
 
-  // マーケットを選択した時、URLも書き換える（シェア用）
   const openMarket = (marketId: number) => {
     if (!session) return handleLogin()
     setSelectedMarketId(marketId)
-    // URLを書き換え (履歴に残さない shallow routing)
     router.push(`/?id=${marketId}`, undefined, { shallow: true })
   }
 
-  // 閉じる時、URLを元に戻す
   const closeMarket = () => {
     setSelectedMarketId(null)
     setSelectedOptionId(null)
@@ -120,7 +115,6 @@ export default function Home() {
     if (error) alert(error.message)
     else {
       alert('投票しました！')
-      // 投票後は閉じずに、シェアを促すUIにするのもアリだが一旦閉じて更新
       closeMarket()
       fetchMarkets()
       initUserData(session.user.id)
@@ -128,10 +122,9 @@ export default function Home() {
     }
   }
 
-  // Xでシェアする機能
   const shareOnX = (market: any) => {
     const url = `${window.location.origin}/?id=${market.id}`
-    const text = `💰予測市場「Polymarket JP」に参加中！\n\nQ. ${market.title}\n\nあなたも予想しよう！ #PolymarketJP`
+    const text = `💰予測市場「YOSOL」に参加中！\n\nQ. ${market.title}\n\nあなたも予想しよう！ #YOSOL`
     const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`
     window.open(twitterUrl, '_blank')
   }
@@ -161,8 +154,13 @@ export default function Home() {
   // --- スタイル設定 ---
   const styles = {
     container: { maxWidth: '600px', margin: '0 auto', padding: '20px 15px 100px', minHeight: '100vh', fontFamily: 'sans-serif', color: '#1f2937' },
-    header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', padding: '10px 0' },
-    logo: { fontSize: '20px', fontWeight: '900', background: 'linear-gradient(to right, #2563eb, #9333ea)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' },
+
+    // ヘッダー周り
+    headerContainer: { padding: '20px 0 10px', textAlign: 'center' as const },
+    appTitle: { fontSize: '28px', fontWeight: '900', background: 'linear-gradient(to right, #2563eb, #9333ea)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0, letterSpacing: '-1px' },
+    appDesc: { fontSize: '12px', color: '#6b7280', marginTop: '5px', fontWeight: 'bold' },
+    pointBadge: { display: 'inline-block', marginTop: '8px', padding: '4px 12px', background: '#eff6ff', color: '#2563eb', borderRadius: '20px', fontSize: '14px', fontWeight: 'bold' },
+    loginBtn: { marginTop: '8px', padding: '4px 12px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold' },
 
     categoryScroll: { display: 'flex', gap: '10px', overflowX: 'auto' as const, paddingBottom: '10px', marginBottom: '20px', scrollbarWidth: 'none' as const },
     categoryBtn: (isActive: boolean) => ({
@@ -179,13 +177,19 @@ export default function Home() {
     }),
 
     card: { background: 'white', borderRadius: '16px', padding: '20px', marginBottom: '20px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' },
+
+    // 説明文エリア
+    descBox: { fontSize: '11px', color: '#4b5563', background: '#f9fafb', padding: '12px', borderRadius: '8px', marginTop: '10px', marginBottom: '15px', whiteSpace: 'pre-wrap' as const, lineHeight: '1.6', border: '1px solid #f3f4f6' },
+
     barRow: { marginBottom: '12px' },
     barLabelArea: { display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px', fontWeight: 'bold' },
     barTrack: { height: '12px', background: '#f3f4f6', borderRadius: '6px', overflow: 'hidden' },
     barFill: (percent: number, idx: number) => ({ height: '100%', width: `${percent}%`, background: ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6'][idx % 5], transition: 'width 0.5s' }),
-    voteButton: { width: '100%', padding: '12px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', marginTop: '15px' },
-    shareButton: { width: '100%', padding: '10px', background: 'black', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', marginTop: '10px', fontSize: '13px' },
+
+    voteButton: { width: '100%', padding: '12px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', fontSize: '14px' },
+    shareButton: { width: '100%', padding: '12px', background: 'black', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', fontSize: '13px' },
     disabledButton: { width: '100%', padding: '12px', background: '#e5e7eb', color: '#9ca3af', border: 'none', borderRadius: '10px', fontWeight: 'bold', marginTop: '15px' },
+
     navBar: { position: 'fixed' as const, bottom: 0, left: 0, right: 0, background: 'rgba(255,255,255,0.95)', borderTop: '1px solid #eee', display: 'flex', justifyContent: 'space-around', padding: '12px', zIndex: 100 },
     navBtn: (isActive: boolean) => ({ background: 'none', border: 'none', color: isActive ? '#2563eb' : '#9ca3af', fontWeight: isActive ? 'bold' : 'normal', fontSize: '10px', display: 'flex', flexDirection: 'column' as const, alignItems: 'center' }),
   }
@@ -216,13 +220,22 @@ export default function Home() {
                <span style={{fontSize:'10px', background:'#f3f4f6', padding:'2px 8px', borderRadius:'4px', color:'#666'}}>{market.category || 'その他'}</span>
             </div>
 
-            <h2 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '8px' }}>{market.title}</h2>
-            <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '15px', display:'flex', gap:'10px' }}>
+            <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '8px', lineHeight: '1.4' }}>{market.title}</h2>
+
+            {/* 説明文・判定基準の表示 */}
+            {market.description && (
+              <div style={styles.descBox}>
+                {market.description}
+              </div>
+            )}
+
+            <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '15px', display:'flex', gap:'10px', alignItems:'center' }}>
               <span>💰 総額: {market.total_pool.toLocaleString()}pt</span>
-              <span style={{ color: isActive ? '#059669' : '#dc2626', fontWeight:'bold' }}>
+              <span style={{ color: isActive ? '#059669' : '#dc2626', fontWeight:'bold', background: isActive ? '#ecfdf5' : '#fef2f2', padding:'2px 8px', borderRadius:'4px' }}>
                 {market.is_resolved ? '🏁 結果確定' : (isActive ? `⏰ 締切: ${new Date(market.end_date).toLocaleDateString()}` : '🚫 受付終了')}
               </span>
             </div>
+
             <div>
               {market.market_options.map((opt: any, idx: number) => {
                 const percent = getPercent(market.total_pool, opt.pool)
@@ -262,9 +275,9 @@ export default function Home() {
                   </div>
                 </div>
               ) : (
-                <div style={{display:'flex', gap:'10px'}}>
-                  <button onClick={() => openMarket(market.id)} style={{...styles.voteButton, marginTop:'15px', flex:2}}>⚡️ 投票する</button>
-                  <button onClick={() => shareOnX(market)} style={{...styles.shareButton, marginTop:'15px', background:'black', flex:1}}>𝕏 シェア</button>
+                <div style={{display:'flex', gap:'10px', marginTop:'15px'}}>
+                  <button onClick={() => openMarket(market.id)} style={{...styles.voteButton, flex:2}}>⚡️ 投票する</button>
+                  <button onClick={() => shareOnX(market)} style={{...styles.shareButton, flex:1}}>𝕏 シェア</button>
                 </div>
               )
             ) : (
@@ -319,10 +332,18 @@ export default function Home() {
 
   return (
     <div style={styles.container as any}>
-      <header style={styles.header}>
-        <div style={styles.logo}>🇯🇵 Polymarket JP</div>
-        {profile ? <div style={{fontWeight:'bold', fontSize:'14px'}}>💎 {profile.point_balance.toLocaleString()}</div> : <button onClick={handleLogin}>ログイン</button>}
-      </header>
+      {/* リッチなヘッダー */}
+      <div style={styles.headerContainer}>
+        <h1 style={styles.appTitle}>YOSOL</h1>
+        <p style={styles.appDesc}>未来をヨソル、ポイントで遊ぶ予測市場</p>
+        <div>
+           {profile ? 
+             <span style={styles.pointBadge}>💎 {profile.point_balance.toLocaleString()} pt</span> 
+             : 
+             <button onClick={handleLogin} style={styles.loginBtn}>ログインして参加</button>
+           }
+        </div>
+      </div>
 
       {activeTab === 'home' && renderHome()}
       {activeTab === 'ranking' && renderRanking()}
