@@ -26,6 +26,16 @@ export default function Home() {
 
   const categories = ['すべて', 'こども', '経済・政治', 'エンタメ', 'スポーツ', 'ライフ', 'その他']
 
+  // カテゴリごとのアイコンと色（透かし用）
+  const categoryMeta: any = {
+    'こども': { icon: '🎒', color: '#f43f5e' },
+    '経済・政治': { icon: '🏛️', color: '#3b82f6' },
+    'エンタメ': { icon: '🎤', color: '#a855f7' },
+    'スポーツ': { icon: '⚽️', color: '#22c55e' },
+    'ライフ': { icon: '🌅', color: '#f59e0b' },
+    'その他': { icon: '🎲', color: '#6b7280' },
+  }
+
   useEffect(() => {
     const init = async () => {
       const { data: { session } } = await supabase.auth.getSession()
@@ -38,7 +48,6 @@ export default function Home() {
     init()
   }, [])
 
-  // URL連動 (Deep Link)
   useEffect(() => {
     if (!router.isReady || markets.length === 0) return
     const { id } = router.query
@@ -65,11 +74,7 @@ export default function Home() {
   }
 
   async function fetchMarkets() {
-    const { data } = await supabase
-      .from('markets')
-      .select('*, market_options(*)')
-      .order('end_date', { ascending: true }) // 締切が近い順
-
+    const { data } = await supabase.from('markets').select('*, market_options(*)').order('end_date', { ascending: true })
     if (data) {
       const sorted = data.map((m: any) => ({
         ...m,
@@ -87,6 +92,14 @@ export default function Home() {
   const handleLogin = async () => {
     await supabase.auth.signInAnonymously()
     window.location.reload()
+  }
+
+  const handleLineLogin = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'line',
+      options: { redirectTo: window.location.origin },
+    })
+    if (error) alert(error.message)
   }
 
   const openMarket = (marketId: number) => {
@@ -151,34 +164,35 @@ export default function Home() {
     return m.category === activeCategory
   })
 
-  // --- スタイル設定 ---
+  // --- スタイル ---
   const styles = {
     container: { maxWidth: '600px', margin: '0 auto', padding: '20px 15px 100px', minHeight: '100vh', fontFamily: 'sans-serif', color: '#1f2937' },
-
-    // ヘッダー周り
     headerContainer: { padding: '20px 0 10px', textAlign: 'center' as const },
     appTitle: { fontSize: '28px', fontWeight: '900', background: 'linear-gradient(to right, #2563eb, #9333ea)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0, letterSpacing: '-1px' },
     appDesc: { fontSize: '12px', color: '#6b7280', marginTop: '5px', fontWeight: 'bold' },
     pointBadge: { display: 'inline-block', marginTop: '8px', padding: '4px 12px', background: '#eff6ff', color: '#2563eb', borderRadius: '20px', fontSize: '14px', fontWeight: 'bold' },
-    loginBtn: { marginTop: '8px', padding: '4px 12px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold' },
+    lineButton: { marginTop: '10px', padding: '10px 20px', background: '#06c755', color: 'white', border: 'none', borderRadius: '30px', fontSize: '14px', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer', width: 'fit-content', margin: '10px auto' },
 
     categoryScroll: { display: 'flex', gap: '10px', overflowX: 'auto' as const, paddingBottom: '10px', marginBottom: '20px', scrollbarWidth: 'none' as const },
     categoryBtn: (isActive: boolean) => ({
-      padding: '8px 16px',
-      borderRadius: '20px',
-      border: isActive ? 'none' : '1px solid #e5e7eb',
-      background: isActive ? '#1f2937' : 'white',
-      color: isActive ? 'white' : '#4b5563',
-      fontSize: '13px',
-      fontWeight: 'bold' as const,
-      whiteSpace: 'nowrap' as const,
-      cursor: 'pointer',
-      boxShadow: isActive ? '0 4px 6px -1px rgba(0,0,0,0.1)' : 'none'
+      padding: '8px 16px', borderRadius: '20px', border: isActive ? 'none' : '1px solid #e5e7eb', background: isActive ? '#1f2937' : 'white', color: isActive ? 'white' : '#4b5563', fontSize: '13px', fontWeight: 'bold' as const, whiteSpace: 'nowrap' as const, cursor: 'pointer', boxShadow: isActive ? '0 4px 6px -1px rgba(0,0,0,0.1)' : 'none'
     }),
 
-    card: { background: 'white', borderRadius: '16px', padding: '20px', marginBottom: '20px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' },
+    // ★ リッチなカードデザイン
+    card: { background: 'white', borderRadius: '16px', padding: '0', marginBottom: '25px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', overflow: 'hidden', position: 'relative' as const, border: '1px solid #f3f4f6' },
 
-    // 説明文エリア (文字としての\nを強制的に改行タグに変換して表示する裏技スタイル)
+    // ★ 画像エリア (Netflix風)
+    imageArea: { position: 'relative' as const, height: '180px', width: '100%' },
+    cardImage: { width: '100%', height: '100%', objectFit: 'cover' as const },
+    imageOverlay: { position: 'absolute' as const, bottom: 0, left: 0, right: 0, height: '80%', background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)', display: 'flex', flexDirection: 'column' as const, justifyContent: 'flex-end', padding: '15px' },
+
+    // ★ 透かしアイコン
+    watermark: (cat: string) => ({
+        position: 'absolute' as const, top: '-10px', right: '-10px', fontSize: '80px', opacity: 0.1, pointerEvents: 'none' as const, transform: 'rotate(15deg)', zIndex: 0
+    }),
+
+    contentArea: { padding: '15px 20px 20px', position: 'relative' as const, zIndex: 1 },
+
     descBox: { fontSize: '11px', color: '#4b5563', background: '#f9fafb', padding: '12px', borderRadius: '8px', marginTop: '10px', marginBottom: '15px', lineHeight: '1.6', border: '1px solid #f3f4f6', whiteSpace: 'pre-wrap' as const },
 
     barRow: { marginBottom: '12px' },
@@ -212,75 +226,88 @@ export default function Home() {
 
       {filteredMarkets.map((market) => {
         const isActive = isMarketActive(market)
+        const catInfo = categoryMeta[market.category] || categoryMeta['その他']
+
         return (
           <div key={market.id} style={styles.card}>
-            {market.image_url && <img src={market.image_url} style={{ width: '100%', height: '140px', objectFit: 'cover', borderRadius: '10px', marginBottom: '12px' }} />}
+            {/* ★ 透かし背景 */}
+            <div style={styles.watermark(market.category)}>{catInfo.icon}</div>
 
-            <div style={{display:'flex', justifyContent:'space-between', marginBottom:'8px'}}>
-               <span style={{fontSize:'10px', background:'#f3f4f6', padding:'2px 8px', borderRadius:'4px', color:'#666'}}>{market.category || 'その他'}</span>
-            </div>
-
-            <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '8px', lineHeight: '1.4' }}>{market.title}</h2>
-
-            {/* 説明文・判定基準の表示 (\nを強制的に<br>に変換) */}
-            {market.description && (
-              <div style={styles.descBox} dangerouslySetInnerHTML={{ __html: market.description.replace(/\\n/g, '<br />') }} />
-            )}
-
-            <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '15px', display:'flex', gap:'10px', alignItems:'center' }}>
-              <span>💰 総額: {market.total_pool.toLocaleString()}pt</span>
-              <span style={{ color: isActive ? '#059669' : '#dc2626', fontWeight:'bold', background: isActive ? '#ecfdf5' : '#fef2f2', padding:'2px 8px', borderRadius:'4px' }}>
-                {market.is_resolved ? '🏁 結果確定' : (isActive ? `⏰ 締切: ${new Date(market.end_date).toLocaleDateString()}` : '🚫 受付終了')}
-              </span>
-            </div>
-
-            <div>
-              {market.market_options.map((opt: any, idx: number) => {
-                const percent = getPercent(market.total_pool, opt.pool)
-                const odds = getOdds(market.total_pool, opt.pool)
-                const isWinner = market.result_option_id === opt.id
-                return (
-                  <div key={opt.id} style={styles.barRow}>
-                    <div style={styles.barLabelArea}>
-                      <span>{isWinner ? '👑 ' : ''}{opt.name}</span>
-                      <span>{odds ? `${odds.toFixed(1)}倍` : '--倍'} ({percent}%)</span>
+            {/* ★ リッチな画像エリア */}
+            <div style={styles.imageArea}>
+                {market.image_url ? 
+                  <img src={market.image_url} style={styles.cardImage} /> : 
+                  <div style={{width:'100%', height:'100%', background:'#eee', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'40px'}}>{catInfo.icon}</div>
+                }
+                <div style={styles.imageOverlay}>
+                    <div style={{display:'flex', gap:'5px', marginBottom:'5px'}}>
+                        <span style={{fontSize:'10px', background: catInfo.color, color:'white', padding:'2px 8px', borderRadius:'4px', fontWeight:'bold'}}>{market.category || 'その他'}</span>
+                        <span style={{fontSize:'10px', background: isActive ? 'rgba(255,255,255,0.9)' : '#ef4444', color: isActive ? '#059669' : 'white', padding:'2px 8px', borderRadius:'4px', fontWeight:'bold'}}>
+                             {market.is_resolved ? '結果確定' : (isActive ? `あと ${Math.ceil((new Date(market.end_date).getTime() - new Date().getTime())/(1000*60*60*24))}日` : '受付終了')}
+                        </span>
                     </div>
-                    <div style={styles.barTrack}>
-                      <div style={styles.barFill(percent, idx) as any} />
-                    </div>
-                  </div>
-                )
-              })}
+                    <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: 'white', margin: 0, lineHeight: '1.3', textShadow:'0 2px 4px rgba(0,0,0,0.5)' }}>{market.title}</h2>
+                </div>
             </div>
 
-            {/* 投票エリア */}
-            {isActive ? (
-              selectedMarketId === market.id ? (
-                <div style={{ background: '#f9fafb', padding: '15px', borderRadius: '10px', marginTop: '15px', border:'1px solid #e5e7eb' }}>
-                  <div style={{fontWeight:'bold', marginBottom:'10px', fontSize:'14px'}}>選択肢を選ぶ:</div>
-                  <div style={{display:'flex', flexWrap:'wrap', gap:'8px', marginBottom:'15px'}}>
-                    {market.market_options.map((opt: any) => (
-                      <button key={opt.id} onClick={() => setSelectedOptionId(opt.id)} style={{ padding: '8px 12px', borderRadius: '20px', border: selectedOptionId === opt.id ? '2px solid #2563eb' : '1px solid #d1d5db', background: selectedOptionId === opt.id ? '#eff6ff' : 'white', fontSize:'13px', fontWeight:'bold' }}>
-                        {opt.name}
-                      </button>
-                    ))}
-                  </div>
-                  <div style={{fontSize:'13px', marginBottom:'5px'}}>投票額: <strong>{voteAmount} pt</strong></div>
-                  <input type="range" min="10" max={profile?.point_balance} step="10" value={voteAmount} onChange={e=>setVoteAmount(Number(e.target.value))} style={{width:'100%', marginBottom:'15px'}} />
-                  <div style={{display:'flex', gap:'10px'}}>
-                    <button onClick={handleVote} style={{flex:1, padding:'10px', background:'#2563eb', color:'white', border:'none', borderRadius:'8px', fontWeight:'bold'}}>投票する</button>
-                    <button onClick={closeMarket} style={{flex:1, padding:'10px', background:'#e5e7eb', color:'#374151', border:'none', borderRadius:'8px'}}>やめる</button>
-                  </div>
+            <div style={styles.contentArea}>
+                {/* 説明文 */}
+                {market.description && (
+                  <div style={styles.descBox} dangerouslySetInnerHTML={{ __html: market.description.replace(/\\n/g, '<br />') }} />
+                )}
+
+                <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '15px', fontWeight:'bold' }}>
+                  💰 投票総額: <span style={{fontSize:'14px', color:'#1f2937'}}>{market.total_pool.toLocaleString()} pt</span>
                 </div>
-              ) : (
-                <div style={{display:'flex', gap:'10px', marginTop:'15px'}}>
-                  <button onClick={() => openMarket(market.id)} style={{...styles.voteButton, flex:2}}>⚡️ 投票する</button>
-                  <button onClick={() => shareOnX(market)} style={{...styles.shareButton, flex:1}}>𝕏 シェア</button>
+
+                <div>
+                  {market.market_options.map((opt: any, idx: number) => {
+                    const percent = getPercent(market.total_pool, opt.pool)
+                    const odds = getOdds(market.total_pool, opt.pool)
+                    const isWinner = market.result_option_id === opt.id
+                    return (
+                      <div key={opt.id} style={styles.barRow}>
+                        <div style={styles.barLabelArea}>
+                          <span>{isWinner ? '👑 ' : ''}{opt.name}</span>
+                          <span>{odds ? `${odds.toFixed(1)}倍` : '--倍'} ({percent}%)</span>
+                        </div>
+                        <div style={styles.barTrack}>
+                          <div style={styles.barFill(percent, idx) as any} />
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
-              )
-            ) : (
-              <button disabled style={styles.disabledButton}>🚫 受付終了</button>
-            )}
+
+                {/* 投票エリア */}
+                {isActive ? (
+                  selectedMarketId === market.id ? (
+                    <div style={{ background: '#f9fafb', padding: '15px', borderRadius: '10px', marginTop: '15px', border:'1px solid #e5e7eb' }}>
+                      <div style={{fontWeight:'bold', marginBottom:'10px', fontSize:'14px'}}>選択肢を選ぶ:</div>
+                      <div style={{display:'flex', flexWrap:'wrap', gap:'8px', marginBottom:'15px'}}>
+                        {market.market_options.map((opt: any) => (
+                          <button key={opt.id} onClick={() => setSelectedOptionId(opt.id)} style={{ padding: '8px 12px', borderRadius: '20px', border: selectedOptionId === opt.id ? '2px solid #2563eb' : '1px solid #d1d5db', background: selectedOptionId === opt.id ? '#eff6ff' : 'white', fontSize:'13px', fontWeight:'bold' }}>
+                            {opt.name}
+                          </button>
+                        ))}
+                      </div>
+                      <div style={{fontSize:'13px', marginBottom:'5px'}}>投票額: <strong>{voteAmount} pt</strong></div>
+                      <input type="range" min="10" max={profile?.point_balance} step="10" value={voteAmount} onChange={e=>setVoteAmount(Number(e.target.value))} style={{width:'100%', marginBottom:'15px'}} />
+                      <div style={{display:'flex', gap:'10px'}}>
+                        <button onClick={handleVote} style={{flex:1, padding:'10px', background:'#2563eb', color:'white', border:'none', borderRadius:'8px', fontWeight:'bold'}}>投票する</button>
+                        <button onClick={closeMarket} style={{flex:1, padding:'10px', background:'#e5e7eb', color:'#374151', border:'none', borderRadius:'8px'}}>やめる</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{display:'flex', gap:'10px', marginTop:'15px'}}>
+                      <button onClick={() => openMarket(market.id)} style={{...styles.voteButton, flex:2}}>⚡️ 投票する</button>
+                      <button onClick={() => shareOnX(market)} style={{...styles.shareButton, flex:1}}>𝕏 シェア</button>
+                    </div>
+                  )
+                ) : (
+                  <button disabled style={styles.disabledButton}>🚫 受付終了</button>
+                )}
+            </div>
           </div>
         )
       })}
@@ -288,7 +315,7 @@ export default function Home() {
   )
 
   const renderRanking = () => (
-    <div style={styles.card}>
+    <div style={{...styles.card, padding:'20px'}}>
       <h3 style={{textAlign:'center', fontWeight:'900', marginBottom:'20px', fontSize:'18px'}}>🏆 投資家ランキング</h3>
       {ranking.map((user, idx) => (
         <div key={user.id} style={{ display: 'flex', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #f3f4f6' }}>
@@ -304,7 +331,7 @@ export default function Home() {
 
   const renderMyPage = () => (
     <div>
-      <div style={{...styles.card, background:'linear-gradient(135deg, #2563eb, #1e40af)', color:'white', textAlign:'center'}}>
+      <div style={{...styles.card, padding:'20px', background:'linear-gradient(135deg, #2563eb, #1e40af)', color:'white', textAlign:'center'}}>
         <div style={{fontSize:'14px', opacity:0.8}}>総資産ポイント</div>
         <div style={{fontSize:'32px', fontWeight:'900'}}>{profile?.point_balance.toLocaleString()} pt</div>
       </div>
@@ -330,16 +357,22 @@ export default function Home() {
 
   return (
     <div style={styles.container as any}>
-      {/* リッチなヘッダー */}
       <div style={styles.headerContainer}>
         <h1 style={styles.appTitle}>YOSOL</h1>
         <p style={styles.appDesc}>未来をヨソル、ポイントで遊ぶ予測市場</p>
         <div>
-           {profile ? 
+           {profile ? (
              <span style={styles.pointBadge}>💎 {profile.point_balance.toLocaleString()} pt</span> 
-             : 
-             <button onClick={handleLogin} style={styles.loginBtn}>ログインして参加</button>
-           }
+           ) : (
+             <div style={{display:'flex', flexDirection:'column', alignItems:'center'}}>
+               <button onClick={handleLineLogin} style={styles.lineButton}>
+                 LINEでログインして始める
+               </button>
+               <button onClick={handleLogin} style={{background:'none', border:'none', fontSize:'11px', color:'#9ca3af', marginTop:'5px', textDecoration:'underline'}}>
+                 アカウントなしで試す
+               </button>
+             </div>
+           )}
         </div>
       </div>
 
