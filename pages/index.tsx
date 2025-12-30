@@ -34,13 +34,23 @@ export default function Home() {
   const [password, setPassword] = useState('')
   const [isSignUp, setIsSignUp] = useState(false)
 
+  // カテゴリ管理用のステート
+  const [categories, setCategories] = useState<string[]>(['すべて'])
+  const [categoryMeta, setCategoryMeta] = useState<any>({})
+
   useEffect(() => {
     const init = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      setSession(session)
-      if (session) await initUserData(session.user.id)
-      await fetchMarkets()
-      await fetchRanking()
+      const { data: { session: currentSession } } = await supabase.auth.getSession()
+      setSession(currentSession)
+
+      // 並列でデータを取得
+      await Promise.all([
+        fetchCategories(),
+        fetchMarkets(),
+        fetchRanking(),
+        currentSession ? initUserData(currentSession.user.id) : Promise.resolve()
+      ])
+
       setIsLoading(false)
     }
     init()
@@ -63,7 +73,7 @@ export default function Home() {
     const { data: profileData } = await supabase.from('profiles').select('*').eq('id', userId).single()
     if (profileData) {
         setProfile(profileData)
-        setEditName(profileData.username || '名無しさん') // 初期値をセット
+        setEditName(profileData.username || '名無しさん')
     }
 
     const { data: betsData } = await supabase
@@ -84,30 +94,25 @@ export default function Home() {
       setMarkets(sorted)
     }
   }
-  
-// fetchRanking を以下に差し替え
+
   async function fetchRanking() {
     const { data } = await supabase
       .from('profiles')
       .select('*')
-      .eq('is_hidden_from_ranking', false) // ★ここ：非表示フラグが立っていない人だけ
+      .eq('is_hidden_from_ranking', false)
       .order('point_balance', { ascending: false })
       .limit(20)
     if (data) setRanking(data)
   }
 
-  // カテゴリ取得を動的にする
-  const [categories, setCategories] = useState<any[]>([])
-  const [categoryMeta, setCategoryMeta] = useState<any>({})
-
   async function fetchCategories() {
     const { data } = await supabase.from('categories').select('*').order('id', { ascending: true })
     if (data) {
-      const list = ['すべて', ...data.map((c:any) => c.name)]
+      const list = ['すべて', ...data.map((c: any) => c.name)]
       setCategories(list)
       const meta: any = {}
-      data.forEach((c:any) => {
-          meta[c.name] = { icon: c.icon || '🎲', color: '#6b7280' } // アイコンをDBから反映
+      data.forEach((c: any) => {
+          meta[c.name] = { icon: c.icon || '🎲', color: '#6b7280' }
       })
       setCategoryMeta(meta)
     }
@@ -120,14 +125,13 @@ export default function Home() {
           if (error) throw error
           alert('名前を変更しました！')
           setIsEditingName(false)
-          initUserData(profile.id) // プロフィール再取得
-          fetchRanking() // ランキングにも反映
+          initUserData(profile.id)
+          fetchRanking()
       } catch (e: any) {
           alert('エラー: ' + e.message)
       }
   }
 
-  // --- ログイン関連 ---
   const handleGoogleLogin = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -197,7 +201,7 @@ export default function Home() {
   }
 
   const getOdds = (marketTotal: number, optionPool: number) => {
-    if (optionPool === 0) return 0
+    if (optionPool === 0) return 1.0
     return (marketTotal / optionPool)
   }
 
@@ -214,34 +218,29 @@ export default function Home() {
 
   const filteredMarkets = markets.filter(m => {
     if (activeCategory === 'すべて') return true
-    if (activeCategory === 'その他' && !m.category) return true
     return m.category === activeCategory
   })
 
-  // --- スタイル ---
-  const styles = {
+  const styles: any = {
     container: { maxWidth: '600px', margin: '0 auto', padding: '20px 15px 100px', minHeight: '100vh', fontFamily: 'sans-serif', color: '#1f2937' },
-    headerContainer: { padding: '20px 0 10px', textAlign: 'center' as const },
+    headerContainer: { padding: '20px 0 10px', textAlign: 'center' },
     appTitle: { fontSize: '28px', fontWeight: '900', background: 'linear-gradient(to right, #2563eb, #9333ea)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0, letterSpacing: '-1px' },
     appDesc: { fontSize: '12px', color: '#6b7280', marginTop: '5px', fontWeight: 'bold' },
     pointBadge: { display: 'inline-block', marginTop: '8px', padding: '4px 12px', background: '#eff6ff', color: '#2563eb', borderRadius: '20px', fontSize: '14px', fontWeight: 'bold' },
-
     googleButton: { marginTop: '10px', padding: '10px 20px', background: 'white', color: '#333', border: '1px solid #ccc', borderRadius: '30px', fontSize: '14px', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer', width: 'fit-content', margin: '10px auto', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' },
     mailButton: { marginTop: '5px', padding: '8px 16px', background: '#f3f4f6', color: '#555', border: 'none', borderRadius: '30px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', width: 'fit-content', margin: '5px auto' },
     inputField: { padding: '10px', border: '1px solid #ccc', borderRadius: '5px', width: '250px', marginBottom: '10px', fontSize: '14px' },
-
-    categoryScroll: { display: 'flex', gap: '10px', overflowX: 'auto' as const, paddingBottom: '10px', marginBottom: '20px', scrollbarWidth: 'none' as const },
+    categoryScroll: { display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '10px', marginBottom: '20px' },
     categoryBtn: (isActive: boolean) => ({
-      padding: '8px 16px', borderRadius: '20px', border: isActive ? 'none' : '1px solid #e5e7eb', background: isActive ? '#1f2937' : 'white', color: isActive ? 'white' : '#4b5563', fontSize: '13px', fontWeight: 'bold' as const, whiteSpace: 'nowrap' as const, cursor: 'pointer', boxShadow: isActive ? '0 4px 6px -1px rgba(0,0,0,0.1)' : 'none'
+      padding: '8px 16px', borderRadius: '20px', border: isActive ? 'none' : '1px solid #e5e7eb', background: isActive ? '#1f2937' : 'white', color: isActive ? 'white' : '#4b5563', fontSize: '13px', fontWeight: 'bold', whiteSpace: 'nowrap', cursor: 'pointer'
     }),
-
-    card: { background: 'white', borderRadius: '16px', padding: '0', marginBottom: '25px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', overflow: 'hidden', position: 'relative' as const, border: '1px solid #f3f4f6' },
-    imageArea: { position: 'relative' as const, height: '180px', width: '100%' },
-    cardImage: { width: '100%', height: '100%', objectFit: 'cover' as const },
-    imageOverlay: { position: 'absolute' as const, bottom: 0, left: 0, right: 0, height: '80%', background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)', display: 'flex', flexDirection: 'column' as const, justifyContent: 'flex-end', padding: '15px' },
-    watermark: (cat: string) => ({ position: 'absolute' as const, top: '-10px', right: '-10px', fontSize: '80px', opacity: 0.1, pointerEvents: 'none' as const, transform: 'rotate(15deg)', zIndex: 0 }),
-    contentArea: { padding: '15px 20px 20px', position: 'relative' as const, zIndex: 1 },
-    descBox: { fontSize: '11px', color: '#4b5563', background: '#f9fafb', padding: '12px', borderRadius: '8px', marginTop: '10px', marginBottom: '15px', lineHeight: '1.6', border: '1px solid #f3f4f6', whiteSpace: 'pre-wrap' as const },
+    card: { background: 'white', borderRadius: '16px', padding: '0', marginBottom: '25px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', overflow: 'hidden', position: 'relative', border: '1px solid #f3f4f6' },
+    imageArea: { position: 'relative', height: '180px', width: '100%' },
+    cardImage: { width: '100%', height: '100%', objectFit: 'cover' },
+    imageOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: '80%', background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '15px' },
+    watermark: { position: 'absolute', top: '-10px', right: '-10px', fontSize: '80px', opacity: 0.1, pointerEvents: 'none', transform: 'rotate(15deg)', zIndex: 0 },
+    contentArea: { padding: '15px 20px 20px', position: 'relative', zIndex: 1 },
+    descBox: { fontSize: '11px', color: '#4b5563', background: '#f9fafb', padding: '12px', borderRadius: '8px', marginTop: '10px', marginBottom: '15px', lineHeight: '1.6', border: '1px solid #f3f4f6', whiteSpace: 'pre-wrap' },
     barRow: { marginBottom: '12px' },
     barLabelArea: { display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px', fontWeight: 'bold' },
     barTrack: { height: '12px', background: '#f3f4f6', borderRadius: '6px', overflow: 'hidden' },
@@ -249,8 +248,8 @@ export default function Home() {
     voteButton: { width: '100%', padding: '12px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', fontSize: '14px' },
     shareButton: { width: '100%', padding: '12px', background: 'black', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', fontSize: '13px' },
     disabledButton: { width: '100%', padding: '12px', background: '#e5e7eb', color: '#9ca3af', border: 'none', borderRadius: '10px', fontWeight: 'bold', marginTop: '15px' },
-    navBar: { position: 'fixed' as const, bottom: 0, left: 0, right: 0, background: 'rgba(255,255,255,0.95)', borderTop: '1px solid #eee', display: 'flex', justifyContent: 'space-around', padding: '12px', zIndex: 100 },
-    navBtn: (isActive: boolean) => ({ background: 'none', border: 'none', color: isActive ? '#2563eb' : '#9ca3af', fontWeight: isActive ? 'bold' : 'normal', fontSize: '10px', display: 'flex', flexDirection: 'column' as const, alignItems: 'center' }),
+    navBar: { position: 'fixed', bottom: 0, left: 0, right: 0, background: 'rgba(255,255,255,0.95)', borderTop: '1px solid #eee', display: 'flex', justifyContent: 'space-around', padding: '12px', zIndex: 100 },
+    navBtn: (isActive: boolean) => ({ background: 'none', border: 'none', color: isActive ? '#2563eb' : '#9ca3af', fontWeight: isActive ? 'bold' : 'normal', fontSize: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center' }),
   }
 
   const renderHome = () => (
@@ -267,10 +266,12 @@ export default function Home() {
 
       {filteredMarkets.map((market) => {
         const isActive = isMarketActive(market)
-        const catInfo = categoryMeta[market.category] || categoryMeta['その他']
+        // ★ 修正：categoryMeta[market.category] が存在しない場合に備えてサイコロをデフォルトにする
+        const catInfo = (market.category && categoryMeta[market.category]) ? categoryMeta[market.category] : { icon: '🎲', color: '#6b7280' }
+
         return (
           <div key={market.id} style={styles.card}>
-            <div style={styles.watermark(market.category)}>{catInfo.icon}</div>
+            <div style={styles.watermark}>{catInfo.icon}</div>
             <div style={styles.imageArea}>
                 {market.image_url ? 
                   <img src={market.image_url} style={styles.cardImage} /> : 
@@ -319,7 +320,7 @@ export default function Home() {
                         ))}
                       </div>
                       <div style={{fontSize:'13px', marginBottom:'5px'}}>投票額: <strong>{voteAmount} pt</strong></div>
-                      <input type="range" min="10" max={profile?.point_balance} step="10" value={voteAmount} onChange={e=>setVoteAmount(Number(e.target.value))} style={{width:'100%', marginBottom:'15px'}} />
+                      <input type="range" min="10" max={profile?.point_balance || 1000} step="10" value={voteAmount} onChange={e=>setVoteAmount(Number(e.target.value))} style={{width:'100%', marginBottom:'15px'}} />
                       <div style={{display:'flex', gap:'10px'}}>
                         <button onClick={handleVote} style={{flex:1, padding:'10px', background:'#2563eb', color:'white', border:'none', borderRadius:'8px', fontWeight:'bold'}}>投票する</button>
                         <button onClick={closeMarket} style={{flex:1, padding:'10px', background:'#e5e7eb', color:'#374151', border:'none', borderRadius:'8px'}}>やめる</button>
@@ -346,7 +347,6 @@ export default function Home() {
         <div key={user.id} style={{ display: 'flex', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #f3f4f6' }}>
           <div style={{ width: '30px', textAlign: 'center', fontWeight: 'bold', color: idx < 3 ? '#d97706' : '#9ca3af' }}>{idx + 1}</div>
           <div style={{ flex: 1, fontSize: '14px', fontWeight: user.id === session?.user?.id ? 'bold' : 'normal' }}>
-            {/* ★ 名前表示を修正 */}
             {user.id === session?.user?.id ? `${user.username || 'あなた'} (自分)` : (user.username || `名無しさん ${user.id.slice(0,4)}`)}
           </div>
           <div style={{ fontWeight: 'bold', color: '#2563eb' }}>{user.point_balance.toLocaleString()} pt</div>
@@ -359,9 +359,8 @@ export default function Home() {
     <div>
       <div style={{...styles.card, padding:'20px', background:'linear-gradient(135deg, #2563eb, #1e40af)', color:'white', textAlign:'center'}}>
         <div style={{fontSize:'14px', opacity:0.8}}>総資産ポイント</div>
-        <div style={{fontSize:'32px', fontWeight:'900'}}>{profile?.point_balance.toLocaleString()} pt</div>
+        <div style={{fontSize:'32px', fontWeight:'900'}}>{profile?.point_balance?.toLocaleString() || 0} pt</div>
 
-        {/* ★ 名前変更エリア */}
         <div style={{marginTop:'15px', background:'rgba(255,255,255,0.2)', padding:'10px', borderRadius:'8px'}}>
             {!isEditingName ? (
                 <div style={{display:'flex', justifyContent:'center', alignItems:'center', gap:'10px'}}>
@@ -389,13 +388,14 @@ export default function Home() {
           </div>
         </div>
       ))}
+      <button onClick={() => supabase.auth.signOut().then(() => window.location.reload())} style={{ width: '100%', padding: '10px', background: 'none', border: '1px solid #ccc', borderRadius: '5px', marginTop: '20px', color: '#666' }}>ログアウト</button>
     </div>
   )
 
   if (isLoading) return <div style={{display:'flex', justifyContent:'center', paddingTop:'50px'}}>読み込み中...</div>
 
   return (
-    <div style={styles.container as any}>
+    <div style={styles.container}>
       <div style={styles.headerContainer}>
         <h1 style={styles.appTitle}>YOSOL</h1>
         <p style={styles.appDesc}>未来をヨソル、ポイントで遊ぶ予測市場</p>
