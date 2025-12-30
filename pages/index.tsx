@@ -28,7 +28,7 @@ export default function Home() {
   const [editName, setEditName] = useState('')
   const [isEditingName, setIsEditingName] = useState(false)
   const [showEmailForm, setShowEmailForm] = useState(false)
-く  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isSignUp, setIsSignUp] = useState(false)
 
@@ -117,15 +117,13 @@ export default function Home() {
     container: { maxWidth: '600px', margin: '0 auto', padding: '20px 15px 120px', fontFamily: 'sans-serif', color: '#1f2937' },
     header: { textAlign: 'center', marginBottom: '20px' },
     appTitle: { fontSize: '32px', fontWeight: '900', background: 'linear-gradient(to right, #2563eb, #9333ea)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0 },
-    appDesc: { fontSize: '13px', color: '#6b7280', marginTop: '8px', fontWeight: 'bold', lineHeight: '1.4' },
-    pointBadge: { display: 'inline-block', marginTop: '10px', padding: '6px 14px', background: '#eff6ff', color: '#2563eb', borderRadius: '20px', fontSize: '14px', fontWeight: 'bold' },
+    appDesc: { fontSize: '12px', color: '#6b7280', marginTop: '5px', fontWeight: 'bold' },
+    pointBadge: { display: 'inline-block', marginTop: '8px', padding: '4px 12px', background: '#eff6ff', color: '#2563eb', borderRadius: '20px', fontSize: '14px', fontWeight: 'bold' },
     sortBar: { display: 'flex', justifyContent: 'center', gap: '15px', marginBottom: '20px' },
     sortBtn: (active: boolean) => ({ fontSize: '12px', padding: '6px 12px', borderRadius: '20px', border: 'none', background: active ? '#2563eb' : '#f3f4f6', color: active ? 'white' : '#9ca3af', fontWeight: 'bold', cursor: 'pointer' }),
     card: { background: 'white', borderRadius: '16px', marginBottom: '25px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', overflow: 'hidden', position: 'relative', border: '1px solid #f3f4f6' },
     watermark: { position: 'absolute', top: '-10px', right: '-10px', fontSize: '80px', opacity: 0.1, pointerEvents: 'none', transform: 'rotate(15deg)', zIndex: 0 },
-    contentArea: { padding: '15px 20px 20px', position: 'relative', zIndex: 1 },
-    // 判定基準ボックスのスタイル
-    descBox: { fontSize: '11px', color: '#64748b', background: '#f8fafc', padding: '10px', borderRadius: '8px', marginBottom: '12px', lineHeight: '1.5', border: '1px solid #f1f5f9', whiteSpace: 'pre-wrap' },
+    descBox: { fontSize: '11px', color: '#4b5563', background: '#f9fafb', padding: '12px', borderRadius: '8px', marginBottom: '15px', lineHeight: '1.6', border: '1px solid #f3f4f6', whiteSpace: 'pre-wrap' },
     nav: { position: 'fixed', bottom: 0, left: 0, right: 0, background: 'rgba(255,255,255,0.95)', borderTop: '1px solid #eee', display: 'flex', justifyContent: 'space-around', padding: '12px', zIndex: 100 },
     adminLink: { textAlign: 'center', marginTop: '40px', fontSize: '11px', color: '#e5e7eb' }
   }
@@ -142,9 +140,9 @@ export default function Home() {
 
       {activeTab === 'home' && (
         <>
-          <div style={{display:'flex', gap:'10px', overflowX:'auto', marginBottom:'15px', paddingBottom:'8px'}}>
+          <div style={{display:'flex', gap:'10px', overflowX:'auto', marginBottom:'15px', paddingBottom:'5px'}}>
             {categories.map(cat => (
-              <button key={cat} onClick={()=>setActiveCategory(cat)} style={{padding:'8px 18px', borderRadius:'25px', background:activeCategory===cat?'#1f2937':'white', color:activeCategory===cat?'white':'#4b5563', whiteSpace:'nowrap', border:'1px solid #ddd', fontWeight:'bold', cursor:'pointer'}}>{cat}</button>
+              <button key={cat} onClick={()=>setActiveCategory(cat)} style={{padding:'8px 16px', borderRadius:'20px', background:activeCategory===cat?'#1f2937':'white', color:activeCategory===cat?'white':'#4b5563', whiteSpace:'nowrap', border:'1px solid #ddd', fontWeight:'bold', cursor:'pointer'}}>{cat}</button>
             ))}
           </div>
 
@@ -159,7 +157,7 @@ export default function Home() {
             return (
               <div key={m.id} style={styles.card}>
                 <div style={styles.watermark}>{catInfo.icon}</div>
-                <div style={{height:'180px', position:'relative', background:'#f3f4f6'}}>
+                <div style={{height:'180px', position:'relative', background:'#eee'}}>
                   {m.image_url ? <img src={m.image_url} style={{width:'100%', height:'100%', objectFit:'cover'}} alt="" /> : <div style={{textAlign:'center', paddingTop:'60px', fontSize:'40px'}}>{catInfo.icon}</div>}
                   <div style={{position:'absolute', bottom:0, left:0, right:0, height:'80%', background:'linear-gradient(to top, rgba(0,0,0,0.8), transparent)', display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'15px'}}>
                     <div style={{display:'flex', gap:'6px', marginBottom:'6px'}}>
@@ -168,47 +166,46 @@ export default function Home() {
                         {m.is_resolved ? '結果確定' : (active ? `あと ${Math.ceil((new Date(m.end_date).getTime() - new Date().getTime())/(1000*60*60*24))}日` : '終了')}
                       </span>
                     </div>
-                    <h2 style={{color:'white', margin:0, fontSize:'19px', fontWeight:'bold', textShadow:'0 2px 4px rgba(0,0,0,0.5)'}}>{m.title}</h2>
+                    <h2 style={{color:'white', margin:0, fontSize:'18px', textShadow:'0 2px 4px rgba(0,0,0,0.5)'}}>{m.title}</h2>
                   </div>
                 </div>
 
-                // pages/index.tsx の該当箇所
-                <div style={styles.contentArea}>
-                    {/* 判定基準：写真やグラデーションに被らないよう、白い背景エリアの先頭に配置 */}
-                    {market.description && (
-                      <div style={{
-                          fontSize: '11px', 
-                          color: '#4b5563', 
-                          background: '#f9fafb', 
-                          padding: '12px', 
-                          borderRadius: '8px', 
-                          marginBottom: '15px', 
-                          lineHeight: '1.6', 
-                          border: '1px solid #f3f4f6', 
-                          whiteSpace: 'pre-wrap',
-                          position: 'relative',
-                          zIndex: 10
-                      }}>
-                        <div style={{fontWeight:'bold', fontSize:'10px', marginBottom:'4px', color:'#2563eb'}}>【判定基準】</div>
-                        <div dangerouslySetInnerHTML={{ __html: market.description.replace(/\n/g, '<br />') }} />
+                <div style={{ background: 'white', padding: '20px', position: 'relative', zIndex: 1, minHeight: '100px' }}>
+                  {/* 判定基準：白背景の最上部に、目立つように配置 */}
+                  {m.description && (
+                    <div style={{
+                      fontSize: '12px', 
+                      color: '#4b5563', 
+                      background: '#f8fafc', 
+                      padding: '12px', 
+                      borderRadius: '8px', 
+                      marginBottom: '15px', 
+                      lineHeight: '1.6', 
+                      border: '1px solid #e2e8f0', 
+                      whiteSpace: 'pre-wrap'
+                    }}>
+                      <div style={{fontWeight:'bold', fontSize: '11px', color: '#2563eb', marginBottom: '6px', borderBottom: '1px solid #e2e8f0', paddingBottom: '4px'}}>
+                        📝 判定基準・詳細条件
                       </div>
-                    )}
-
-                    <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '15px', fontWeight:'bold' }}>
-                      💰 投票総額: <span style={{fontSize:'14px', color:'#1f2937'}}>{market.total_pool.toLocaleString()} pt</span>
+                      {m.description}
                     </div>
-                    {/* ...以下、選択肢とボタン */}
-                  {m.market_options.map((opt: any, idx: number) => {
+                  )}
+
+                  <div style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: '15px', color: '#1f2937' }}>
+                    💰 投票総額: {m.total_pool.toLocaleString()} pt
+                  </div>
+                  {/* ...以下、選択肢 */}
+                {m.market_options.map((opt: any, idx: number) => {
                     const pct = m.total_pool === 0 ? 0 : Math.round((opt.pool / m.total_pool) * 100)
                     const odds = opt.pool === 0 ? '1.0' : (m.total_pool / opt.pool).toFixed(1)
                     return (
-                      <div key={opt.id} style={{marginBottom:'12px'}}>
-                        <div style={{display:'flex', justifyContent:'space-between', fontSize:'14px', fontWeight:'bold', marginBottom:'4px'}}>
+                      <div key={opt.id} style={{marginBottom:'10px'}}>
+                        <div style={{display:'flex', justifyContent:'space-between', fontSize:'13px', fontWeight:'bold'}}>
                           <span>{m.result_option_id === opt.id ? '👑 ' : ''}{opt.name}</span>
                           <span style={{color:'#2563eb'}}>{odds}倍 ({pct}%)</span>
                         </div>
-                        <div style={{height:'10px', background:'#f3f4f6', borderRadius:'5px', overflow:'hidden'}}>
-                          <div style={{width:`${pct}%`, height:'100%', background:['#3b82f6','#ef4444','#10b981','#f59e0b'][idx%4], transition:'width 0.5s ease-out'}} />
+                        <div style={{height:'8px', background:'#f3f4f6', borderRadius:'4px', overflow:'hidden'}}>
+                          <div style={{width:`${pct}%`, height:'100%', background:['#3b82f6','#ef4444','#10b981','#f59e0b'][idx%4]}} />
                         </div>
                       </div>
                     )
@@ -222,7 +219,6 @@ export default function Home() {
                             <button key={o.id} onClick={()=>setSelectedOptionId(o.id)} style={{padding:'10px 14px', borderRadius:'25px', border:selectedOptionId===o.id?'2px solid #2563eb':'1px solid #ddd', background:selectedOptionId===o.id?'#eff6ff':'white', color:'black', fontWeight:'bold', cursor:'pointer'}}>{o.name}</button>
                           ))}
                         </div>
-                        <div style={{fontSize:'13px', marginBottom:'8px', fontWeight:'bold'}}>投票額: {voteAmount} pt</div>
                         <input type="range" min="10" max={profile?.point_balance || 1000} step="10" value={voteAmount} onChange={e=>setVoteAmount(Number(e.target.value))} style={{width:'100%', marginBottom:'15px'}} />
                         <div style={{display:'flex', gap:'12px'}}>
                           <button onClick={handleVote} style={{flex:1, padding:'14px', background:'#2563eb', color:'white', border:'none', borderRadius:'10px', fontWeight:'bold', cursor:'pointer'}}>投票する</button>
@@ -247,10 +243,9 @@ export default function Home() {
         </>
       )}
 
-      {/* ランキング・マイページ等のロジックは以前のまま維持 */}
       {activeTab === 'ranking' && (
         <div style={{background:'white', borderRadius:'16px', padding:'24px', boxShadow:'0 4px 20px rgba(0,0,0,0.05)'}}>
-           <h3 style={{textAlign:'center', marginBottom:'24px', fontSize:'20px', fontWeight:'bold'}}>🏆 投資家ランキング</h3>
+           <h3 style={{textAlign:'center', marginBottom:'24px', fontSize:'20px', fontWeight:'bold'}}>🏆 ランキング</h3>
            {ranking.map((u, i) => (
              <div key={u.id} style={{display:'flex', padding:'14px 0', borderBottom:'1px solid #f1f5f9', alignItems:'center'}}>
                <div style={{width:'36px', fontWeight:'bold', fontSize:'18px', color:i<3?'#f59e0b':'#cbd5e1'}}>{i+1}</div>
