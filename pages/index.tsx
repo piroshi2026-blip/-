@@ -12,12 +12,19 @@ export default function Home() {
   const [markets, setMarkets] = useState<any[]>([])
   const [ranking, setRanking] = useState<any[]>([])
   const [myBets, setMyBets] = useState<any[]>([])
+
+  // 画面タブ（ホーム、ランキング...）
   const [activeTab, setActiveTab] = useState<'home' | 'ranking' | 'mypage'>('home')
+  // ジャンルタブ（すべて、政治、エンタメ...）
+  const [activeCategory, setActiveCategory] = useState('すべて')
 
   const [voteAmount, setVoteAmount] = useState(100)
   const [selectedMarketId, setSelectedMarketId] = useState<number | null>(null)
   const [selectedOptionId, setSelectedOptionId] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+
+  // カテゴリ一覧
+  const categories = ['すべて', 'こども', '経済・政治', 'エンタメ', 'スポーツ', 'ライフ', 'その他']
 
   useEffect(() => {
     const init = async () => {
@@ -105,53 +112,78 @@ export default function Home() {
     return true
   }
 
-  // --- スタイル設定 (エラー対策済み決定版) ---
+  // カテゴリでフィルタリングしたマーケット一覧
+  const filteredMarkets = markets.filter(m => {
+    if (activeCategory === 'すべて') return true
+    // カテゴリが未設定(null)の場合は「その他」として扱う
+    if (activeCategory === 'その他' && !m.category) return true
+    return m.category === activeCategory
+  })
+
+  // --- スタイル設定 ---
   const styles = {
     container: { maxWidth: '600px', margin: '0 auto', padding: '20px 15px 100px', minHeight: '100vh', fontFamily: 'sans-serif', color: '#1f2937' },
-    header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', padding: '10px 0' },
+    header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', padding: '10px 0' },
     logo: { fontSize: '20px', fontWeight: '900', background: 'linear-gradient(to right, #2563eb, #9333ea)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' },
+
+    // カテゴリタブのスタイル
+    categoryScroll: { display: 'flex', gap: '10px', overflowX: 'auto' as const, paddingBottom: '10px', marginBottom: '20px', scrollbarWidth: 'none' as const },
+    categoryBtn: (isActive: boolean) => ({
+      padding: '8px 16px',
+      borderRadius: '20px',
+      border: isActive ? 'none' : '1px solid #e5e7eb',
+      background: isActive ? '#1f2937' : 'white',
+      color: isActive ? 'white' : '#4b5563',
+      fontSize: '13px',
+      fontWeight: 'bold' as const,
+      whiteSpace: 'nowrap' as const,
+      cursor: 'pointer',
+      boxShadow: isActive ? '0 4px 6px -1px rgba(0,0,0,0.1)' : 'none'
+    }),
+
     card: { background: 'white', borderRadius: '16px', padding: '20px', marginBottom: '20px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' },
     barRow: { marginBottom: '12px' },
     barLabelArea: { display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px', fontWeight: 'bold' },
     barTrack: { height: '12px', background: '#f3f4f6', borderRadius: '6px', overflow: 'hidden' },
-    // ↓ 関数も型定義なしでそのまま書く
-    barFill: (percent: number, idx: number) => ({ 
-      height: '100%', 
-      width: `${percent}%`, 
-      background: ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6'][idx % 5], 
-      transition: 'width 0.5s' 
-    }),
+    barFill: (percent: number, idx: number) => ({ height: '100%', width: `${percent}%`, background: ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6'][idx % 5], transition: 'width 0.5s' }),
     voteButton: { width: '100%', padding: '12px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', marginTop: '15px' },
     disabledButton: { width: '100%', padding: '12px', background: '#e5e7eb', color: '#9ca3af', border: 'none', borderRadius: '10px', fontWeight: 'bold', marginTop: '15px' },
-    navBar: { 
-      position: 'fixed' as const, // as const で固定
-      bottom: 0, left: 0, right: 0, 
-      background: 'rgba(255,255,255,0.95)', 
-      borderTop: '1px solid #eee', 
-      display: 'flex', 
-      justifyContent: 'space-around', 
-      padding: '12px', 
-      zIndex: 100 
-    },
-    navBtn: (isActive: boolean) => ({ 
-      background: 'none', 
-      border: 'none', 
-      color: isActive ? '#2563eb' : '#9ca3af', 
-      fontWeight: isActive ? 'bold' : 'normal', 
-      fontSize: '10px', 
-      display: 'flex', 
-      flexDirection: 'column' as const, // as const で固定
-      alignItems: 'center' 
-    }),
+    navBar: { position: 'fixed' as const, bottom: 0, left: 0, right: 0, background: 'rgba(255,255,255,0.95)', borderTop: '1px solid #eee', display: 'flex', justifyContent: 'space-around', padding: '12px', zIndex: 100 },
+    navBtn: (isActive: boolean) => ({ background: 'none', border: 'none', color: isActive ? '#2563eb' : '#9ca3af', fontWeight: isActive ? 'bold' : 'normal', fontSize: '10px', display: 'flex', flexDirection: 'column' as const, alignItems: 'center' }),
   }
 
   const renderHome = () => (
     <div>
-      {markets.map((market) => {
+      {/* カテゴリタブ */}
+      <div style={styles.categoryScroll}>
+        {categories.map(cat => (
+          <button 
+            key={cat} 
+            onClick={() => setActiveCategory(cat)} 
+            style={styles.categoryBtn(activeCategory === cat)}
+          >
+            {cat}
+          </button>
+        ))}
+      </div>
+
+      {filteredMarkets.length === 0 && (
+        <div style={{textAlign:'center', padding:'40px', color:'#9ca3af', fontSize:'14px'}}>
+          まだこのジャンルの質問はありません
+        </div>
+      )}
+
+      {filteredMarkets.map((market) => {
         const isActive = isMarketActive(market)
         return (
-          <div key={market.id} style={styles.card as any}>
+          <div key={market.id} style={styles.card}>
             {market.image_url && <img src={market.image_url} style={{ width: '100%', height: '140px', objectFit: 'cover', borderRadius: '10px', marginBottom: '12px' }} />}
+
+            {/* カテゴリバッジ */}
+            <div style={{display:'flex', justifyContent:'space-between', marginBottom:'8px'}}>
+               <span style={{fontSize:'10px', background:'#f3f4f6', padding:'2px 8px', borderRadius:'4px', color:'#666'}}>{market.category || 'その他'}</span>
+            </div>
+
             <h2 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '8px' }}>{market.title}</h2>
             <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '15px', display:'flex', gap:'10px' }}>
               <span>💰 総額: {market.total_pool.toLocaleString()}pt</span>
@@ -165,12 +197,12 @@ export default function Home() {
                 const odds = getOdds(market.total_pool, opt.pool)
                 const isWinner = market.result_option_id === opt.id
                 return (
-                  <div key={opt.id} style={styles.barRow as any}>
-                    <div style={styles.barLabelArea as any}>
+                  <div key={opt.id} style={styles.barRow}>
+                    <div style={styles.barLabelArea}>
                       <span>{isWinner ? '👑 ' : ''}{opt.name}</span>
                       <span>{odds ? `${odds.toFixed(1)}倍` : '--倍'} ({percent}%)</span>
                     </div>
-                    <div style={styles.barTrack as any}>
+                    <div style={styles.barTrack}>
                       <div style={styles.barFill(percent, idx) as any} />
                     </div>
                   </div>
@@ -196,10 +228,10 @@ export default function Home() {
                   </div>
                 </div>
               ) : (
-                <button onClick={() => { if(!session) return handleLogin(); setSelectedMarketId(market.id) }} style={styles.voteButton as any}>⚡️ 投票する</button>
+                <button onClick={() => { if(!session) return handleLogin(); setSelectedMarketId(market.id) }} style={styles.voteButton}>⚡️ 投票する</button>
               )
             ) : (
-              <button disabled style={styles.disabledButton as any}>🚫 受付終了</button>
+              <button disabled style={styles.disabledButton}>🚫 受付終了</button>
             )}
           </div>
         )
@@ -208,7 +240,7 @@ export default function Home() {
   )
 
   const renderRanking = () => (
-    <div style={styles.card as any}>
+    <div style={styles.card}>
       <h3 style={{textAlign:'center', fontWeight:'900', marginBottom:'20px', fontSize:'18px'}}>🏆 投資家ランキング</h3>
       {ranking.map((user, idx) => (
         <div key={user.id} style={{ display: 'flex', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #f3f4f6' }}>
@@ -224,14 +256,14 @@ export default function Home() {
 
   const renderMyPage = () => (
     <div>
-      <div style={{...(styles.card as any), background:'linear-gradient(135deg, #2563eb, #1e40af)', color:'white', textAlign:'center'}}>
+      <div style={{...styles.card, background:'linear-gradient(135deg, #2563eb, #1e40af)', color:'white', textAlign:'center'}}>
         <div style={{fontSize:'14px', opacity:0.8}}>総資産ポイント</div>
         <div style={{fontSize:'32px', fontWeight:'900'}}>{profile?.point_balance.toLocaleString()} pt</div>
       </div>
       <h3 style={{fontWeight:'bold', marginLeft:'5px', marginBottom:'10px'}}>📜 投票履歴</h3>
       {myBets.length === 0 && <div style={{textAlign:'center', color:'#9ca3af', marginTop:'20px'}}>まだ投票履歴がありません</div>}
       {myBets.map((bet) => (
-        <div key={bet.id} style={{...(styles.card as any), padding:'15px', marginBottom:'10px'}}>
+        <div key={bet.id} style={{...styles.card, padding:'15px', marginBottom:'10px'}}>
           <div style={{fontSize:'12px', color:'#6b7280', marginBottom:'5px'}}>{bet.markets?.title}</div>
           <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
             <div style={{fontWeight:'bold', fontSize:'15px'}}>
@@ -250,8 +282,8 @@ export default function Home() {
 
   return (
     <div style={styles.container as any}>
-      <header style={styles.header as any}>
-        <div style={styles.logo as any}>🇯🇵 Polymarket JP</div>
+      <header style={styles.header}>
+        <div style={styles.logo}>🇯🇵 Polymarket JP</div>
         {profile ? <div style={{fontWeight:'bold', fontSize:'14px'}}>💎 {profile.point_balance.toLocaleString()}</div> : <button onClick={handleLogin}>ログイン</button>}
       </header>
 
@@ -259,10 +291,14 @@ export default function Home() {
       {activeTab === 'ranking' && renderRanking()}
       {activeTab === 'mypage' && renderMyPage()}
 
-      <nav style={styles.navBar as any}>
-        <button onClick={() => setActiveTab('home')} style={styles.navBtn(activeTab === 'home') as any}><span style={{fontSize:'20px'}}>🏠</span>ホーム</button>
-        <button onClick={() => setActiveTab('ranking')} style={styles.navBtn(activeTab === 'ranking') as any}><span style={{fontSize:'20px'}}>👑</span>ランキング</button>
-        <button onClick={() => { if(!session) handleLogin(); setActiveTab('mypage') }} style={styles.navBtn(activeTab === 'mypage') as any}><span style={{fontSize:'20px'}}>👤</span>マイページ</button>
+      <div style={{ textAlign: 'center', paddingBottom: '80px', fontSize: '12px', color: '#ccc' }}>
+        <a href="/admin" style={{ textDecoration: 'none', color: '#e5e7eb' }}>Admin Login</a>
+      </div>
+
+      <nav style={styles.navBar}>
+        <button onClick={() => setActiveTab('home')} style={styles.navBtn(activeTab === 'home')}><span style={{fontSize:'20px'}}>🏠</span>ホーム</button>
+        <button onClick={() => setActiveTab('ranking')} style={styles.navBtn(activeTab === 'ranking')}><span style={{fontSize:'20px'}}>👑</span>ランキング</button>
+        <button onClick={() => { if(!session) handleLogin(); setActiveTab('mypage') }} style={styles.navBtn(activeTab === 'mypage')}><span style={{fontSize:'20px'}}>👤</span>マイページ</button>
       </nav>
     </div>
   )
