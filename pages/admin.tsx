@@ -10,28 +10,30 @@ export default function Admin() {
   const [markets, setMarkets] = useState<any[]>([])
   const [password, setPassword] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
-  const [isReady, setIsReady] = useState(false) // 読み込み完了フラグ
+  const [isReady, setIsReady] = useState(false)
 
-  // 新規作成・編集用ステート
+  // カテゴリの選択肢 (アプリ側のタブと合わせる)
+  const categories = ['経済・政治', 'エンタメ', 'スポーツ', 'ライフ', 'こども', 'その他']
+
+  // 新規作成用
   const [newTitle, setNewTitle] = useState('')
   const [newImage, setNewImage] = useState('')
   const [newOptions, setNewOptions] = useState('') 
   const [newEndDate, setNewEndDate] = useState('')
+  const [newCategory, setNewCategory] = useState('経済・政治') // デフォルト
 
+  // 編集用
   const [editingId, setEditingId] = useState<number | null>(null)
-  const [editForm, setEditForm] = useState({ title: '', image_url: '', end_date: '' })
+  const [editForm, setEditForm] = useState({ title: '', image_url: '', end_date: '', category: '' })
 
   useEffect(() => {
-    // 1. ログイン状態の復元
+    // ログイン状態復元
     const storedAuth = localStorage.getItem('isAdmin')
-    if (storedAuth === 'true') {
-      setIsAdmin(true)
-    }
+    if (storedAuth === 'true') setIsAdmin(true)
 
-    // 2. 初期値として7日後をセット
+    // 日付初期値 (7日後)
     const d = new Date()
     d.setDate(d.getDate() + 7)
-    // JSTを意識してフォーマット (簡易版)
     const yyyy = d.getFullYear()
     const MM = ('0' + (d.getMonth() + 1)).slice(-2)
     const dd = ('0' + d.getDate()).slice(-2)
@@ -61,7 +63,7 @@ export default function Admin() {
   const handleLogin = () => {
     if (password === 'admin1234') {
       setIsAdmin(true)
-      localStorage.setItem('isAdmin', 'true') // 記憶する
+      localStorage.setItem('isAdmin', 'true')
     } else {
       alert('パスワードが違います')
     }
@@ -69,12 +71,11 @@ export default function Admin() {
 
   const handleLogout = () => {
     setIsAdmin(false)
-    localStorage.removeItem('isAdmin') // 記憶を消す
+    localStorage.removeItem('isAdmin')
     window.location.href = '/'
   }
 
-  // --- 作成・編集・削除・判定ロジック ---
-
+  // --- 作成 ---
   const createMarket = async () => {
     if (!newTitle || !newOptions || !newEndDate) return alert('必須項目が空です')
     try {
@@ -83,7 +84,8 @@ export default function Admin() {
         .insert({ 
           title: newTitle, 
           image_url: newImage || 'https://placehold.co/600x400',
-          end_date: new Date(newEndDate).toISOString()
+          end_date: new Date(newEndDate).toISOString(),
+          category: newCategory // カテゴリも保存
         })
         .select().single()
       if (marketError) throw marketError
@@ -96,30 +98,37 @@ export default function Admin() {
       if (optionError) throw optionError
 
       alert('作成しました！')
-      setNewTitle(''); setNewImage(''); setNewOptions(''); fetchMarkets()
+      setNewTitle(''); setNewImage(''); setNewOptions(''); 
+      fetchMarkets()
     } catch (e: any) { alert(e.message) }
   }
 
+  // --- 編集開始 ---
   const startEdit = (market: any) => {
     setEditingId(market.id)
-    // 日時をinput用に変換
     const localDate = new Date(market.end_date)
-    // ずれている時間を補正してYYYY-MM-DDThh:mm形式にする
     const offset = localDate.getTimezoneOffset()
     const adjusted = new Date(localDate.getTime() - (offset * 60 * 1000))
+
     setEditForm({
       title: market.title,
       image_url: market.image_url || '',
-      end_date: adjusted.toISOString().slice(0, 16)
+      end_date: adjusted.toISOString().slice(0, 16),
+      category: market.category || 'その他' // カテゴリ読み込み
     })
   }
 
+  // --- 編集保存 ---
   const saveEdit = async () => {
     if (!editingId) return
     try {
       const { error } = await supabase.from('markets').update({
-        title: editForm.title, image_url: editForm.image_url, end_date: new Date(editForm.end_date).toISOString()
+        title: editForm.title, 
+        image_url: editForm.image_url, 
+        end_date: new Date(editForm.end_date).toISOString(),
+        category: editForm.category // カテゴリ更新
       }).eq('id', editingId)
+
       if (error) throw error
       alert('更新しました！'); setEditingId(null); fetchMarkets()
     } catch (e: any) { alert(e.message) }
@@ -141,9 +150,7 @@ export default function Admin() {
     if (error) alert(error.message); else { alert('配当配布完了！'); fetchMarkets() }
   }
 
-  // --- 描画 ---
-  if (!isReady) return null // 初期化待ち
-
+  if (!isReady) return null
   if (!isAdmin) {
     return (
       <div style={{ padding: '40px', textAlign: 'center', fontFamily: 'sans-serif' }}>
@@ -166,11 +173,29 @@ export default function Admin() {
       <div style={{ background: '#f0f9ff', padding: '20px', borderRadius: '12px', marginBottom: '30px', border:'1px solid #bae6fd' }}>
         <h3>📝 新規作成</h3>
         <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
+          <label style={{fontSize:'12px', fontWeight:'bold'}}>タイトル</label>
           <input placeholder="タイトル" value={newTitle} onChange={e=>setNewTitle(e.target.value)} style={{padding:'8px'}} />
-          <input type="datetime-local" value={newEndDate} onChange={e=>setNewEndDate(e.target.value)} style={{padding:'8px'}} />
-          <input placeholder="画像URL" value={newImage} onChange={e=>setNewImage(e.target.value)} style={{padding:'8px'}} />
-          <input placeholder="選択肢 (カンマ区切り)" value={newOptions} onChange={e=>setNewOptions(e.target.value)} style={{padding:'8px'}} />
-          <button onClick={createMarket} style={{background:'#0284c7', color:'white', padding:'10px', border:'none', borderRadius:'5px'}}>公開</button>
+
+          <div style={{display:'flex', gap:'10px'}}>
+            <div style={{flex:1}}>
+              <label style={{fontSize:'12px', fontWeight:'bold'}}>カテゴリ</label>
+              <select value={newCategory} onChange={e=>setNewCategory(e.target.value)} style={{width:'100%', padding:'8px'}}>
+                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div style={{flex:1}}>
+              <label style={{fontSize:'12px', fontWeight:'bold'}}>締切日時</label>
+              <input type="datetime-local" value={newEndDate} onChange={e=>setNewEndDate(e.target.value)} style={{width:'100%', padding:'8px'}} />
+            </div>
+          </div>
+
+          <label style={{fontSize:'12px', fontWeight:'bold'}}>画像URL</label>
+          <input placeholder="https://..." value={newImage} onChange={e=>setNewImage(e.target.value)} style={{padding:'8px'}} />
+
+          <label style={{fontSize:'12px', fontWeight:'bold'}}>選択肢 (カンマ区切り)</label>
+          <input placeholder="A, B, C" value={newOptions} onChange={e=>setNewOptions(e.target.value)} style={{padding:'8px'}} />
+
+          <button onClick={createMarket} style={{background:'#0284c7', color:'white', padding:'10px', border:'none', borderRadius:'5px', marginTop:'10px'}}>公開</button>
         </div>
       </div>
 
@@ -183,17 +208,32 @@ export default function Admin() {
 
              {editingId === m.id ? (
                <div style={{background:'#fffbeb', padding:'15px', borderRadius:'8px', marginTop:'30px'}}>
-                 <h4>編集中</h4>
-                 <input value={editForm.title} onChange={e=>setEditForm({...editForm, title: e.target.value})} style={{width:'100%', marginBottom:'5px'}} />
-                 <input type="datetime-local" value={editForm.end_date} onChange={e=>setEditForm({...editForm, end_date: e.target.value})} style={{width:'100%', marginBottom:'5px'}} />
-                 <input value={editForm.image_url} onChange={e=>setEditForm({...editForm, image_url: e.target.value})} style={{width:'100%', marginBottom:'5px'}} />
-                 <button onClick={saveEdit} style={{marginRight:'10px'}}>保存</button>
-                 <button onClick={()=>setEditingId(null)}>キャンセル</button>
+                 <h4>✏️ 編集中</h4>
+                 <label style={{fontSize:'12px'}}>タイトル</label>
+                 <input value={editForm.title} onChange={e=>setEditForm({...editForm, title: e.target.value})} style={{width:'100%', marginBottom:'5px', padding:'5px'}} />
+
+                 <label style={{fontSize:'12px'}}>カテゴリ</label>
+                 <select value={editForm.category} onChange={e=>setEditForm({...editForm, category: e.target.value})} style={{width:'100%', marginBottom:'5px', padding:'5px'}}>
+                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                 </select>
+
+                 <label style={{fontSize:'12px'}}>締切</label>
+                 <input type="datetime-local" value={editForm.end_date} onChange={e=>setEditForm({...editForm, end_date: e.target.value})} style={{width:'100%', marginBottom:'5px', padding:'5px'}} />
+
+                 <label style={{fontSize:'12px'}}>画像URL</label>
+                 <input value={editForm.image_url} onChange={e=>setEditForm({...editForm, image_url: e.target.value})} style={{width:'100%', marginBottom:'10px', padding:'5px'}} />
+
+                 <button onClick={saveEdit} style={{marginRight:'10px', background:'#059669', color:'white', border:'none', padding:'5px 10px', borderRadius:'5px'}}>保存</button>
+                 <button onClick={()=>setEditingId(null)} style={{background:'#9ca3af', color:'white', border:'none', padding:'5px 10px', borderRadius:'5px'}}>キャンセル</button>
                </div>
              ) : (
                <>
                  <button onClick={() => startEdit(m)} style={{position:'absolute', top:'15px', right:'70px', background:'#e0f2fe', color:'#0284c7', border:'none', padding:'5px 10px', borderRadius:'5px'}}>編集</button>
-                 <div style={{fontWeight:'bold', fontSize:'18px', paddingRight:'120px'}}>{m.title}</div>
+
+                 {/* カテゴリバッジ */}
+                 <span style={{background:'#e5e7eb', fontSize:'10px', padding:'2px 6px', borderRadius:'4px', color:'#374151'}}>{m.category || '未設定'}</span>
+
+                 <div style={{fontWeight:'bold', fontSize:'18px', paddingRight:'120px', marginTop:'5px'}}>{m.title}</div>
                  <div style={{fontSize:'12px', color:'#666', marginBottom:'10px'}}>締切: {new Date(m.end_date).toLocaleString()}</div>
                  <div style={{display:'flex', gap:'5px', flexWrap:'wrap'}}>
                    {m.market_options.map((opt:any) => (
