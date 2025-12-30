@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
+import Link from 'next/link' // ← これを追加しました！
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -13,9 +14,9 @@ export default function Home() {
   const [ranking, setRanking] = useState<any[]>([])
   const [myBets, setMyBets] = useState<any[]>([])
 
-  // 画面タブ（ホーム、ランキング...）
+  // 画面タブ
   const [activeTab, setActiveTab] = useState<'home' | 'ranking' | 'mypage'>('home')
-  // ジャンルタブ（すべて、政治、エンタメ...）
+  // ジャンルタブ
   const [activeCategory, setActiveCategory] = useState('すべて')
 
   const [voteAmount, setVoteAmount] = useState(100)
@@ -112,10 +113,8 @@ export default function Home() {
     return true
   }
 
-  // カテゴリでフィルタリングしたマーケット一覧
   const filteredMarkets = markets.filter(m => {
     if (activeCategory === 'すべて') return true
-    // カテゴリが未設定(null)の場合は「その他」として扱う
     if (activeCategory === 'その他' && !m.category) return true
     return m.category === activeCategory
   })
@@ -126,7 +125,6 @@ export default function Home() {
     header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', padding: '10px 0' },
     logo: { fontSize: '20px', fontWeight: '900', background: 'linear-gradient(to right, #2563eb, #9333ea)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' },
 
-    // カテゴリタブのスタイル
     categoryScroll: { display: 'flex', gap: '10px', overflowX: 'auto' as const, paddingBottom: '10px', marginBottom: '20px', scrollbarWidth: 'none' as const },
     categoryBtn: (isActive: boolean) => ({
       padding: '8px 16px',
@@ -154,14 +152,9 @@ export default function Home() {
 
   const renderHome = () => (
     <div>
-      {/* カテゴリタブ */}
       <div style={styles.categoryScroll}>
         {categories.map(cat => (
-          <button 
-            key={cat} 
-            onClick={() => setActiveCategory(cat)} 
-            style={styles.categoryBtn(activeCategory === cat)}
-          >
+          <button key={cat} onClick={() => setActiveCategory(cat)} style={styles.categoryBtn(activeCategory === cat)}>
             {cat}
           </button>
         ))}
@@ -179,7 +172,6 @@ export default function Home() {
           <div key={market.id} style={styles.card}>
             {market.image_url && <img src={market.image_url} style={{ width: '100%', height: '140px', objectFit: 'cover', borderRadius: '10px', marginBottom: '12px' }} />}
 
-            {/* カテゴリバッジ */}
             <div style={{display:'flex', justifyContent:'space-between', marginBottom:'8px'}}>
                <span style={{fontSize:'10px', background:'#f3f4f6', padding:'2px 8px', borderRadius:'4px', color:'#666'}}>{market.category || 'その他'}</span>
             </div>
@@ -291,8 +283,9 @@ export default function Home() {
       {activeTab === 'ranking' && renderRanking()}
       {activeTab === 'mypage' && renderMyPage()}
 
+      {/* ↓ ここを修正しました（Linkタグを使用） */}
       <div style={{ textAlign: 'center', paddingBottom: '80px', fontSize: '12px', color: '#ccc' }}>
-        <a href="/admin" style={{ textDecoration: 'none', color: '#e5e7eb' }}>Admin Login</a>
+        <Link href="/admin" style={{ textDecoration: 'none', color: '#e5e7eb' }}>Admin Login</Link>
       </div>
 
       <nav style={styles.navBar}>
