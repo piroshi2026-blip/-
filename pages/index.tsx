@@ -195,7 +195,10 @@ export default function Home() {
 
   const shareOnX = (market: any) => {
     const url = `${window.location.origin}/?id=${market.id}`
-    const text = `💰予測市場「YOSOL」に参加中！\n\nQ. ${market.title}\n\nあなたも予想しよう！ #YOSOL`
+    // 管理画面で保存したテンプレートを読み込む
+    const template = localStorage.getItem('x_template') || '💰予測市場「YOSOL」に参加中！\n\nQ. {title}\n\nあなたも予想しよう！ #YOSOL'
+    const text = template.replace('{title}', market.title)
+
     const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`
     window.open(twitterUrl, '_blank')
   }
