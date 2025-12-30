@@ -28,7 +28,7 @@ export default function Home() {
   const [editName, setEditName] = useState('')
   const [isEditingName, setIsEditingName] = useState(false)
   const [showEmailForm, setShowEmailForm] = useState(false)
-  const [email, setEmail] = useState('')
+く  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isSignUp, setIsSignUp] = useState(false)
 
