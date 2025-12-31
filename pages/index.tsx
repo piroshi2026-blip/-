@@ -103,11 +103,15 @@ export default function Home() {
   }
 
   const handleGoogleLogin = async () => {
-    await supabase.auth.signInWithOAuth({
+    const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        // ログイン後の戻り先を現在のサイトURL（Vercel）に固定する
-        redirectTo: window.location.origin 
+        // window.location.origin を使うことで、Vercel上ならVercelのURLを自動送信する
+        redirectTo: window.location.origin,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
       }
     })
   }
