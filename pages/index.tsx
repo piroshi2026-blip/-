@@ -113,10 +113,16 @@ export default function Home() {
   }
 
   const handleGoogleLogin = async () => {
-    setDebugInfo("Googleログイン開始...")
+    setDebugInfo("Googleログイン開始...");
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: window.location.origin }
+      options: {
+        redirectTo: 'https://minna-eta.vercel.app',
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
+      }
     })
     if (error) setDebugInfo(`ログインエラー: ${error.message}`)
   }
