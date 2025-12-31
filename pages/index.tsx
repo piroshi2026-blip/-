@@ -69,6 +69,32 @@ export default function Home() {
   }, [])
 
   useEffect(() => {
+    // 1. URLに認証情報（#access_token）が含まれているか最優先でチェック
+    const checkHash = async () => {
+      const { data: { session: hashSession } } = await supabase.auth.getSession();
+      if (hashSession) {
+        setSession(hashSession);
+        setDebugInfo(`ハッシュからログイン成功: ${hashSession.user.id.slice(0,5)}`);
+        initUserData(hashSession.user.id);
+        // ログイン情報を読み取ったらURLを綺麗にする
+        window.history.replaceState(null, '', window.location.pathname);
+      }
+    };
+
+    // 2. 認証状態の変化を監視
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, currentSession) => {
+      setDebugInfo(`イベント: ${event} | セッション: ${currentSession ? "あり" : "なし"}`);
+      if (currentSession) {
+        setSession(currentSession);
+        initUserData(currentSession.user.id);
+      }
+    });
+
+    checkHash();
+    return () => authListener.subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
     const initData = async () => {
       await Promise.all([fetchCategories(), fetchMarkets(), fetchRanking()])
       setIsLoading(false)
