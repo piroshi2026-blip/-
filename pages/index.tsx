@@ -96,7 +96,8 @@ export default function Home() {
 
   const handleLineLogin = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'line',
+      // ↓ ここを修正しました (as any を追加してエラーを回避)
+      provider: 'line' as any,
       options: { redirectTo: window.location.origin },
     })
     if (error) alert(error.message)
