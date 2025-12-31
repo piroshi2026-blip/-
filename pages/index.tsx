@@ -25,6 +25,10 @@ export default function Home() {
   const [selectedOptionId, setSelectedOptionId] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
+  // エラーの原因だった定義を確実に追加
+  const [editName, setEditName] = useState('')
+  const [isEditingName, setIsEditingName] = useState(false)
+
   const [categories, setCategories] = useState<string[]>(['すべて'])
   const [categoryMeta, setCategoryMeta] = useState<any>({})
 
@@ -54,7 +58,6 @@ export default function Home() {
   }
 
   async function fetchMarkets() {
-    // descriptionを確実に取得
     let query = supabase.from('markets').select('*, market_options(*)')
     if (sortBy === 'popular') query = query.order('total_pool', { ascending: false })
     else query = query.order('end_date', { ascending: true })
@@ -74,12 +77,26 @@ export default function Home() {
 
   async function initUserData(userId: string) {
     const { data: profileData } = await supabase.from('profiles').select('*').eq('id', userId).single()
-    if (profileData) setProfile(profileData)
+    if (profileData) {
+      setProfile(profileData)
+      setEditName(profileData.username || '名無しさん')
+    }
     const { data: betsData } = await supabase.from('bets').select('*, markets(title), market_options(name)').eq('user_id', userId).order('created_at', { ascending: false })
     if (betsData) setMyBets(betsData)
   }
 
+  const handleUpdateName = async () => {
+    if (!profile || !editName) return
+    const { error } = await supabase.from('profiles').update({ username: editName }).eq('id', profile.id)
+    if (!error) {
+      setIsEditingName(false)
+      initUserData(profile.id)
+      fetchRanking()
+    }
+  }
+
   const handleGoogleLogin = async () => await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } })
+
   const handleVote = async () => {
     if (voteAmount > (profile?.point_balance || 0)) return alert('ポイント不足')
     const { error } = await supabase.rpc('place_bet', { market_id_input: selectedMarketId, option_id_input: selectedOptionId, amount_input: voteAmount })
@@ -97,7 +114,7 @@ export default function Home() {
     header: { textAlign: 'center', marginBottom: '20px' },
     appTitle: { fontSize: '32px', fontWeight: '900', background: 'linear-gradient(to right, #2563eb, #9333ea)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0 },
     appDesc: { fontSize: '13px', color: '#6b7280', marginTop: '5px', fontWeight: 'bold' },
-    card: { background: 'white', borderRadius: '16px', marginBottom: '35px', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', overflow: 'hidden', position: 'relative', border: '1px solid #f3f4f6' },
+    card: { background: 'white', borderRadius: '16px', marginBottom: '35px', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', overflow: 'hidden', border: '1px solid #f3f4f6' },
     imageArea: { height: '180px', position: 'relative', background: '#eee' },
     imageOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: '20px', background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)' },
     contentArea: { padding: '20px', background: 'white', position: 'relative', zIndex: 10 },
@@ -135,11 +152,11 @@ export default function Home() {
             return (
               <div key={m.id} style={styles.card}>
                 <div style={styles.imageArea}>
-                  {m.image_url ? <img src={m.image_url} style={{width:'100%', height:'100%', objectFit:'cover'}} alt="" /> : <div style={{textAlign:'center', paddingTop:'60px', fontSize:'50px'}}>{catInfo.icon}</div>}
+                  {m.image_url ? <img src={m.image_url} style={{width:'100%', height:'100%', objectFit:'cover'}} /> : <div style={{textAlign:'center', paddingTop:'60px', fontSize:'50px'}}>{catInfo.icon}</div>}
                   <div style={styles.imageOverlay}>
                     <div style={{display:'flex', gap:'8px', marginBottom:'8px'}}>
                       <span style={{fontSize:'10px', background:catInfo.color, color:'white', padding:'4px 10px', borderRadius:'6px', fontWeight:'bold'}}>{m.category}</span>
-                      <span style={{fontSize:'10px', background:active?'rgba(255,255,255,0.9)':'#ef4444', color:active?'#059669':'white', padding:'4px 10px', borderRadius:'6px', fontWeight:'bold'}}>
+                      <span style={{fontSize:'10px', background:active?'#10b981':'#ef4444', color:'white', padding:'4px 10px', borderRadius:'6px', fontWeight:'bold'}}>
                         {m.is_resolved ? '結果確定' : (active ? `あと ${Math.ceil((new Date(m.end_date).getTime() - new Date().getTime())/(1000*60*60*24))}日` : '受付終了')}
                       </span>
                     </div>
@@ -198,16 +215,13 @@ export default function Home() {
               </div>
             )
           })}
-
-          <div style={styles.adminLink}>
-            <Link href="/admin" style={{color:'inherit', textDecoration:'none'}}>Admin Login</Link>
-          </div>
+          <div style={{ textAlign: 'center', marginTop: '40px', paddingBottom: '40px' }}><Link href="/admin" style={{ color: '#cbd5e1', textDecoration: 'none', fontSize: '12px' }}>Admin Login</Link></div>
         </>
       )}
 
       {activeTab === 'ranking' && (
         <div style={{background:'white', borderRadius:'16px', padding:'25px', boxShadow:'0 4px 20px rgba(0,0,0,0.05)'}}>
-           <h3 style={{textAlign:'center', marginBottom:'25px', fontSize:'20px', fontWeight:'bold'}}>🏆 ランキング</h3>
+           <h3 style={{textAlign:'center', marginBottom:'25px', fontSize:'20px', fontWeight:'bold'}}>🏆 投資家ランキング</h3>
            {ranking.map((u, i) => (
              <div key={u.id} style={{display:'flex', padding:'14px 0', borderBottom:'1px solid #f1f5f9', alignItems:'center'}}>
                <div style={{width:'40px', fontWeight:'bold', fontSize:'20px', color:i<3?'#f59e0b':'#cbd5e1'}}>{i+1}</div>
