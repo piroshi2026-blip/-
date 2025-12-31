@@ -24,14 +24,9 @@ export default function Home() {
   const [selectedOptionId, setSelectedOptionId] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  // メールログイン用のステート
-  const [showEmailForm, setShowEmailForm] = useState(false)
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [isSignUp, setIsSignUp] = useState(false) // 登録かログインか
-
   const categories = ['すべて', 'こども', '経済・政治', 'エンタメ', 'スポーツ', 'ライフ', 'その他']
 
+  // カテゴリごとのアイコンと色（透かし用）
   const categoryMeta: any = {
     'こども': { icon: '🎒', color: '#f43f5e' },
     '経済・政治': { icon: '🏛️', color: '#3b82f6' },
@@ -94,46 +89,21 @@ export default function Home() {
     if (data) setRanking(data)
   }
 
-  // --- ログイン関連 ---
+  const handleLogin = async () => {
+    await supabase.auth.signInAnonymously()
+    window.location.reload()
+  }
 
-  // 1. Googleログイン
-  const handleGoogleLogin = async () => {
+  const handleLineLogin = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
+      provider: 'line',
       options: { redirectTo: window.location.origin },
     })
     if (error) alert(error.message)
   }
 
-  // 2. メールログイン/登録
-  const handleEmailAuth = async () => {
-    if (!email || !password) return alert('入力してください')
-    try {
-      if (isSignUp) {
-        // 新規登録
-        const { error } = await supabase.auth.signUp({ email, password })
-        if (error) throw error
-        alert('確認メールを送信しました！メール内のリンクを押して完了してください。')
-      } else {
-        // ログイン
-        const { error } = await supabase.auth.signInWithPassword({ email, password })
-        if (error) throw error
-        window.location.reload()
-      }
-    } catch (e: any) {
-      alert(e.message)
-    }
-  }
-
-  // 3. 匿名ログイン
-  const handleAnonLogin = async () => {
-    await supabase.auth.signInAnonymously()
-    window.location.reload()
-  }
-
-
   const openMarket = (marketId: number) => {
-    if (!session) return handleGoogleLogin() // 未ログイン時はGoogleへ誘導
+    if (!session) return handleLogin()
     setSelectedMarketId(marketId)
     router.push(`/?id=${marketId}`, undefined, { shallow: true })
   }
@@ -201,35 +171,39 @@ export default function Home() {
     appTitle: { fontSize: '28px', fontWeight: '900', background: 'linear-gradient(to right, #2563eb, #9333ea)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0, letterSpacing: '-1px' },
     appDesc: { fontSize: '12px', color: '#6b7280', marginTop: '5px', fontWeight: 'bold' },
     pointBadge: { display: 'inline-block', marginTop: '8px', padding: '4px 12px', background: '#eff6ff', color: '#2563eb', borderRadius: '20px', fontSize: '14px', fontWeight: 'bold' },
-
-    // Googleボタン
-    googleButton: { marginTop: '10px', padding: '10px 20px', background: 'white', color: '#333', border: '1px solid #ccc', borderRadius: '30px', fontSize: '14px', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer', width: 'fit-content', margin: '10px auto', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' },
-
-    // メールボタン
-    mailButton: { marginTop: '5px', padding: '8px 16px', background: '#f3f4f6', color: '#555', border: 'none', borderRadius: '30px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', width: 'fit-content', margin: '5px auto' },
-
-    // 入力フォーム
-    inputField: { padding: '10px', border: '1px solid #ccc', borderRadius: '5px', width: '250px', marginBottom: '10px', fontSize: '14px' },
+    lineButton: { marginTop: '10px', padding: '10px 20px', background: '#06c755', color: 'white', border: 'none', borderRadius: '30px', fontSize: '14px', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer', width: 'fit-content', margin: '10px auto' },
 
     categoryScroll: { display: 'flex', gap: '10px', overflowX: 'auto' as const, paddingBottom: '10px', marginBottom: '20px', scrollbarWidth: 'none' as const },
     categoryBtn: (isActive: boolean) => ({
       padding: '8px 16px', borderRadius: '20px', border: isActive ? 'none' : '1px solid #e5e7eb', background: isActive ? '#1f2937' : 'white', color: isActive ? 'white' : '#4b5563', fontSize: '13px', fontWeight: 'bold' as const, whiteSpace: 'nowrap' as const, cursor: 'pointer', boxShadow: isActive ? '0 4px 6px -1px rgba(0,0,0,0.1)' : 'none'
     }),
 
+    // ★ リッチなカードデザイン
     card: { background: 'white', borderRadius: '16px', padding: '0', marginBottom: '25px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', overflow: 'hidden', position: 'relative' as const, border: '1px solid #f3f4f6' },
+
+    // ★ 画像エリア (Netflix風)
     imageArea: { position: 'relative' as const, height: '180px', width: '100%' },
     cardImage: { width: '100%', height: '100%', objectFit: 'cover' as const },
     imageOverlay: { position: 'absolute' as const, bottom: 0, left: 0, right: 0, height: '80%', background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)', display: 'flex', flexDirection: 'column' as const, justifyContent: 'flex-end', padding: '15px' },
-    watermark: (cat: string) => ({ position: 'absolute' as const, top: '-10px', right: '-10px', fontSize: '80px', opacity: 0.1, pointerEvents: 'none' as const, transform: 'rotate(15deg)', zIndex: 0 }),
+
+    // ★ 透かしアイコン
+    watermark: (cat: string) => ({
+        position: 'absolute' as const, top: '-10px', right: '-10px', fontSize: '80px', opacity: 0.1, pointerEvents: 'none' as const, transform: 'rotate(15deg)', zIndex: 0
+    }),
+
     contentArea: { padding: '15px 20px 20px', position: 'relative' as const, zIndex: 1 },
+
     descBox: { fontSize: '11px', color: '#4b5563', background: '#f9fafb', padding: '12px', borderRadius: '8px', marginTop: '10px', marginBottom: '15px', lineHeight: '1.6', border: '1px solid #f3f4f6', whiteSpace: 'pre-wrap' as const },
+
     barRow: { marginBottom: '12px' },
     barLabelArea: { display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px', fontWeight: 'bold' },
     barTrack: { height: '12px', background: '#f3f4f6', borderRadius: '6px', overflow: 'hidden' },
     barFill: (percent: number, idx: number) => ({ height: '100%', width: `${percent}%`, background: ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6'][idx % 5], transition: 'width 0.5s' }),
+
     voteButton: { width: '100%', padding: '12px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', fontSize: '14px' },
     shareButton: { width: '100%', padding: '12px', background: 'black', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', fontSize: '13px' },
     disabledButton: { width: '100%', padding: '12px', background: '#e5e7eb', color: '#9ca3af', border: 'none', borderRadius: '10px', fontWeight: 'bold', marginTop: '15px' },
+
     navBar: { position: 'fixed' as const, bottom: 0, left: 0, right: 0, background: 'rgba(255,255,255,0.95)', borderTop: '1px solid #eee', display: 'flex', justifyContent: 'space-around', padding: '12px', zIndex: 100 },
     navBtn: (isActive: boolean) => ({ background: 'none', border: 'none', color: isActive ? '#2563eb' : '#9ca3af', fontWeight: isActive ? 'bold' : 'normal', fontSize: '10px', display: 'flex', flexDirection: 'column' as const, alignItems: 'center' }),
   }
@@ -244,14 +218,22 @@ export default function Home() {
         ))}
       </div>
 
-      {filteredMarkets.length === 0 && <div style={{textAlign:'center', padding:'40px', color:'#9ca3af', fontSize:'14px'}}>まだこのジャンルの質問はありません</div>}
+      {filteredMarkets.length === 0 && (
+        <div style={{textAlign:'center', padding:'40px', color:'#9ca3af', fontSize:'14px'}}>
+          まだこのジャンルの質問はありません
+        </div>
+      )}
 
       {filteredMarkets.map((market) => {
         const isActive = isMarketActive(market)
         const catInfo = categoryMeta[market.category] || categoryMeta['その他']
+
         return (
           <div key={market.id} style={styles.card}>
+            {/* ★ 透かし背景 */}
             <div style={styles.watermark(market.category)}>{catInfo.icon}</div>
+
+            {/* ★ リッチな画像エリア */}
             <div style={styles.imageArea}>
                 {market.image_url ? 
                   <img src={market.image_url} style={styles.cardImage} /> : 
@@ -267,11 +249,17 @@ export default function Home() {
                     <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: 'white', margin: 0, lineHeight: '1.3', textShadow:'0 2px 4px rgba(0,0,0,0.5)' }}>{market.title}</h2>
                 </div>
             </div>
+
             <div style={styles.contentArea}>
-                {market.description && <div style={styles.descBox} dangerouslySetInnerHTML={{ __html: market.description.replace(/\\n/g, '<br />') }} />}
+                {/* 説明文 */}
+                {market.description && (
+                  <div style={styles.descBox} dangerouslySetInnerHTML={{ __html: market.description.replace(/\\n/g, '<br />') }} />
+                )}
+
                 <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '15px', fontWeight:'bold' }}>
                   💰 投票総額: <span style={{fontSize:'14px', color:'#1f2937'}}>{market.total_pool.toLocaleString()} pt</span>
                 </div>
+
                 <div>
                   {market.market_options.map((opt: any, idx: number) => {
                     const percent = getPercent(market.total_pool, opt.pool)
@@ -290,13 +278,17 @@ export default function Home() {
                     )
                   })}
                 </div>
+
+                {/* 投票エリア */}
                 {isActive ? (
                   selectedMarketId === market.id ? (
                     <div style={{ background: '#f9fafb', padding: '15px', borderRadius: '10px', marginTop: '15px', border:'1px solid #e5e7eb' }}>
                       <div style={{fontWeight:'bold', marginBottom:'10px', fontSize:'14px'}}>選択肢を選ぶ:</div>
                       <div style={{display:'flex', flexWrap:'wrap', gap:'8px', marginBottom:'15px'}}>
                         {market.market_options.map((opt: any) => (
-                          <button key={opt.id} onClick={() => setSelectedOptionId(opt.id)} style={{ padding: '8px 12px', borderRadius: '20px', border: selectedOptionId === opt.id ? '2px solid #2563eb' : '1px solid #d1d5db', background: selectedOptionId === opt.id ? '#eff6ff' : 'white', fontSize:'13px', fontWeight:'bold' }}>{opt.name}</button>
+                          <button key={opt.id} onClick={() => setSelectedOptionId(opt.id)} style={{ padding: '8px 12px', borderRadius: '20px', border: selectedOptionId === opt.id ? '2px solid #2563eb' : '1px solid #d1d5db', background: selectedOptionId === opt.id ? '#eff6ff' : 'white', fontSize:'13px', fontWeight:'bold' }}>
+                            {opt.name}
+                          </button>
                         ))}
                       </div>
                       <div style={{fontSize:'13px', marginBottom:'5px'}}>投票額: <strong>{voteAmount} pt</strong></div>
@@ -312,7 +304,9 @@ export default function Home() {
                       <button onClick={() => shareOnX(market)} style={{...styles.shareButton, flex:1}}>𝕏 シェア</button>
                     </div>
                   )
-                ) : <button disabled style={styles.disabledButton}>🚫 受付終了</button>}
+                ) : (
+                  <button disabled style={styles.disabledButton}>🚫 受付終了</button>
+                )}
             </div>
           </div>
         )
@@ -347,8 +341,12 @@ export default function Home() {
         <div key={bet.id} style={{...styles.card, padding:'15px', marginBottom:'10px'}}>
           <div style={{fontSize:'12px', color:'#6b7280', marginBottom:'5px'}}>{bet.markets?.title}</div>
           <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-            <div style={{fontWeight:'bold', fontSize:'15px'}}>「{bet.market_options?.name}」に {bet.amount}pt</div>
-            <div style={{fontSize:'12px', padding:'2px 8px', borderRadius:'10px', background:'#f3f4f6', color:'#6b7280'}}>結果待ち</div>
+            <div style={{fontWeight:'bold', fontSize:'15px'}}>
+              「{bet.market_options?.name}」に {bet.amount}pt
+            </div>
+            <div style={{fontSize:'12px', padding:'2px 8px', borderRadius:'10px', background:'#f3f4f6', color:'#6b7280'}}>
+               結果待ち
+            </div>
           </div>
         </div>
       ))}
@@ -367,41 +365,12 @@ export default function Home() {
              <span style={styles.pointBadge}>💎 {profile.point_balance.toLocaleString()} pt</span> 
            ) : (
              <div style={{display:'flex', flexDirection:'column', alignItems:'center'}}>
-
-               {/* --- ログインエリア --- */}
-               {!showEmailForm ? (
-                   <>
-                     {/* Googleボタン */}
-                     <button onClick={handleGoogleLogin} style={styles.googleButton}>
-                       <img src="https://www.google.com/favicon.ico" width="16" /> Googleでログイン
-                     </button>
-
-                     {/* メールでログインボタン */}
-                     <button onClick={()=>setShowEmailForm(true)} style={styles.mailButton}>📧 メールアドレスでログイン</button>
-
-                     <button onClick={handleAnonLogin} style={{background:'none', border:'none', fontSize:'11px', color:'#9ca3af', marginTop:'5px', textDecoration:'underline'}}>アカウントなしで試す</button>
-                   </>
-               ) : (
-                   /* メール入力フォーム */
-                   <div style={{marginTop:'10px', padding:'15px', background:'white', borderRadius:'10px', boxShadow:'0 2px 5px rgba(0,0,0,0.1)'}}>
-                       <div style={{fontSize:'12px', marginBottom:'5px'}}>メールアドレス</div>
-                       <input type="email" value={email} onChange={e=>setEmail(e.target.value)} style={styles.inputField} />
-                       <div style={{fontSize:'12px', marginBottom:'5px'}}>パスワード</div>
-                       <input type="password" value={password} onChange={e=>setPassword(e.target.value)} style={styles.inputField} />
-
-                       <button onClick={handleEmailAuth} style={{...styles.voteButton, width:'100%', marginTop:'5px'}}>
-                           {isSignUp ? '登録してログイン' : 'ログイン'}
-                       </button>
-
-                       <div style={{fontSize:'11px', marginTop:'10px', color:'#666'}}>
-                           {isSignUp ? 'すでにアカウントをお持ちですか？' : 'アカウントをお持ちでないですか？'} 
-                           <span onClick={()=>setIsSignUp(!isSignUp)} style={{color:'blue', cursor:'pointer', marginLeft:'5px'}}>
-                               {isSignUp ? 'ログインへ' : '新規登録へ'}
-                           </span>
-                       </div>
-                       <button onClick={()=>setShowEmailForm(false)} style={{marginTop:'10px', background:'none', border:'none', fontSize:'11px', color:'#999'}}>キャンセル</button>
-                   </div>
-               )}
+               <button onClick={handleLineLogin} style={styles.lineButton}>
+                 LINEでログインして始める
+               </button>
+               <button onClick={handleLogin} style={{background:'none', border:'none', fontSize:'11px', color:'#9ca3af', marginTop:'5px', textDecoration:'underline'}}>
+                 アカウントなしで試す
+               </button>
              </div>
            )}
         </div>
@@ -418,7 +387,7 @@ export default function Home() {
       <nav style={styles.navBar}>
         <button onClick={() => setActiveTab('home')} style={styles.navBtn(activeTab === 'home')}><span style={{fontSize:'20px'}}>🏠</span>ホーム</button>
         <button onClick={() => setActiveTab('ranking')} style={styles.navBtn(activeTab === 'ranking')}><span style={{fontSize:'20px'}}>👑</span>ランキング</button>
-        <button onClick={() => { if(!session) handleGoogleLogin(); setActiveTab('mypage') }} style={styles.navBtn(activeTab === 'mypage')}><span style={{fontSize:'20px'}}>👤</span>マイページ</button>
+        <button onClick={() => { if(!session) handleLogin(); setActiveTab('mypage') }} style={styles.navBtn(activeTab === 'mypage')}><span style={{fontSize:'20px'}}>👤</span>マイページ</button>
       </nav>
     </div>
   )
