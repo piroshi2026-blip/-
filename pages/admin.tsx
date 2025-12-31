@@ -74,12 +74,6 @@ export default function Admin() {
     alert('保存しました'); setEditingId(null); fetchData();
   }
 
-  async function handleDeleteMarket(id: number) {
-    if(!confirm('問いを削除しますか？')) return
-    await supabase.from('markets').delete().eq('id', id)
-    fetchData()
-  }
-
   async function handleResolve(marketId: number, optionId: number) {
     if(!confirm('この結果で確定させますか？')) return
     const { error } = await supabase.rpc('resolve_market', { market_id_input: marketId, winning_option_id: optionId })
@@ -95,14 +89,14 @@ export default function Admin() {
 
   return (
     <div style={{ maxWidth: '950px', margin: '0 auto', padding: '20px', fontFamily: 'sans-serif' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h1 style={{ margin: 0 }}>🛠 YOSOL 管理パネル</h1>
-        <Link href="/" style={{ textDecoration: 'none', background: '#f3f4f6', color: '#374151', padding: '8px 16px', borderRadius: '8px', fontWeight: 'bold', border: '1px solid #d1d5db' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '2px solid #eee', paddingBottom: '15px' }}>
+        <h1 style={{ margin: 0, fontSize: '24px' }}>🛠 YOSOL 管理パネル</h1>
+        <Link href="/" style={{ textDecoration: 'none', background: '#3b82f6', color: 'white', padding: '10px 20px', borderRadius: '8px', fontWeight: 'bold' }}>
           🏠 アプリに戻る
         </Link>
       </div>
 
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+      <div style={{ display: 'flex', gap: '5px', marginBottom: '20px' }}>
         <button onClick={() => setActiveTab('markets')} style={tabStyle(activeTab === 'markets')}>問い管理</button>
         <button onClick={() => setActiveTab('categories')} style={tabStyle(activeTab === 'categories')}>カテゴリー設定</button>
         <button onClick={() => setActiveTab('users')} style={tabStyle(activeTab === 'users')}>ランキング・ユーザー</button>
@@ -117,13 +111,15 @@ export default function Admin() {
               <textarea placeholder="判定基準" onChange={e => setNewMarket({...newMarket, description: e.target.value})} style={inpStyle} />
               <div style={{display:'flex', gap:'10px'}}>
                 <select onChange={e => setNewMarket({...newMarket, category: e.target.value})} style={{...inpStyle, flex:1}}>
-                  <option value="">カテゴリ</option>
+                  <option value="">カテゴリを選択</option>
                   {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                 </select>
                 <input type="datetime-local" onChange={e => setNewMarket({...newMarket, end_date: e.target.value})} style={{...inpStyle, flex:1}} />
               </div>
-              <input type="file" accept="image/*" onChange={(e) => uploadImage(e, false)} />
-              <input placeholder="選択肢 (カンマ区切り)" onChange={e => setNewMarket({...newMarket, options: e.target.value})} style={inpStyle} />
+              <div style={{fontSize:'12px', border:'1px dashed #ccc', padding:'10px'}}>
+                画像: <input type="file" accept="image/*" onChange={(e) => uploadImage(e, false)} />
+              </div>
+              <input placeholder="選択肢 (カンマ区切り: はい, いいえ)" onChange={e => setNewMarket({...newMarket, options: e.target.value})} style={inpStyle} />
               <button onClick={handleCreateMarket} style={btnPrimary}>問いを公開する</button>
             </div>
           </section>
@@ -149,20 +145,20 @@ export default function Admin() {
               ) : (
                 <>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <strong>{m.title} [{m.category}]</strong>
+                    <strong>{m.title} <span style={{color:'#666', fontSize:'12px'}}>[{m.category}]</span></strong>
                     <div>
                       <button onClick={() => { setEditingId(m.id); setEditForm({...m, end_date: new Date(m.end_date).toISOString().slice(0,16)}); }} style={btnEdit}>編集</button>
-                      <button onClick={() => handleDeleteMarket(m.id)} style={{...btnEdit, color:'red'}}>削除</button>
+                      <button onClick={() => { if(confirm('削除？')) supabase.from('markets').delete().eq('id', m.id).then(()=>fetchData()) }} style={{...btnEdit, color:'red'}}>削除</button>
                     </div>
                   </div>
                   {!m.is_resolved && (
-                    <div style={{marginTop:'10px', display:'flex', gap:'5px'}}>
+                    <div style={{marginTop:'10px', display:'flex', gap:'5px', flexWrap:'wrap'}}>
                       {m.market_options.map((opt: any) => (
                         <button key={opt.id} onClick={() => handleResolve(m.id, opt.id)} style={btnResolve}>「{opt.name}」で確定</button>
                       ))}
                     </div>
                   )}
-                  {m.is_resolved && <span style={{color:'green', fontSize:'12px'}}>✅ 確定済み</span>}
+                  {m.is_resolved && <span style={{color:'green', fontSize:'12px', fontWeight:'bold'}}>✅ 確定済み</span>}
                 </>
               )}
             </div>
@@ -172,35 +168,45 @@ export default function Admin() {
 
       {activeTab === 'categories' && (
         <>
+          <section style={sectionStyle}>
+            <h3>🆕 カテゴリ追加</h3>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <input placeholder="名前" value={newCategory.name} onChange={e => setNewCategory({...newCategory, name: e.target.value})} style={inpStyle} />
+              <input placeholder="アイコン" value={newCategory.icon} onChange={e => setNewCategory({...newCategory, icon: e.target.value})} style={{...inpStyle, width:'60px'}} />
+              <input type="number" value={newCategory.display_order} onChange={e => setNewCategory({...newCategory, display_order: Number(e.target.value)})} style={{...inpStyle, width:'60px'}} />
+              <button onClick={() => { if(newCategory.name) { supabase.from('categories').insert([newCategory]).then(()=>fetchData()); setNewCategory({name:'', icon:'', display_order:0}); } }} style={btnPrimary}>追加</button>
+            </div>
+          </section>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead><tr style={{textAlign:'left'}}><th style={{padding:'10px'}}>順序</th><th>名前</th><th>アイコン</th><th>操作</th></tr></thead>
+            <thead><tr style={{textAlign:'left', borderBottom:'2px solid #eee'}}><th style={{padding:'10px'}}>順序</th><th>名前</th><th>アイコン</th><th>操作</th></tr></thead>
             <tbody>
               {categories.map(c => (
                 <tr key={c.id} style={{borderBottom:'1px solid #eee'}}>
-                  <td><input type="number" defaultValue={c.display_order} onBlur={e => handleUpdateCategory(c.id, {display_order: Number(e.target.value)})} style={{width:'50px'}} /></td>
-                  <td><input defaultValue={c.name} onBlur={e => handleUpdateCategory(c.id, {name: e.target.value})} style={{border:'none'}} /></td>
-                  <td><input defaultValue={c.icon} onBlur={e => handleUpdateCategory(c.id, {icon: e.target.value})} style={{width:'40px', border:'none'}} /></td>
-                  <td><button onClick={() => { if(confirm('削除しますか？')) supabase.from('categories').delete().eq('id', c.id).then(()=>fetchData()) }} style={{color:'red', border:'none', background:'none'}}>削除</button></td>
+                  <td style={{padding:'10px'}}><input type="number" defaultValue={c.display_order} onBlur={e => handleUpdateCategory(c.id, {display_order: Number(e.target.value)})} style={{width:'50px'}} /></td>
+                  <td><input defaultValue={c.name} onBlur={e => handleUpdateCategory(c.id, {name: e.target.value})} style={{border:'none', background:'none'}} /></td>
+                  <td><input defaultValue={c.icon} onBlur={e => handleUpdateCategory(c.id, {icon: e.target.value})} style={{width:'40px', border:'none', background:'none'}} /></td>
+                  <td><button onClick={() => { if(confirm('削除しますか？')) supabase.from('categories').delete().eq('id', c.id).then(()=>fetchData()) }} style={{color:'red', border:'none', background:'none', cursor:'pointer'}}>削除</button></td>
                 </tr>
-              </tbody>
-            </table>
+              ))}
+            </tbody>
+          </table>
         </>
       )}
 
       {activeTab === 'users' && (
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr style={{textAlign:'left'}}><th style={{padding:'10px'}}>ユーザー</th><th>ポイント</th><th>ランキング</th><th>操作</th></tr></thead>
+          <thead><tr style={{textAlign:'left', borderBottom:'2px solid #eee'}}><th style={{padding:'10px'}}>ユーザー</th><th>ポイント</th><th>ランキング</th><th>操作</th></tr></thead>
           <tbody>
             {users.map(u => (
               <tr key={u.id} style={{borderBottom:'1px solid #eee'}}>
                 <td style={{padding:'10px'}}>{u.username || '名無しさん'}</td>
-                <td>{u.point_balance.toLocaleString()}</td>
-                <td>{u.is_hidden_from_ranking ? '🙈 非表示' : '👁 表示中'}</td>
+                <td>{u.point_balance.toLocaleString()} pt</td>
+                <td style={{fontSize:'12px'}}>{u.is_hidden_from_ranking ? '🙈 非表示' : '👁 表示中'}</td>
                 <td>
-                  <button onClick={() => supabase.from('profiles').update({ is_hidden_from_ranking: !u.is_hidden_from_ranking }).eq('id', u.id).then(()=>fetchData())} style={{background: u.is_hidden_from_ranking ? '#22c55e' : '#f59e0b', color:'white', border:'none', padding:'5px', borderRadius:'4px', marginRight:'5px'}}>
+                  <button onClick={() => supabase.from('profiles').update({ is_hidden_from_ranking: !u.is_hidden_from_ranking }).eq('id', u.id).then(()=>fetchData())} style={{background: u.is_hidden_from_ranking ? '#10b981' : '#f59e0b', color:'white', border:'none', padding:'5px 10px', borderRadius:'4px', marginRight:'5px', cursor:'pointer'}}>
                     {u.is_hidden_from_ranking ? '戻す' : '隠す'}
                   </button>
-                  <button onClick={() => { if(confirm('削除？')) supabase.from('profiles').delete().eq('id', u.id).then(()=>fetchData()) }} style={{background:'red', color:'white', border:'none', padding:'5px', borderRadius:'4px'}}>削除</button>
+                  <button onClick={() => { if(confirm('ユーザーを削除しますか？')) supabase.from('profiles').delete().eq('id', u.id).then(()=>fetchData()) }} style={{background:'#ef4444', color:'white', border:'none', padding:'5px 10px', borderRadius:'4px', cursor:'pointer'}}>削除</button>
                 </td>
               </tr>
             ))}
@@ -211,14 +217,12 @@ export default function Admin() {
   )
 }
 
-const tabStyle = (active: boolean) => ({ flex: 1, padding: '12px', background: active ? '#2563eb' : '#eee', color: active ? 'white' : 'black', border:'none', cursor:'pointer' });
-const sectionStyle = { background: '#f8fafc', padding: '20px', borderRadius: '12px', marginBottom: '20px', border: '1px solid #eee' };
+const tabStyle = (active: boolean) => ({ flex: 1, padding: '12px', background: active ? '#1f2937' : '#f3f4f6', color: active ? 'white' : '#4b5563', border:'none', cursor:'pointer', fontWeight:'bold', borderRadius:'4px' });
+const sectionStyle = { background: '#f8fafc', padding: '20px', borderRadius: '12px', marginBottom: '20px', border: '1px solid #e2e8f0' };
 const cardStyle = { border: '1px solid #ddd', padding: '15px', borderRadius: '10px', marginBottom: '10px', background: 'white' };
 const inpStyle = { padding: '10px', border: '1px solid #ddd', borderRadius: '6px' };
-const btnPrimary = { background: '#2563eb', color: 'white', padding: '10px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' };
-const btnEdit = { background: '#eee', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', marginRight: '5px' };
-const btnSave = { flex: 1, background: '#059669', color: 'white', padding: '10px', border: 'none', borderRadius: '6px' };
-const btnCancel = { flex: 1, background: '#94a3b8', color: 'white', padding: '10px', border: 'none', borderRadius: '6px' };
+const btnPrimary = { background: '#1f2937', color: 'white', padding: '10px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' };
+const btnEdit = { background: '#f3f4f6', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', marginRight: '5px' };
+const btnSave = { flex: 1, background: '#10b981', color: 'white', padding: '10px', border: 'none', borderRadius: '6px', cursor: 'pointer' };
+const btnCancel = { flex: 1, background: '#94a3b8', color: 'white', padding: '10px', border: 'none', borderRadius: '6px', cursor: 'pointer' };
 const btnResolve = { background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1d4ed8', padding: '5px 10px', borderRadius: '4px', fontSize: '11px', cursor: 'pointer' };
-
-          
