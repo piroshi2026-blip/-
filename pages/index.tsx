@@ -1,80 +1,60 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
-import Link from 'next/link'
-import { useRouter } from 'next/router'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 )
 
-export default function Home() {
-  const router = useRouter()
-  const [session, setSession] = useState<any>(null)
-  const [profile, setProfile] = useState<any>(null)
+export default function Admin() {
   const [markets, setMarkets] = useState<any[]>([])
-  const [ranking, setRanking] = useState<any[]>([])
-  const [myBets, setMyBets] = useState<any[]>([])
+  const [password, setPassword] = useState('')
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [isReady, setIsReady] = useState(false)
 
-  const [activeTab, setActiveTab] = useState<'home' | 'ranking' | 'mypage'>('home')
-  const [activeCategory, setActiveCategory] = useState('すべて')
+  const categories = ['経済・政治', 'エンタメ', 'スポーツ', 'ライフ', 'こども', 'その他']
+  const [sortType, setSortType] = useState<'created_at' | 'end_date' | 'category'>('created_at')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
 
-  const [voteAmount, setVoteAmount] = useState(100)
-  const [selectedMarketId, setSelectedMarketId] = useState<number | null>(null)
-  const [selectedOptionId, setSelectedOptionId] = useState<number | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  // 新規作成用
+  const [newTitle, setNewTitle] = useState('')
+  const [newImage, setNewImage] = useState('') // ここにURLが入ります
+  const [newOptions, setNewOptions] = useState('') 
+  const [newEndDate, setNewEndDate] = useState('')
+  const [newCategory, setNewCategory] = useState('経済・政治')
+  const [newDescription, setNewDescription] = useState('')
+  const [uploading, setUploading] = useState(false) // アップロード中のグルグル用
 
-  const categories = ['すべて', 'こども', '経済・政治', 'エンタメ', 'スポーツ', 'ライフ', 'その他']
-
-  // カテゴリごとのアイコンと色（透かし用）
-  const categoryMeta: any = {
-    'こども': { icon: '🎒', color: '#f43f5e' },
-    '経済・政治': { icon: '🏛️', color: '#3b82f6' },
-    'エンタメ': { icon: '🎤', color: '#a855f7' },
-    'スポーツ': { icon: '⚽️', color: '#22c55e' },
-    'ライフ': { icon: '🌅', color: '#f59e0b' },
-    'その他': { icon: '🎲', color: '#6b7280' },
-  }
+  // 編集用
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editForm, setEditForm] = useState({ title: '', image_url: '', end_date: '', category: '', description: '' })
 
   useEffect(() => {
-    const init = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      setSession(session)
-      if (session) await initUserData(session.user.id)
-      await fetchMarkets()
-      await fetchRanking()
-      setIsLoading(false)
-    }
-    init()
+    const storedAuth = localStorage.getItem('isAdmin')
+    if (storedAuth === 'true') setIsAdmin(true)
+
+    const d = new Date()
+    d.setDate(d.getDate() + 7)
+    const yyyy = d.getFullYear()
+    const MM = ('0' + (d.getMonth() + 1)).slice(-2)
+    const dd = ('0' + d.getDate()).slice(-2)
+    const hh = ('0' + d.getHours()).slice(-2)
+    const mm = ('0' + d.getMinutes()).slice(-2)
+    setNewEndDate(`${yyyy}-${MM}-${dd}T${hh}:${mm}`)
+
+    fetchMarkets('created_at', 'desc')
+    setIsReady(true)
   }, [])
 
   useEffect(() => {
-    if (!router.isReady || markets.length === 0) return
-    const { id } = router.query
-    if (id) {
-      const marketId = Number(id)
-      const target = markets.find(m => m.id === marketId)
-      if (target) {
-        setSelectedMarketId(marketId)
-        if (target.category) setActiveCategory(target.category)
-      }
-    }
-  }, [router.isReady, router.query, markets])
+    if (isAdmin) fetchMarkets(sortType, sortOrder)
+  }, [sortType, sortOrder, isAdmin])
 
-  async function initUserData(userId: string) {
-    const { data: profileData } = await supabase.from('profiles').select('*').eq('id', userId).single()
-    if (profileData) setProfile(profileData)
-
-    const { data: betsData } = await supabase
-      .from('bets')
-      .select('*, markets(title), market_options(name)')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-    if (betsData) setMyBets(betsData)
-  }
-
-  async function fetchMarkets() {
-    const { data } = await supabase.from('markets').select('*, market_options(*)').order('end_date', { ascending: true })
+  async function fetchMarkets(column: string, order: 'asc' | 'desc') {
+    const { data } = await supabase
+      .from('markets')
+      .select('*, market_options(*)')
+      .order(column, { ascending: order === 'asc' })
     if (data) {
       const sorted = data.map((m: any) => ({
         ...m,
@@ -84,312 +64,246 @@ export default function Home() {
     }
   }
 
-  async function fetchRanking() {
-    const { data } = await supabase.from('profiles').select('*').order('point_balance', { ascending: false }).limit(20)
-    if (data) setRanking(data)
+  const handleSortChange = (e: any) => {
+      const value = e.target.value;
+      switch(value) {
+          case 'newest': setSortType('created_at'); setSortOrder('desc'); break;
+          case 'closest_deadline': setSortType('end_date'); setSortOrder('asc'); break;
+          case 'category': setSortType('category'); setSortOrder('asc'); break;
+      }
   }
 
-  const handleLogin = async () => {
-    await supabase.auth.signInAnonymously()
-    window.location.reload()
-  }
+  // ★画像アップロード関数
+  const handleImageUpload = async (event: any, isEdit = false) => {
+    try {
+      setUploading(true)
+      const file = event.target.files[0]
+      if (!file) return
 
-  const handleLineLogin = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      // ↓ ここを修正しました (as any を追加してエラーを回避)
-      provider: 'line' as any,
-      options: { redirectTo: window.location.origin },
-    })
-    if (error) alert(error.message)
-  }
+      // ファイル名をランダムにする(被り防止)
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
+      const filePath = `${fileName}`
 
-  const openMarket = (marketId: number) => {
-    if (!session) return handleLogin()
-    setSelectedMarketId(marketId)
-    router.push(`/?id=${marketId}`, undefined, { shallow: true })
-  }
+      // Supabase Storageにアップロード
+      const { error: uploadError } = await supabase.storage
+        .from('market-images')
+        .upload(filePath, file)
 
-  const closeMarket = () => {
-    setSelectedMarketId(null)
-    setSelectedOptionId(null)
-    router.push('/', undefined, { shallow: true })
-  }
+      if (uploadError) throw uploadError
 
-  const handleVote = async () => {
-    if (!session) return alert('ログインしてください')
-    if (!selectedMarketId || !selectedOptionId) return
-    if (voteAmount > (profile?.point_balance || 0)) return alert('ポイント不足です')
+      // 公開URLを取得
+      const { data } = supabase.storage.from('market-images').getPublicUrl(filePath)
+      const publicUrl = data.publicUrl
 
-    const { error } = await supabase.rpc('place_bet', {
-      market_id_input: selectedMarketId,
-      option_id_input: selectedOptionId,
-      amount_input: voteAmount
-    })
-
-    if (error) alert(error.message)
-    else {
-      alert('投票しました！')
-      closeMarket()
-      fetchMarkets()
-      initUserData(session.user.id)
-      fetchRanking()
+      if (isEdit) {
+        setEditForm({ ...editForm, image_url: publicUrl })
+      } else {
+        setNewImage(publicUrl)
+      }
+    } catch (error: any) {
+      alert('アップロード失敗: ' + error.message)
+    } finally {
+      setUploading(false)
     }
   }
 
-  const shareOnX = (market: any) => {
-    const url = `${window.location.origin}/?id=${market.id}`
-    const text = `💰予測市場「YOSOL」に参加中！\n\nQ. ${market.title}\n\nあなたも予想しよう！ #YOSOL`
-    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`
-    window.open(twitterUrl, '_blank')
+  const handleLogin = () => {
+    if (password === 'admin1234') {
+      setIsAdmin(true)
+      localStorage.setItem('isAdmin', 'true')
+    } else { alert('パスワードが違います') }
   }
 
-  const getOdds = (marketTotal: number, optionPool: number) => {
-    if (optionPool === 0) return 0
-    return (marketTotal / optionPool)
+  const handleLogout = () => {
+    setIsAdmin(false); localStorage.removeItem('isAdmin'); window.location.href = '/'
   }
 
-  const getPercent = (marketTotal: number, optionPool: number) => {
-    if (marketTotal === 0) return 0
-    return Math.round((optionPool / marketTotal) * 100)
+  const createMarket = async () => {
+    if (!newTitle || !newOptions || !newEndDate) return alert('必須項目が空です')
+    try {
+      const { data: marketData, error: marketError } = await supabase
+        .from('markets')
+        .insert({ 
+          title: newTitle, 
+          image_url: newImage || 'https://placehold.co/600x400',
+          end_date: new Date(newEndDate).toISOString(),
+          category: newCategory,
+          description: newDescription
+        })
+        .select().single()
+      if (marketError) throw marketError
+
+      const optionsList = newOptions.split(',').map(s => s.trim()).filter(s => s)
+      const optionsToInsert = optionsList.map(name => ({ market_id: marketData.id, name: name, pool: 0 }))
+      const { error: optionError } = await supabase.from('market_options').insert(optionsToInsert)
+      if (optionError) throw optionError
+
+      alert('作成しました！')
+      setNewTitle(''); setNewImage(''); setNewOptions(''); setNewDescription('');
+      fetchMarkets(sortType, sortOrder)
+    } catch (e: any) { alert(e.message) }
   }
 
-  const isMarketActive = (market: any) => {
-    if (market.is_resolved) return false
-    if (new Date(market.end_date) < new Date()) return false
-    return true
+  const startEdit = (market: any) => {
+    setEditingId(market.id)
+    const localDate = new Date(market.end_date)
+    const offset = localDate.getTimezoneOffset()
+    const adjusted = new Date(localDate.getTime() - (offset * 60 * 1000))
+    setEditForm({
+      title: market.title,
+      image_url: market.image_url || '',
+      end_date: adjusted.toISOString().slice(0, 16),
+      category: market.category || 'その他',
+      description: market.description || ''
+    })
   }
 
-  const filteredMarkets = markets.filter(m => {
-    if (activeCategory === 'すべて') return true
-    if (activeCategory === 'その他' && !m.category) return true
-    return m.category === activeCategory
-  })
-
-  // --- スタイル ---
-  const styles = {
-    container: { maxWidth: '600px', margin: '0 auto', padding: '20px 15px 100px', minHeight: '100vh', fontFamily: 'sans-serif', color: '#1f2937' },
-    headerContainer: { padding: '20px 0 10px', textAlign: 'center' as const },
-    appTitle: { fontSize: '28px', fontWeight: '900', background: 'linear-gradient(to right, #2563eb, #9333ea)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0, letterSpacing: '-1px' },
-    appDesc: { fontSize: '12px', color: '#6b7280', marginTop: '5px', fontWeight: 'bold' },
-    pointBadge: { display: 'inline-block', marginTop: '8px', padding: '4px 12px', background: '#eff6ff', color: '#2563eb', borderRadius: '20px', fontSize: '14px', fontWeight: 'bold' },
-    lineButton: { marginTop: '10px', padding: '10px 20px', background: '#06c755', color: 'white', border: 'none', borderRadius: '30px', fontSize: '14px', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer', width: 'fit-content', margin: '10px auto' },
-
-    categoryScroll: { display: 'flex', gap: '10px', overflowX: 'auto' as const, paddingBottom: '10px', marginBottom: '20px', scrollbarWidth: 'none' as const },
-    categoryBtn: (isActive: boolean) => ({
-      padding: '8px 16px', borderRadius: '20px', border: isActive ? 'none' : '1px solid #e5e7eb', background: isActive ? '#1f2937' : 'white', color: isActive ? 'white' : '#4b5563', fontSize: '13px', fontWeight: 'bold' as const, whiteSpace: 'nowrap' as const, cursor: 'pointer', boxShadow: isActive ? '0 4px 6px -1px rgba(0,0,0,0.1)' : 'none'
-    }),
-
-    // ★ リッチなカードデザイン
-    card: { background: 'white', borderRadius: '16px', padding: '0', marginBottom: '25px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', overflow: 'hidden', position: 'relative' as const, border: '1px solid #f3f4f6' },
-
-    // ★ 画像エリア (Netflix風)
-    imageArea: { position: 'relative' as const, height: '180px', width: '100%' },
-    cardImage: { width: '100%', height: '100%', objectFit: 'cover' as const },
-    imageOverlay: { position: 'absolute' as const, bottom: 0, left: 0, right: 0, height: '80%', background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)', display: 'flex', flexDirection: 'column' as const, justifyContent: 'flex-end', padding: '15px' },
-
-    // ★ 透かしアイコン
-    watermark: (cat: string) => ({
-        position: 'absolute' as const, top: '-10px', right: '-10px', fontSize: '80px', opacity: 0.1, pointerEvents: 'none' as const, transform: 'rotate(15deg)', zIndex: 0
-    }),
-
-    contentArea: { padding: '15px 20px 20px', position: 'relative' as const, zIndex: 1 },
-
-    descBox: { fontSize: '11px', color: '#4b5563', background: '#f9fafb', padding: '12px', borderRadius: '8px', marginTop: '10px', marginBottom: '15px', lineHeight: '1.6', border: '1px solid #f3f4f6', whiteSpace: 'pre-wrap' as const },
-
-    barRow: { marginBottom: '12px' },
-    barLabelArea: { display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px', fontWeight: 'bold' },
-    barTrack: { height: '12px', background: '#f3f4f6', borderRadius: '6px', overflow: 'hidden' },
-    barFill: (percent: number, idx: number) => ({ height: '100%', width: `${percent}%`, background: ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6'][idx % 5], transition: 'width 0.5s' }),
-
-    voteButton: { width: '100%', padding: '12px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', fontSize: '14px' },
-    shareButton: { width: '100%', padding: '12px', background: 'black', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', fontSize: '13px' },
-    disabledButton: { width: '100%', padding: '12px', background: '#e5e7eb', color: '#9ca3af', border: 'none', borderRadius: '10px', fontWeight: 'bold', marginTop: '15px' },
-
-    navBar: { position: 'fixed' as const, bottom: 0, left: 0, right: 0, background: 'rgba(255,255,255,0.95)', borderTop: '1px solid #eee', display: 'flex', justifyContent: 'space-around', padding: '12px', zIndex: 100 },
-    navBtn: (isActive: boolean) => ({ background: 'none', border: 'none', color: isActive ? '#2563eb' : '#9ca3af', fontWeight: isActive ? 'bold' : 'normal', fontSize: '10px', display: 'flex', flexDirection: 'column' as const, alignItems: 'center' }),
+  const saveEdit = async () => {
+    if (!editingId) return
+    try {
+      const { error } = await supabase.from('markets').update({
+        title: editForm.title, image_url: editForm.image_url, end_date: new Date(editForm.end_date).toISOString(),
+        category: editForm.category, description: editForm.description
+      }).eq('id', editingId)
+      if (error) throw error
+      alert('更新しました！'); setEditingId(null); fetchMarkets(sortType, sortOrder)
+    } catch (e: any) { alert(e.message) }
   }
 
-  const renderHome = () => (
-    <div>
-      <div style={styles.categoryScroll}>
-        {categories.map(cat => (
-          <button key={cat} onClick={() => { setActiveCategory(cat); router.push('/', undefined, { shallow: true }) }} style={styles.categoryBtn(activeCategory === cat)}>
-            {cat}
-          </button>
-        ))}
-      </div>
+  const deleteMarket = async (id: number) => {
+    if (!confirm('本当に削除しますか？')) return
+    try {
+      await supabase.from('bets').delete().eq('market_id', id)
+      await supabase.from('market_options').delete().eq('market_id', id)
+      await supabase.from('markets').delete().eq('id', id)
+      alert('削除しました🗑️'); fetchMarkets(sortType, sortOrder)
+    } catch (e: any) { alert(e.message) }
+  }
 
-      {filteredMarkets.length === 0 && (
-        <div style={{textAlign:'center', padding:'40px', color:'#9ca3af', fontSize:'14px'}}>
-          まだこのジャンルの質問はありません
-        </div>
-      )}
+  const resolve = async (marketId: number, optionId: number, name: string) => {
+    if (!confirm(`「${name}」の勝ちで確定しますか？`)) return
+    const { error } = await supabase.rpc('resolve_market_multi', { market_id_input: marketId, winning_option_id_input: optionId })
+    if (error) alert(error.message); else { alert('配当配布完了！'); fetchMarkets(sortType, sortOrder) }
+  }
 
-      {filteredMarkets.map((market) => {
-        const isActive = isMarketActive(market)
-        const catInfo = categoryMeta[market.category] || categoryMeta['その他']
-
-        return (
-          <div key={market.id} style={styles.card}>
-            {/* ★ 透かし背景 */}
-            <div style={styles.watermark(market.category)}>{catInfo.icon}</div>
-
-            {/* ★ リッチな画像エリア */}
-            <div style={styles.imageArea}>
-                {market.image_url ? 
-                  <img src={market.image_url} style={styles.cardImage} /> : 
-                  <div style={{width:'100%', height:'100%', background:'#eee', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'40px'}}>{catInfo.icon}</div>
-                }
-                <div style={styles.imageOverlay}>
-                    <div style={{display:'flex', gap:'5px', marginBottom:'5px'}}>
-                        <span style={{fontSize:'10px', background: catInfo.color, color:'white', padding:'2px 8px', borderRadius:'4px', fontWeight:'bold'}}>{market.category || 'その他'}</span>
-                        <span style={{fontSize:'10px', background: isActive ? 'rgba(255,255,255,0.9)' : '#ef4444', color: isActive ? '#059669' : 'white', padding:'2px 8px', borderRadius:'4px', fontWeight:'bold'}}>
-                             {market.is_resolved ? '結果確定' : (isActive ? `あと ${Math.ceil((new Date(market.end_date).getTime() - new Date().getTime())/(1000*60*60*24))}日` : '受付終了')}
-                        </span>
-                    </div>
-                    <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: 'white', margin: 0, lineHeight: '1.3', textShadow:'0 2px 4px rgba(0,0,0,0.5)' }}>{market.title}</h2>
-                </div>
-            </div>
-
-            <div style={styles.contentArea}>
-                {/* 説明文 */}
-                {market.description && (
-                  <div style={styles.descBox} dangerouslySetInnerHTML={{ __html: market.description.replace(/\\n/g, '<br />') }} />
-                )}
-
-                <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '15px', fontWeight:'bold' }}>
-                  💰 投票総額: <span style={{fontSize:'14px', color:'#1f2937'}}>{market.total_pool.toLocaleString()} pt</span>
-                </div>
-
-                <div>
-                  {market.market_options.map((opt: any, idx: number) => {
-                    const percent = getPercent(market.total_pool, opt.pool)
-                    const odds = getOdds(market.total_pool, opt.pool)
-                    const isWinner = market.result_option_id === opt.id
-                    return (
-                      <div key={opt.id} style={styles.barRow}>
-                        <div style={styles.barLabelArea}>
-                          <span>{isWinner ? '👑 ' : ''}{opt.name}</span>
-                          <span>{odds ? `${odds.toFixed(1)}倍` : '--倍'} ({percent}%)</span>
-                        </div>
-                        <div style={styles.barTrack}>
-                          <div style={styles.barFill(percent, idx) as any} />
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-
-                {/* 投票エリア */}
-                {isActive ? (
-                  selectedMarketId === market.id ? (
-                    <div style={{ background: '#f9fafb', padding: '15px', borderRadius: '10px', marginTop: '15px', border:'1px solid #e5e7eb' }}>
-                      <div style={{fontWeight:'bold', marginBottom:'10px', fontSize:'14px'}}>選択肢を選ぶ:</div>
-                      <div style={{display:'flex', flexWrap:'wrap', gap:'8px', marginBottom:'15px'}}>
-                        {market.market_options.map((opt: any) => (
-                          <button key={opt.id} onClick={() => setSelectedOptionId(opt.id)} style={{ padding: '8px 12px', borderRadius: '20px', border: selectedOptionId === opt.id ? '2px solid #2563eb' : '1px solid #d1d5db', background: selectedOptionId === opt.id ? '#eff6ff' : 'white', fontSize:'13px', fontWeight:'bold' }}>
-                            {opt.name}
-                          </button>
-                        ))}
-                      </div>
-                      <div style={{fontSize:'13px', marginBottom:'5px'}}>投票額: <strong>{voteAmount} pt</strong></div>
-                      <input type="range" min="10" max={profile?.point_balance} step="10" value={voteAmount} onChange={e=>setVoteAmount(Number(e.target.value))} style={{width:'100%', marginBottom:'15px'}} />
-                      <div style={{display:'flex', gap:'10px'}}>
-                        <button onClick={handleVote} style={{flex:1, padding:'10px', background:'#2563eb', color:'white', border:'none', borderRadius:'8px', fontWeight:'bold'}}>投票する</button>
-                        <button onClick={closeMarket} style={{flex:1, padding:'10px', background:'#e5e7eb', color:'#374151', border:'none', borderRadius:'8px'}}>やめる</button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div style={{display:'flex', gap:'10px', marginTop:'15px'}}>
-                      <button onClick={() => openMarket(market.id)} style={{...styles.voteButton, flex:2}}>⚡️ 投票する</button>
-                      <button onClick={() => shareOnX(market)} style={{...styles.shareButton, flex:1}}>𝕏 シェア</button>
-                    </div>
-                  )
-                ) : (
-                  <button disabled style={styles.disabledButton}>🚫 受付終了</button>
-                )}
-            </div>
-          </div>
-        )
-      })}
+  if (!isReady) return null
+  if (!isAdmin) return (
+    <div style={{ padding: '40px', textAlign: 'center', fontFamily: 'sans-serif' }}>
+      <h2>🔐 管理者ログイン</h2>
+      <input type="password" placeholder="Pass" value={password} onChange={e => setPassword(e.target.value)} style={{ padding: '10px' }} />
+      <button onClick={handleLogin} style={{ padding: '10px 20px', marginLeft: '10px' }}>入室</button>
+      <div style={{ marginTop: '30px' }}><button onClick={() => window.location.href = '/'} style={{background:'none', border:'none', textDecoration:'underline', color:'blue'}}>アプリに戻る</button></div>
     </div>
   )
-
-  const renderRanking = () => (
-    <div style={{...styles.card, padding:'20px'}}>
-      <h3 style={{textAlign:'center', fontWeight:'900', marginBottom:'20px', fontSize:'18px'}}>🏆 投資家ランキング</h3>
-      {ranking.map((user, idx) => (
-        <div key={user.id} style={{ display: 'flex', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #f3f4f6' }}>
-          <div style={{ width: '30px', textAlign: 'center', fontWeight: 'bold', color: idx < 3 ? '#d97706' : '#9ca3af' }}>{idx + 1}</div>
-          <div style={{ flex: 1, fontSize: '14px', fontWeight: user.id === session?.user?.id ? 'bold' : 'normal' }}>
-            {user.id === session?.user?.id ? 'あなた' : `名無しさん ${user.id.slice(0,4)}`}
-          </div>
-          <div style={{ fontWeight: 'bold', color: '#2563eb' }}>{user.point_balance.toLocaleString()} pt</div>
-        </div>
-      ))}
-    </div>
-  )
-
-  const renderMyPage = () => (
-    <div>
-      <div style={{...styles.card, padding:'20px', background:'linear-gradient(135deg, #2563eb, #1e40af)', color:'white', textAlign:'center'}}>
-        <div style={{fontSize:'14px', opacity:0.8}}>総資産ポイント</div>
-        <div style={{fontSize:'32px', fontWeight:'900'}}>{profile?.point_balance.toLocaleString()} pt</div>
-      </div>
-      <h3 style={{fontWeight:'bold', marginLeft:'5px', marginBottom:'10px'}}>📜 投票履歴</h3>
-      {myBets.length === 0 && <div style={{textAlign:'center', color:'#9ca3af', marginTop:'20px'}}>まだ投票履歴がありません</div>}
-      {myBets.map((bet) => (
-        <div key={bet.id} style={{...styles.card, padding:'15px', marginBottom:'10px'}}>
-          <div style={{fontSize:'12px', color:'#6b7280', marginBottom:'5px'}}>{bet.markets?.title}</div>
-          <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-            <div style={{fontWeight:'bold', fontSize:'15px'}}>
-              「{bet.market_options?.name}」に {bet.amount}pt
-            </div>
-            <div style={{fontSize:'12px', padding:'2px 8px', borderRadius:'10px', background:'#f3f4f6', color:'#6b7280'}}>
-               結果待ち
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-
-  if (isLoading) return <div style={{display:'flex', justifyContent:'center', paddingTop:'50px'}}>読み込み中...</div>
 
   return (
-    <div style={styles.container as any}>
-      <div style={styles.headerContainer}>
-        <h1 style={styles.appTitle}>YOSOL</h1>
-        <p style={styles.appDesc}>未来をヨソル、ポイントで遊ぶ予測市場</p>
-        <div>
-           {profile ? (
-             <span style={styles.pointBadge}>💎 {profile.point_balance.toLocaleString()} pt</span> 
-           ) : (
-             <div style={{display:'flex', flexDirection:'column', alignItems:'center'}}>
-               <button onClick={handleLineLogin} style={styles.lineButton}>
-                 LINEでログインして始める
-               </button>
-               <button onClick={handleLogin} style={{background:'none', border:'none', fontSize:'11px', color:'#9ca3af', marginTop:'5px', textDecoration:'underline'}}>
-                 アカウントなしで試す
-               </button>
-             </div>
-           )}
+    <div style={{ maxWidth: '800px', margin: '0 auto', padding: '20px', fontFamily: 'sans-serif', paddingBottom:'100px' }}>
+      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px'}}>
+        <h1>⚙️ 管理画面</h1>
+        <button onClick={handleLogout} style={{background:'#ef4444', color:'white', border:'none', padding:'8px 16px', borderRadius:'5px', fontWeight:'bold'}}>ログアウト</button>
+      </div>
+
+      <div style={{ background: '#f0f9ff', padding: '20px', borderRadius: '12px', marginBottom: '30px', border:'1px solid #bae6fd' }}>
+        <h3>📝 新規作成</h3>
+        <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
+          <label style={{fontSize:'12px', fontWeight:'bold'}}>タイトル</label>
+          <input placeholder="例: M-1グランプリ優勝は？" value={newTitle} onChange={e=>setNewTitle(e.target.value)} style={{padding:'8px', border:'1px solid #ccc', borderRadius:'4px'}} />
+
+          <div style={{display:'flex', gap:'10px'}}>
+            <div style={{flex:1}}>
+              <label style={{fontSize:'12px', fontWeight:'bold'}}>カテゴリ</label>
+              <select value={newCategory} onChange={e=>setNewCategory(e.target.value)} style={{width:'100%', padding:'8px', border:'1px solid #ccc', borderRadius:'4px'}}>
+                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div style={{flex:1}}>
+              <label style={{fontSize:'12px', fontWeight:'bold'}}>締切日時</label>
+              <input type="datetime-local" value={newEndDate} onChange={e=>setNewEndDate(e.target.value)} style={{width:'100%', padding:'8px', border:'1px solid #ccc', borderRadius:'4px'}} />
+            </div>
+          </div>
+
+          <label style={{fontSize:'12px', fontWeight:'bold'}}>詳細・判定基準</label>
+          <textarea placeholder="例: 公式サイトの発表に基づきます" value={newDescription} onChange={e=>setNewDescription(e.target.value)} style={{padding:'8px', height:'60px', border:'1px solid #ccc', borderRadius:'4px'}} />
+
+          {/* ★ 画像アップロード部分の変更 ★ */}
+          <label style={{fontSize:'12px', fontWeight:'bold'}}>画像 (カメラロールから選択)</label>
+          <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, false)} style={{padding:'5px'}} />
+          {uploading && <span style={{fontSize:'12px', color:'blue'}}>アップロード中...</span>}
+          {newImage && <img src={newImage} alt="Preview" style={{height:'100px', objectFit:'cover', borderRadius:'8px', marginTop:'5px'}} />}
+          {/* URL直接入力も一応残しておく */}
+          <input placeholder="またはURL直接入力" value={newImage} onChange={e=>setNewImage(e.target.value)} style={{padding:'8px', border:'1px solid #ccc', borderRadius:'4px', marginTop:'5px', fontSize:'12px'}} />
+
+          <label style={{fontSize:'12px', fontWeight:'bold'}}>選択肢 (カンマ区切り)</label>
+          <input placeholder="A, B, C" value={newOptions} onChange={e=>setNewOptions(e.target.value)} style={{padding:'8px', border:'1px solid #ccc', borderRadius:'4px'}} />
+
+          <button onClick={createMarket} style={{background:'#0284c7', color:'white', padding:'10px', border:'none', borderRadius:'5px', marginTop:'10px', fontWeight:'bold', cursor:'pointer'}} disabled={uploading}>公開する</button>
         </div>
       </div>
 
-      {activeTab === 'home' && renderHome()}
-      {activeTab === 'ranking' && renderRanking()}
-      {activeTab === 'mypage' && renderMyPage()}
-
-      <div style={{ textAlign: 'center', paddingBottom: '80px', fontSize: '12px', color: '#ccc' }}>
-        <Link href="/admin" style={{ textDecoration: 'none', color: '#e5e7eb' }}>Admin Login</Link>
+      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+        <h3>📊 マーケット管理</h3>
+        <select onChange={handleSortChange} style={{padding:'5px', borderRadius:'5px', border:'1px solid #ccc'}}>
+            <option value="newest">作成順（新着）</option>
+            <option value="closest_deadline">締切が近い順</option>
+            <option value="category">カテゴリ順</option>
+        </select>
       </div>
 
-      <nav style={styles.navBar}>
-        <button onClick={() => setActiveTab('home')} style={styles.navBtn(activeTab === 'home')}><span style={{fontSize:'20px'}}>🏠</span>ホーム</button>
-        <button onClick={() => setActiveTab('ranking')} style={styles.navBtn(activeTab === 'ranking')}><span style={{fontSize:'20px'}}>👑</span>ランキング</button>
-        <button onClick={() => { if(!session) handleLogin(); setActiveTab('mypage') }} style={styles.navBtn(activeTab === 'mypage')}><span style={{fontSize:'20px'}}>👤</span>マイページ</button>
-      </nav>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginTop:'10px' }}>
+        {markets.map((m) => (
+          <div key={m.id} style={{ border: '1px solid #ddd', padding: '20px', borderRadius: '8px', background: m.is_resolved ? '#f3f4f6' : 'white', position:'relative' }}>
+             <button onClick={() => deleteMarket(m.id)} style={{ position:'absolute', top:'15px', right:'15px', background:'#fee2e2', color:'#dc2626', border:'none', padding:'5px 10px', borderRadius:'5px', fontWeight:'bold', cursor:'pointer'}}>削除</button>
+
+             {editingId === m.id ? (
+               <div style={{background:'#fffbeb', padding:'15px', borderRadius:'8px', marginTop:'30px', border:'2px solid #fcd34d'}}>
+                 <h4 style={{marginTop:0}}>✏️ 編集中</h4>
+                 <input value={editForm.title} onChange={e=>setEditForm({...editForm, title: e.target.value})} style={{width:'100%', marginBottom:'5px', padding:'5px'}} />
+                 <textarea value={editForm.description} onChange={e=>setEditForm({...editForm, description: e.target.value})} style={{width:'100%', marginBottom:'5px', padding:'5px', height:'80px'}} />
+                 <input type="datetime-local" value={editForm.end_date} onChange={e=>setEditForm({...editForm, end_date: e.target.value})} style={{width:'100%', marginBottom:'5px', padding:'5px'}} />
+
+                 {/* ★ 編集時の画像アップロード */}
+                 <label style={{fontSize:'12px', display:'block', marginTop:'5px'}}>画像変更:</label>
+                 <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, true)} style={{marginBottom:'5px'}} />
+                 {uploading && <span style={{fontSize:'12px', color:'blue'}}>アップロード中...</span>}
+                 {editForm.image_url && <img src={editForm.image_url} style={{height:'60px', borderRadius:'4px', display:'block', marginBottom:'5px'}} />}
+
+                 <div style={{display:'flex', gap:'10px', marginTop:'10px'}}>
+                   <button onClick={saveEdit} disabled={uploading} style={{background:'#059669', color:'white', border:'none', padding:'8px 16px', borderRadius:'5px', cursor:'pointer'}}>保存</button>
+                   <button onClick={()=>setEditingId(null)} style={{background:'#9ca3af', color:'white', border:'none', padding:'8px 16px', borderRadius:'5px', cursor:'pointer'}}>キャンセル</button>
+                 </div>
+               </div>
+             ) : (
+               <>
+                 <button onClick={() => startEdit(m)} style={{position:'absolute', top:'15px', right:'70px', background:'#e0f2fe', color:'#0284c7', border:'none', padding:'5px 10px', borderRadius:'5px', fontWeight:'bold', cursor:'pointer'}}>編集</button>
+                 <div style={{marginBottom:'5px'}}>
+                   <span style={{background:'#e5e7eb', fontSize:'10px', padding:'2px 6px', borderRadius:'4px', color:'#374151', marginRight:'5px'}}>{m.category || '未設定'}</span>
+                   <span style={{fontWeight:'bold', color: m.is_resolved ? 'green' : 'red', fontSize:'12px'}}>{m.is_resolved ? '✅ 終了済み' : '🔥 受付中'}</span>
+                 </div>
+                 {/* 画像プレビュー追加 */}
+                 <div style={{display:'flex', gap:'15px'}}>
+                    {m.image_url && <img src={m.image_url} style={{width:'60px', height:'60px', objectFit:'cover', borderRadius:'4px'}} />}
+                    <div>
+                        <div style={{fontWeight:'bold', fontSize:'18px'}}>{m.title}</div>
+                        <div style={{fontSize:'12px', color:'#666', marginTop:'5px'}}>締切: {new Date(m.end_date).toLocaleString()}</div>
+                    </div>
+                 </div>
+                 <div style={{display:'flex', gap:'5px', flexWrap:'wrap', alignItems:'center', marginTop:'10px'}}>
+                   <span style={{fontSize:'12px', fontWeight:'bold'}}>勝者判定:</span>
+                   {m.market_options.map((opt:any) => (
+                     <button key={opt.id} disabled={m.is_resolved} onClick={()=>resolve(m.id, opt.id, opt.name)} style={{padding:'5px 10px', borderRadius:'15px', border:'1px solid #ccc', background: m.result_option_id === opt.id ? '#22c55e' : 'white', color: m.result_option_id === opt.id ? 'white' : 'black', cursor: m.is_resolved ? 'default' : 'pointer'}}>
+                       {opt.name}
+                     </button>
+                   ))}
+                 </div>
+               </>
+             )}
+          </div>
+        ))}
+      </div>
+      <div style={{marginTop:'40px', textAlign:'center'}}>
+        <button onClick={() => window.location.href = '/'} style={{padding:'10px 20px', borderRadius:'20px', border:'1px solid #ccc', background:'#fff', cursor:'pointer'}}>🏠 アプリに戻る</button>
+      </div>
     </div>
   )
 }
