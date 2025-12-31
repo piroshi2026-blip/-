@@ -10,7 +10,10 @@ const supabase = createClient(
     auth: {
       persistSession: true,
       autoRefreshToken: true,
-      detectSessionInUrl: true
+      detectSessionInUrl: true,
+      // 本番環境でのセッション維持を強化
+      storageKey: 'yosol-auth-token',
+      storage: typeof window !== 'undefined' ? window.localStorage : undefined
     }
   }
 )
