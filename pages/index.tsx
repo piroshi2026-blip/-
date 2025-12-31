@@ -5,7 +5,14 @@ import { useRouter } from 'next/router'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+  {
+    auth: {
+      persistSession: true, // セッションを維持する
+      autoRefreshToken: true, // トークンを自動更新する
+      detectSessionInUrl: true // URLから認証情報を読み取る
+    }
+  }
 )
 
 export default function Home() {
