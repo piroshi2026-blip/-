@@ -24,11 +24,15 @@ export default function Home() {
   const [selectedOptionId, setSelectedOptionId] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
+  // 名前変更用のステート
+  const [editName, setEditName] = useState('')
+  const [isEditingName, setIsEditingName] = useState(false)
+
   // メールログイン用のステート
   const [showEmailForm, setShowEmailForm] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [isSignUp, setIsSignUp] = useState(false) // 登録かログインか
+  const [isSignUp, setIsSignUp] = useState(false)
 
   const categories = ['すべて', 'こども', '経済・政治', 'エンタメ', 'スポーツ', 'ライフ', 'その他']
 
@@ -68,7 +72,10 @@ export default function Home() {
 
   async function initUserData(userId: string) {
     const { data: profileData } = await supabase.from('profiles').select('*').eq('id', userId).single()
-    if (profileData) setProfile(profileData)
+    if (profileData) {
+        setProfile(profileData)
+        setEditName(profileData.username || '名無しさん') // 初期値をセット
+    }
 
     const { data: betsData } = await supabase
       .from('bets')
@@ -90,13 +97,26 @@ export default function Home() {
   }
 
   async function fetchRanking() {
+    // usernameも取得する
     const { data } = await supabase.from('profiles').select('*').order('point_balance', { ascending: false }).limit(20)
     if (data) setRanking(data)
   }
 
-  // --- ログイン関連 ---
+  const handleUpdateName = async () => {
+      if (!profile || !editName) return
+      try {
+          const { error } = await supabase.from('profiles').update({ username: editName }).eq('id', profile.id)
+          if (error) throw error
+          alert('名前を変更しました！')
+          setIsEditingName(false)
+          initUserData(profile.id) // プロフィール再取得
+          fetchRanking() // ランキングにも反映
+      } catch (e: any) {
+          alert('エラー: ' + e.message)
+      }
+  }
 
-  // 1. Googleログイン
+  // --- ログイン関連 ---
   const handleGoogleLogin = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -105,35 +125,28 @@ export default function Home() {
     if (error) alert(error.message)
   }
 
-  // 2. メールログイン/登録
   const handleEmailAuth = async () => {
     if (!email || !password) return alert('入力してください')
     try {
       if (isSignUp) {
-        // 新規登録
         const { error } = await supabase.auth.signUp({ email, password })
         if (error) throw error
-        alert('確認メールを送信しました！メール内のリンクを押して完了してください。')
+        alert('確認メールを送信しました！')
       } else {
-        // ログイン
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
         window.location.reload()
       }
-    } catch (e: any) {
-      alert(e.message)
-    }
+    } catch (e: any) { alert(e.message) }
   }
 
-  // 3. 匿名ログイン
   const handleAnonLogin = async () => {
     await supabase.auth.signInAnonymously()
     window.location.reload()
   }
 
-
   const openMarket = (marketId: number) => {
-    if (!session) return handleGoogleLogin() // 未ログイン時はGoogleへ誘導
+    if (!session) return handleGoogleLogin()
     setSelectedMarketId(marketId)
     router.push(`/?id=${marketId}`, undefined, { shallow: true })
   }
@@ -202,13 +215,8 @@ export default function Home() {
     appDesc: { fontSize: '12px', color: '#6b7280', marginTop: '5px', fontWeight: 'bold' },
     pointBadge: { display: 'inline-block', marginTop: '8px', padding: '4px 12px', background: '#eff6ff', color: '#2563eb', borderRadius: '20px', fontSize: '14px', fontWeight: 'bold' },
 
-    // Googleボタン
     googleButton: { marginTop: '10px', padding: '10px 20px', background: 'white', color: '#333', border: '1px solid #ccc', borderRadius: '30px', fontSize: '14px', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer', width: 'fit-content', margin: '10px auto', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' },
-
-    // メールボタン
     mailButton: { marginTop: '5px', padding: '8px 16px', background: '#f3f4f6', color: '#555', border: 'none', borderRadius: '30px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', width: 'fit-content', margin: '5px auto' },
-
-    // 入力フォーム
     inputField: { padding: '10px', border: '1px solid #ccc', borderRadius: '5px', width: '250px', marginBottom: '10px', fontSize: '14px' },
 
     categoryScroll: { display: 'flex', gap: '10px', overflowX: 'auto' as const, paddingBottom: '10px', marginBottom: '20px', scrollbarWidth: 'none' as const },
@@ -327,7 +335,8 @@ export default function Home() {
         <div key={user.id} style={{ display: 'flex', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #f3f4f6' }}>
           <div style={{ width: '30px', textAlign: 'center', fontWeight: 'bold', color: idx < 3 ? '#d97706' : '#9ca3af' }}>{idx + 1}</div>
           <div style={{ flex: 1, fontSize: '14px', fontWeight: user.id === session?.user?.id ? 'bold' : 'normal' }}>
-            {user.id === session?.user?.id ? 'あなた' : `名無しさん ${user.id.slice(0,4)}`}
+            {/* ★ 名前表示を修正 */}
+            {user.id === session?.user?.id ? `${user.username || 'あなた'} (自分)` : (user.username || `名無しさん ${user.id.slice(0,4)}`)}
           </div>
           <div style={{ fontWeight: 'bold', color: '#2563eb' }}>{user.point_balance.toLocaleString()} pt</div>
         </div>
@@ -340,7 +349,24 @@ export default function Home() {
       <div style={{...styles.card, padding:'20px', background:'linear-gradient(135deg, #2563eb, #1e40af)', color:'white', textAlign:'center'}}>
         <div style={{fontSize:'14px', opacity:0.8}}>総資産ポイント</div>
         <div style={{fontSize:'32px', fontWeight:'900'}}>{profile?.point_balance.toLocaleString()} pt</div>
+
+        {/* ★ 名前変更エリア */}
+        <div style={{marginTop:'15px', background:'rgba(255,255,255,0.2)', padding:'10px', borderRadius:'8px'}}>
+            {!isEditingName ? (
+                <div style={{display:'flex', justifyContent:'center', alignItems:'center', gap:'10px'}}>
+                    <span style={{fontWeight:'bold'}}>{profile?.username || '名無しさん'}</span>
+                    <button onClick={()=>setIsEditingName(true)} style={{fontSize:'10px', background:'white', color:'#333', border:'none', padding:'4px 8px', borderRadius:'4px', cursor:'pointer'}}>変更</button>
+                </div>
+            ) : (
+                <div style={{display:'flex', justifyContent:'center', alignItems:'center', gap:'5px'}}>
+                    <input value={editName} onChange={e=>setEditName(e.target.value)} style={{width:'120px', padding:'5px', borderRadius:'4px', border:'none', color:'black'}} />
+                    <button onClick={handleUpdateName} style={{fontSize:'10px', background:'#22c55e', color:'white', border:'none', padding:'6px 8px', borderRadius:'4px', cursor:'pointer'}}>保存</button>
+                    <button onClick={()=>{setIsEditingName(false); setEditName(profile?.username)}} style={{fontSize:'10px', background:'#666', color:'white', border:'none', padding:'6px 8px', borderRadius:'4px', cursor:'pointer'}}>✕</button>
+                </div>
+            )}
+        </div>
       </div>
+
       <h3 style={{fontWeight:'bold', marginLeft:'5px', marginBottom:'10px'}}>📜 投票履歴</h3>
       {myBets.length === 0 && <div style={{textAlign:'center', color:'#9ca3af', marginTop:'20px'}}>まだ投票履歴がありません</div>}
       {myBets.map((bet) => (
@@ -367,38 +393,20 @@ export default function Home() {
              <span style={styles.pointBadge}>💎 {profile.point_balance.toLocaleString()} pt</span> 
            ) : (
              <div style={{display:'flex', flexDirection:'column', alignItems:'center'}}>
-
-               {/* --- ログインエリア --- */}
                {!showEmailForm ? (
                    <>
-                     {/* Googleボタン */}
-                     <button onClick={handleGoogleLogin} style={styles.googleButton}>
-                       <img src="https://www.google.com/favicon.ico" width="16" /> Googleでログイン
-                     </button>
-
-                     {/* メールでログインボタン */}
+                     <button onClick={handleGoogleLogin} style={styles.googleButton}><img src="https://www.google.com/favicon.ico" width="16" /> Googleでログイン</button>
                      <button onClick={()=>setShowEmailForm(true)} style={styles.mailButton}>📧 メールアドレスでログイン</button>
-
                      <button onClick={handleAnonLogin} style={{background:'none', border:'none', fontSize:'11px', color:'#9ca3af', marginTop:'5px', textDecoration:'underline'}}>アカウントなしで試す</button>
                    </>
                ) : (
-                   /* メール入力フォーム */
                    <div style={{marginTop:'10px', padding:'15px', background:'white', borderRadius:'10px', boxShadow:'0 2px 5px rgba(0,0,0,0.1)'}}>
                        <div style={{fontSize:'12px', marginBottom:'5px'}}>メールアドレス</div>
                        <input type="email" value={email} onChange={e=>setEmail(e.target.value)} style={styles.inputField} />
                        <div style={{fontSize:'12px', marginBottom:'5px'}}>パスワード</div>
                        <input type="password" value={password} onChange={e=>setPassword(e.target.value)} style={styles.inputField} />
-
-                       <button onClick={handleEmailAuth} style={{...styles.voteButton, width:'100%', marginTop:'5px'}}>
-                           {isSignUp ? '登録してログイン' : 'ログイン'}
-                       </button>
-
-                       <div style={{fontSize:'11px', marginTop:'10px', color:'#666'}}>
-                           {isSignUp ? 'すでにアカウントをお持ちですか？' : 'アカウントをお持ちでないですか？'} 
-                           <span onClick={()=>setIsSignUp(!isSignUp)} style={{color:'blue', cursor:'pointer', marginLeft:'5px'}}>
-                               {isSignUp ? 'ログインへ' : '新規登録へ'}
-                           </span>
-                       </div>
+                       <button onClick={handleEmailAuth} style={{...styles.voteButton, width:'100%', marginTop:'5px'}}>{isSignUp ? '登録してログイン' : 'ログイン'}</button>
+                       <div style={{fontSize:'11px', marginTop:'10px', color:'#666'}}>{isSignUp ? 'すでにアカウントをお持ちですか？' : 'アカウントをお持ちでないですか？'} <span onClick={()=>setIsSignUp(!isSignUp)} style={{color:'blue', cursor:'pointer', marginLeft:'5px'}}>{isSignUp ? 'ログインへ' : '新規登録へ'}</span></div>
                        <button onClick={()=>setShowEmailForm(false)} style={{marginTop:'10px', background:'none', border:'none', fontSize:'11px', color:'#999'}}>キャンセル</button>
                    </div>
                )}
