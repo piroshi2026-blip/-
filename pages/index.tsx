@@ -18,345 +18,231 @@ export default function Home() {
 
   const [activeTab, setActiveTab] = useState<'home' | 'ranking' | 'mypage'>('home')
   const [activeCategory, setActiveCategory] = useState('すべて')
+  const [sortBy, setSortBy] = useState<'popular' | 'deadline'>('popular')
 
   const [voteAmount, setVoteAmount] = useState(100)
   const [selectedMarketId, setSelectedMarketId] = useState<number | null>(null)
   const [selectedOptionId, setSelectedOptionId] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  const categories = ['すべて', 'こども', '経済・政治', 'エンタメ', 'スポーツ', 'ライフ', 'その他']
+  const [editName, setEditName] = useState('')
+  const [isEditingName, setIsEditingName] = useState(false)
+  const [categories, setCategories] = useState<string[]>(['すべて'])
+  const [categoryMeta, setCategoryMeta] = useState<any>({})
 
   useEffect(() => {
     const init = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      setSession(session)
-      if (session) await initUserData(session.user.id)
-      await fetchMarkets()
-      await fetchRanking()
+      const { data: { session: currentSession } } = await supabase.auth.getSession()
+      setSession(currentSession)
+      await Promise.all([
+        fetchCategories(),
+        fetchMarkets(),
+        fetchRanking(),
+        currentSession ? initUserData(currentSession.user.id) : Promise.resolve()
+      ])
       setIsLoading(false)
     }
     init()
-  }, [])
+  }, [sortBy])
 
-  // URL連動 (Deep Link)
-  useEffect(() => {
-    if (!router.isReady || markets.length === 0) return
-    const { id } = router.query
-    if (id) {
-      const marketId = Number(id)
-      const target = markets.find(m => m.id === marketId)
-      if (target) {
-        setSelectedMarketId(marketId)
-        if (target.category) setActiveCategory(target.category)
-      }
+  async function fetchCategories() {
+    const { data } = await supabase.from('categories').select('*').order('display_order', { ascending: true })
+    if (data) {
+      setCategories(['すべて', ...data.map((c: any) => c.name)])
+      const meta: any = {}
+      data.forEach((c: any) => { meta[c.name] = { icon: c.icon || '🎲', color: '#6b7280' } })
+      setCategoryMeta(meta)
     }
-  }, [router.isReady, router.query, markets])
-
-  async function initUserData(userId: string) {
-    const { data: profileData } = await supabase.from('profiles').select('*').eq('id', userId).single()
-    if (profileData) setProfile(profileData)
-
-    const { data: betsData } = await supabase
-      .from('bets')
-      .select('*, markets(title), market_options(name)')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-    if (betsData) setMyBets(betsData)
   }
 
   async function fetchMarkets() {
-    const { data } = await supabase
-      .from('markets')
-      .select('*, market_options(*)')
-      .order('end_date', { ascending: true }) // 締切が近い順
-
+    let query = supabase.from('markets').select('*, market_options(*)')
+    if (sortBy === 'popular') query = query.order('total_pool', { ascending: false })
+    else query = query.order('end_date', { ascending: true })
+    const { data } = await query
     if (data) {
-      const sorted = data.map((m: any) => ({
+      setMarkets(data.map((m: any) => ({
         ...m,
         market_options: m.market_options.sort((a: any, b: any) => a.id - b.id)
-      }))
-      setMarkets(sorted)
+      })))
     }
   }
 
   async function fetchRanking() {
-    const { data } = await supabase.from('profiles').select('*').order('point_balance', { ascending: false }).limit(20)
+    const { data } = await supabase.from('profiles').select('*').eq('is_hidden_from_ranking', false).order('point_balance', { ascending: false }).limit(20)
     if (data) setRanking(data)
   }
 
-  const handleLogin = async () => {
-    await supabase.auth.signInAnonymously()
-    window.location.reload()
+  async function initUserData(userId: string) {
+    const { data: profileData } = await supabase.from('profiles').select('*').eq('id', userId).single()
+    if (profileData) { setProfile(profileData); setEditName(profileData.username || '名無しさん') }
+    const { data: betsData } = await supabase.from('bets').select('*, markets(title), market_options(name)').eq('user_id', userId).order('created_at', { ascending: false })
+    if (betsData) setMyBets(betsData)
   }
 
-  const openMarket = (marketId: number) => {
-    if (!session) return handleLogin()
-    setSelectedMarketId(marketId)
-    router.push(`/?id=${marketId}`, undefined, { shallow: true })
+  const handleUpdateName = async () => {
+    if (!profile || !editName) return
+    await supabase.from('profiles').update({ username: editName }).eq('id', profile.id)
+    setIsEditingName(false); initUserData(profile.id); fetchRanking()
   }
 
-  const closeMarket = () => {
-    setSelectedMarketId(null)
-    setSelectedOptionId(null)
-    router.push('/', undefined, { shallow: true })
-  }
-
+  const handleGoogleLogin = async () => await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } })
   const handleVote = async () => {
-    if (!session) return alert('ログインしてください')
-    if (!selectedMarketId || !selectedOptionId) return
-    if (voteAmount > (profile?.point_balance || 0)) return alert('ポイント不足です')
-
-    const { error } = await supabase.rpc('place_bet', {
-      market_id_input: selectedMarketId,
-      option_id_input: selectedOptionId,
-      amount_input: voteAmount
-    })
-
-    if (error) alert(error.message)
-    else {
-      alert('投票しました！')
-      closeMarket()
-      fetchMarkets()
-      initUserData(session.user.id)
-      fetchRanking()
-    }
+    if (voteAmount > (profile?.point_balance || 0)) return alert('ポイント不足')
+    const { error } = await supabase.rpc('place_bet', { market_id_input: selectedMarketId, option_id_input: selectedOptionId, amount_input: voteAmount })
+    if (!error) { alert('投票完了！'); setSelectedMarketId(null); fetchMarkets(); initUserData(session.user.id); fetchRanking() }
   }
 
   const shareOnX = (market: any) => {
-    const url = `${window.location.origin}/?id=${market.id}`
-    const text = `💰予測市場「YOSOL」に参加中！\n\nQ. ${market.title}\n\nあなたも予想しよう！ #YOSOL`
-    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`
-    window.open(twitterUrl, '_blank')
+    const template = localStorage.getItem('x_template') || '💰予測市場「YOSOL」に参加中！\n\nQ. {title}\n\nあなたも予想しよう！ #YOSOL'
+    const text = template.replace('{title}', market.title)
+    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(window.location.origin + '/?id=' + market.id)}`, '_blank')
   }
 
-  const getOdds = (marketTotal: number, optionPool: number) => {
-    if (optionPool === 0) return 0
-    return (marketTotal / optionPool)
+  const styles: any = {
+    container: { maxWidth: '600px', margin: '0 auto', padding: '20px 15px 120px', fontFamily: 'sans-serif', color: '#1f2937' },
+    header: { textAlign: 'center', marginBottom: '20px' },
+    appTitle: { fontSize: '32px', fontWeight: '900', background: 'linear-gradient(to right, #2563eb, #9333ea)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0 },
+    appDesc: { fontSize: '13px', color: '#6b7280', marginTop: '5px', fontWeight: 'bold' },
+    card: { background: 'white', borderRadius: '16px', marginBottom: '30px', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', overflow: 'hidden', border: '1px solid #f3f4f6' },
+    imageArea: { height: '180px', position: 'relative', background: '#eee' },
+    imageOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: '20px', background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)' },
+    descBox: { fontSize: '12px', color: '#4b5563', background: '#f8fafc', padding: '15px', borderRadius: '10px', marginBottom: '20px', border: '1px solid #edf2f7', lineHeight: '1.6', whiteSpace: 'pre-wrap' },
+    nav: { position: 'fixed', bottom: 0, left: 0, right: 0, background: 'rgba(255,255,255,0.95)', borderTop: '1px solid #eee', display: 'flex', justifyContent: 'space-around', padding: '12px', z_index: 100 },
+    adminLink: { textAlign: 'center', marginTop: '40px', fontSize: '12px', color: '#cbd5e1' }
   }
 
-  const getPercent = (marketTotal: number, optionPool: number) => {
-    if (marketTotal === 0) return 0
-    return Math.round((optionPool / marketTotal) * 100)
-  }
+  if (isLoading) return <div style={{textAlign:'center', marginTop:'50px'}}>読み込み中...</div>
 
-  const isMarketActive = (market: any) => {
-    if (market.is_resolved) return false
-    if (new Date(market.end_date) < new Date()) return false
-    return true
-  }
+  return (
+    <div style={styles.container}>
+      <header style={styles.header}>
+        <h1 style={styles.appTitle}>YOSOL</h1>
+        <p style={styles.appDesc}>未来をヨソル、ポイントで遊ぶ予測市場</p>
+        {profile && <div style={{marginTop:'10px', fontWeight:'bold', color:'#2563eb', fontSize:'16px'}}>💎 {profile.point_balance.toLocaleString()} pt</div>}
+      </header>
 
-  const filteredMarkets = markets.filter(m => {
-    if (activeCategory === 'すべて') return true
-    if (activeCategory === 'その他' && !m.category) return true
-    return m.category === activeCategory
-  })
+      {activeTab === 'home' && (
+        <>
+          <div style={{display:'flex', gap:'10px', overflowX:'auto', marginBottom:'15px', paddingBottom:'5px'}}>
+            {categories.map(cat => (
+              <button key={cat} onClick={()=>setActiveCategory(cat)} style={{padding:'8px 18px', borderRadius:'25px', background:activeCategory===cat?'#1f2937':'white', color:activeCategory===cat?'white':'#4b5563', border:'1px solid #ddd', fontWeight:'bold', cursor:'pointer'}}>{cat}</button>
+            ))}
+          </div>
 
-  // --- スタイル設定 ---
-  const styles = {
-    container: { maxWidth: '600px', margin: '0 auto', padding: '20px 15px 100px', minHeight: '100vh', fontFamily: 'sans-serif', color: '#1f2937' },
+          <div style={{display:'flex', justifyContent:'center', gap:'15px', marginBottom:'20px'}}>
+            <button onClick={()=>setSortBy('popular')} style={{fontSize:'12px', border:'none', background:sortBy==='popular'?'#2563eb':'#f3f4f6', color:sortBy==='popular'?'white':'#94a3b8', padding:'6px 15px', borderRadius:'20px', fontWeight:'bold', cursor:'pointer'}}>🔥 人気順</button>
+            <button onClick={()=>setSortBy('deadline')} style={{fontSize:'12px', border:'none', background:sortBy==='deadline'?'#2563eb':'#f3f4f6', color:sortBy==='deadline'?'white':'#94a3b8', padding:'6px 15px', borderRadius:'20px', fontWeight:'bold', cursor:'pointer'}}>⏰ 締切順</button>
+          </div>
 
-    // ヘッダー周り
-    headerContainer: { padding: '20px 0 10px', textAlign: 'center' as const },
-    appTitle: { fontSize: '28px', fontWeight: '900', background: 'linear-gradient(to right, #2563eb, #9333ea)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0, letterSpacing: '-1px' },
-    appDesc: { fontSize: '12px', color: '#6b7280', marginTop: '5px', fontWeight: 'bold' },
-    pointBadge: { display: 'inline-block', marginTop: '8px', padding: '4px 12px', background: '#eff6ff', color: '#2563eb', borderRadius: '20px', fontSize: '14px', fontWeight: 'bold' },
-    loginBtn: { marginTop: '8px', padding: '4px 12px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold' },
+          {markets.filter(m => activeCategory==='すべて' || m.category===activeCategory).map(m => {
+            const catInfo = categoryMeta[m.category] || { icon: '🎲', color: '#6b7280' }
+            const active = !m.is_resolved && new Date(m.end_date) > new Date()
+            return (
+              <div key={m.id} style={styles.card}>
+                <div style={styles.imageArea}>
+                  {m.image_url ? <img src={m.image_url} style={{width:'100%', height:'100%', objectFit:'cover'}} /> : <div style={{textAlign:'center', paddingTop:'60px', fontSize:'50px'}}>{catInfo.icon}</div>}
+                  <div style={styles.imageOverlay}>
+                    <div style={{display:'flex', gap:'8px', marginBottom:'8px'}}>
+                      <span style={{fontSize:'10px', background:catInfo.color, color:'white', padding:'4px 10px', borderRadius:'6px', fontWeight:'bold'}}>{m.category}</span>
+                      <span style={{fontSize:'10px', background:active?'rgba(255,255,255,0.9)':'#ef4444', color:active?'#059669':'white', padding:'4px 10px', borderRadius:'6px', fontWeight:'bold'}}>
+                        {m.is_resolved ? '結果確定' : (active ? `あと ${Math.ceil((new Date(m.end_date).getTime() - new Date().getTime())/(1000*60*60*24))}日` : '受付終了')}
+                      </span>
+                    </div>
+                    <h2 style={{color:'white', margin:0, fontSize:'20px', fontWeight:'bold', textShadow:'0 2px 10px rgba(0,0,0,0.5)'}}>{m.title}</h2>
+                  </div>
+                </div>
 
-    categoryScroll: { display: 'flex', gap: '10px', overflowX: 'auto' as const, paddingBottom: '10px', marginBottom: '20px', scrollbarWidth: 'none' as const },
-    categoryBtn: (isActive: boolean) => ({
-      padding: '8px 16px',
-      borderRadius: '20px',
-      border: isActive ? 'none' : '1px solid #e5e7eb',
-      background: isActive ? '#1f2937' : 'white',
-      color: isActive ? 'white' : '#4b5563',
-      fontSize: '13px',
-      fontWeight: 'bold' as const,
-      whiteSpace: 'nowrap' as const,
-      cursor: 'pointer',
-      boxShadow: isActive ? '0 4px 6px -1px rgba(0,0,0,0.1)' : 'none'
-    }),
+                <div style={{padding:'20px', background: 'white'}}>
+                  {/* 判定基準の表示 */}
+                  {m.description && (
+                    <div style={styles.descBox}>
+                      <div style={{fontWeight:'bold', fontSize:'11px', color:'#2563eb', marginBottom:'6px', borderBottom:'1px solid #edf2f7', paddingBottom:'4px'}}>📝 判定基準</div>
+                      {m.description}
+                    </div>
+                  )}
 
-    card: { background: 'white', borderRadius: '16px', padding: '20px', marginBottom: '20px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' },
+                  <div style={{fontSize:'14px', fontWeight:'bold', marginBottom:'15px', color:'#4b5563'}}>💰 投票総額: {m.total_pool.toLocaleString()} pt</div>
 
-    // 説明文エリア
-    descBox: { fontSize: '11px', color: '#4b5563', background: '#f9fafb', padding: '12px', borderRadius: '8px', marginTop: '10px', marginBottom: '15px', whiteSpace: 'pre-wrap' as const, lineHeight: '1.6', border: '1px solid #f3f4f6' },
+                  {m.market_options.map((opt: any, idx: number) => {
+                    const pct = m.total_pool === 0 ? 0 : Math.round((opt.pool / m.total_pool) * 100)
+                    const odds = opt.pool === 0 ? '1.0' : (m.total_pool / opt.pool).toFixed(1)
+                    return (
+                      <div key={opt.id} style={{marginBottom:'12px'}}>
+                        <div style={{display:'flex', justifyContent:'space-between', fontSize:'14px', fontWeight:'bold', marginBottom:'4px'}}>
+                          <span>{m.result_option_id === opt.id ? '👑 ' : ''}{opt.name}</span>
+                          <span style={{color:'#2563eb'}}>{odds}倍 ({pct}%)</span>
+                        </div>
+                        <div style={{height:'10px', background:'#f1f5f9', borderRadius:'5px', overflow:'hidden'}}>
+                          <div style={{width:`${pct}%`, height:'100%', background:['#3b82f6','#ef4444','#10b981','#f59e0b'][idx%4], transition:'width 0.8s ease-out'}} />
+                        </div>
+                      </div>
+                    )
+                  })}
 
-    barRow: { marginBottom: '12px' },
-    barLabelArea: { display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px', fontWeight: 'bold' },
-    barTrack: { height: '12px', background: '#f3f4f6', borderRadius: '6px', overflow: 'hidden' },
-    barFill: (percent: number, idx: number) => ({ height: '100%', width: `${percent}%`, background: ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6'][idx % 5], transition: 'width 0.5s' }),
+                  {active ? (
+                    selectedMarketId === m.id ? (
+                      <div style={{marginTop:'20px', padding:'15px', background:'#f9fafb', borderRadius:'12px', border:'1px solid #e2e8f0'}}>
+                        <div style={{display:'flex', gap:'8px', flexWrap:'wrap', marginBottom:'15px'}}>
+                          {m.market_options.map((o: any) => (
+                            <button key={o.id} onClick={()=>setSelectedOptionId(o.id)} style={{padding:'10px 15px', borderRadius:'25px', border:selectedOptionId===o.id?'2px solid #2563eb':'1px solid #cbd5e1', background:selectedOptionId===o.id?'#eff6ff':'white', color:'black', fontWeight:'bold', cursor:'pointer'}}>{o.name}</button>
+                          ))}
+                        </div>
+                        <input type="range" min="10" max={profile?.point_balance || 1000} step="10" value={voteAmount} onChange={e=>setVoteAmount(Number(e.target.value))} style={{width:'100%', marginBottom:'15px'}} />
+                        <div style={{display:'flex', gap:'10px'}}>
+                          <button onClick={handleVote} style={{flex:2, padding:'14px', background:'#2563eb', color:'white', border:'none', borderRadius:'12px', fontWeight:'bold', cursor:'pointer'}}>投票を確定</button>
+                          <button onClick={()=>setSelectedMarketId(null)} style={{flex:1, background:'#e2e8f0', color:'#475569', border:'none', borderRadius:'12px', fontWeight:'bold', cursor:'pointer'}}>中止</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{display:'flex', gap:'12px', marginTop:'20px'}}>
+                        <button onClick={()=>{ if(!session) handleGoogleLogin(); else setSelectedMarketId(m.id) }} style={{flex:2, padding:'14px', background:'#2563eb', color:'white', border:'none', borderRadius:'12px', fontWeight:'bold', cursor:'pointer', fontSize:'16px'}}>⚡️ 予想に参加</button>
+                        <button onClick={()=>shareOnX(m)} style={{flex:1, background:'black', color:'white', border:'none', borderRadius:'12px', fontWeight:'bold', cursor:'pointer', fontSize:'16px'}}>𝕏 シェア</button>
+                      </div>
+                    )
+                  ) : <div style={{textAlign:'center', padding:'15px', background:'#f8fafc', color:'#94a3b8', borderRadius:'12px', marginTop:'15px', fontWeight:'bold'}}>受付終了しました</div>}
+                </div>
+              </div>
+            )
+          })}
 
-    voteButton: { width: '100%', padding: '12px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', fontSize: '14px' },
-    shareButton: { width: '100%', padding: '12px', background: 'black', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', fontSize: '13px' },
-    disabledButton: { width: '100%', padding: '12px', background: '#e5e7eb', color: '#9ca3af', border: 'none', borderRadius: '10px', fontWeight: 'bold', marginTop: '15px' },
+          <div style={{ textAlign: 'center', marginTop: '40px', paddingBottom: '40px' }}>
+            <Link href="/admin" style={{ color: '#cbd5e1', textDecoration: 'none', fontSize: '12px' }}>Admin Login</Link>
+          </div>
+        </>
+      )}
 
-    navBar: { position: 'fixed' as const, bottom: 0, left: 0, right: 0, background: 'rgba(255,255,255,0.95)', borderTop: '1px solid #eee', display: 'flex', justifyContent: 'space-around', padding: '12px', zIndex: 100 },
-    navBtn: (isActive: boolean) => ({ background: 'none', border: 'none', color: isActive ? '#2563eb' : '#9ca3af', fontWeight: isActive ? 'bold' : 'normal', fontSize: '10px', display: 'flex', flexDirection: 'column' as const, alignItems: 'center' }),
-  }
-
-  const renderHome = () => (
-    <div>
-      <div style={styles.categoryScroll}>
-        {categories.map(cat => (
-          <button key={cat} onClick={() => { setActiveCategory(cat); router.push('/', undefined, { shallow: true }) }} style={styles.categoryBtn(activeCategory === cat)}>
-            {cat}
-          </button>
-        ))}
-      </div>
-
-      {filteredMarkets.length === 0 && (
-        <div style={{textAlign:'center', padding:'40px', color:'#9ca3af', fontSize:'14px'}}>
-          まだこのジャンルの質問はありません
+      {activeTab === 'ranking' && (
+        <div style={{background:'white', borderRadius:'16px', padding:'25px', boxShadow:'0 4px 20px rgba(0,0,0,0.05)'}}>
+           <h3 style={{textAlign:'center', marginBottom:'25px', fontSize:'20px', fontWeight:'bold'}}>🏆 投資家ランキング</h3>
+           {ranking.map((u, i) => (
+             <div key={u.id} style={{display:'flex', padding:'15px 0', borderBottom:'1px solid #f1f5f9', alignItems:'center'}}>
+               <div style={{width:'40px', fontWeight:'bold', fontSize:'20px', color:i<3?'#f59e0b':'#cbd5e1'}}>{i+1}</div>
+               <div style={{flex:1}}>{u.id===session?.user?.id ? <strong>{u.username} (自分)</strong> : u.username}</div>
+               <div style={{fontWeight:'bold', color:'#2563eb', fontSize:'18px'}}>{u.point_balance.toLocaleString()} pt</div>
+             </div>
+           ))}
         </div>
       )}
 
-      {filteredMarkets.map((market) => {
-        const isActive = isMarketActive(market)
-        return (
-          <div key={market.id} style={styles.card}>
-            {market.image_url && <img src={market.image_url} style={{ width: '100%', height: '140px', objectFit: 'cover', borderRadius: '10px', marginBottom: '12px' }} />}
-
-            <div style={{display:'flex', justifyContent:'space-between', marginBottom:'8px'}}>
-               <span style={{fontSize:'10px', background:'#f3f4f6', padding:'2px 8px', borderRadius:'4px', color:'#666'}}>{market.category || 'その他'}</span>
-            </div>
-
-            <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '8px', lineHeight: '1.4' }}>{market.title}</h2>
-
-            {/* 説明文・判定基準の表示 */}
-            {market.description && (
-              <div style={styles.descBox}>
-                {market.description}
-              </div>
-            )}
-
-            <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '15px', display:'flex', gap:'10px', alignItems:'center' }}>
-              <span>💰 総額: {market.total_pool.toLocaleString()}pt</span>
-              <span style={{ color: isActive ? '#059669' : '#dc2626', fontWeight:'bold', background: isActive ? '#ecfdf5' : '#fef2f2', padding:'2px 8px', borderRadius:'4px' }}>
-                {market.is_resolved ? '🏁 結果確定' : (isActive ? `⏰ 締切: ${new Date(market.end_date).toLocaleDateString()}` : '🚫 受付終了')}
-              </span>
-            </div>
-
-            <div>
-              {market.market_options.map((opt: any, idx: number) => {
-                const percent = getPercent(market.total_pool, opt.pool)
-                const odds = getOdds(market.total_pool, opt.pool)
-                const isWinner = market.result_option_id === opt.id
-                return (
-                  <div key={opt.id} style={styles.barRow}>
-                    <div style={styles.barLabelArea}>
-                      <span>{isWinner ? '👑 ' : ''}{opt.name}</span>
-                      <span>{odds ? `${odds.toFixed(1)}倍` : '--倍'} ({percent}%)</span>
-                    </div>
-                    <div style={styles.barTrack}>
-                      <div style={styles.barFill(percent, idx) as any} />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-
-            {/* 投票エリア */}
-            {isActive ? (
-              selectedMarketId === market.id ? (
-                <div style={{ background: '#f9fafb', padding: '15px', borderRadius: '10px', marginTop: '15px', border:'1px solid #e5e7eb' }}>
-                  <div style={{fontWeight:'bold', marginBottom:'10px', fontSize:'14px'}}>選択肢を選ぶ:</div>
-                  <div style={{display:'flex', flexWrap:'wrap', gap:'8px', marginBottom:'15px'}}>
-                    {market.market_options.map((opt: any) => (
-                      <button key={opt.id} onClick={() => setSelectedOptionId(opt.id)} style={{ padding: '8px 12px', borderRadius: '20px', border: selectedOptionId === opt.id ? '2px solid #2563eb' : '1px solid #d1d5db', background: selectedOptionId === opt.id ? '#eff6ff' : 'white', fontSize:'13px', fontWeight:'bold' }}>
-                        {opt.name}
-                      </button>
-                    ))}
-                  </div>
-                  <div style={{fontSize:'13px', marginBottom:'5px'}}>投票額: <strong>{voteAmount} pt</strong></div>
-                  <input type="range" min="10" max={profile?.point_balance} step="10" value={voteAmount} onChange={e=>setVoteAmount(Number(e.target.value))} style={{width:'100%', marginBottom:'15px'}} />
-                  <div style={{display:'flex', gap:'10px'}}>
-                    <button onClick={handleVote} style={{flex:1, padding:'10px', background:'#2563eb', color:'white', border:'none', borderRadius:'8px', fontWeight:'bold'}}>投票する</button>
-                    <button onClick={closeMarket} style={{flex:1, padding:'10px', background:'#e5e7eb', color:'#374151', border:'none', borderRadius:'8px'}}>やめる</button>
-                  </div>
-                </div>
-              ) : (
-                <div style={{display:'flex', gap:'10px', marginTop:'15px'}}>
-                  <button onClick={() => openMarket(market.id)} style={{...styles.voteButton, flex:2}}>⚡️ 投票する</button>
-                  <button onClick={() => shareOnX(market)} style={{...styles.shareButton, flex:1}}>𝕏 シェア</button>
-                </div>
-              )
-            ) : (
-              <button disabled style={styles.disabledButton}>🚫 受付終了</button>
-            )}
-          </div>
-        )
-      })}
-    </div>
-  )
-
-  const renderRanking = () => (
-    <div style={styles.card}>
-      <h3 style={{textAlign:'center', fontWeight:'900', marginBottom:'20px', fontSize:'18px'}}>🏆 投資家ランキング</h3>
-      {ranking.map((user, idx) => (
-        <div key={user.id} style={{ display: 'flex', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #f3f4f6' }}>
-          <div style={{ width: '30px', textAlign: 'center', fontWeight: 'bold', color: idx < 3 ? '#d97706' : '#9ca3af' }}>{idx + 1}</div>
-          <div style={{ flex: 1, fontSize: '14px', fontWeight: user.id === session?.user?.id ? 'bold' : 'normal' }}>
-            {user.id === session?.user?.id ? 'あなた' : `名無しさん ${user.id.slice(0,4)}`}
-          </div>
-          <div style={{ fontWeight: 'bold', color: '#2563eb' }}>{user.point_balance.toLocaleString()} pt</div>
-        </div>
-      ))}
-    </div>
-  )
-
-  const renderMyPage = () => (
-    <div>
-      <div style={{...styles.card, background:'linear-gradient(135deg, #2563eb, #1e40af)', color:'white', textAlign:'center'}}>
-        <div style={{fontSize:'14px', opacity:0.8}}>総資産ポイント</div>
-        <div style={{fontSize:'32px', fontWeight:'900'}}>{profile?.point_balance.toLocaleString()} pt</div>
-      </div>
-      <h3 style={{fontWeight:'bold', marginLeft:'5px', marginBottom:'10px'}}>📜 投票履歴</h3>
-      {myBets.length === 0 && <div style={{textAlign:'center', color:'#9ca3af', marginTop:'20px'}}>まだ投票履歴がありません</div>}
-      {myBets.map((bet) => (
-        <div key={bet.id} style={{...styles.card, padding:'15px', marginBottom:'10px'}}>
-          <div style={{fontSize:'12px', color:'#6b7280', marginBottom:'5px'}}>{bet.markets?.title}</div>
-          <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-            <div style={{fontWeight:'bold', fontSize:'15px'}}>
-              「{bet.market_options?.name}」に {bet.amount}pt
-            </div>
-            <div style={{fontSize:'12px', padding:'2px 8px', borderRadius:'10px', background:'#f3f4f6', color:'#6b7280'}}>
-               結果待ち
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-
-  if (isLoading) return <div style={{display:'flex', justifyContent:'center', paddingTop:'50px'}}>読み込み中...</div>
-
-  return (
-    <div style={styles.container as any}>
-      {/* リッチなヘッダー */}
-      <div style={styles.headerContainer}>
-        <h1 style={styles.appTitle}>YOSOL</h1>
-        <p style={styles.appDesc}>未来をヨソル、ポイントで遊ぶ予測市場</p>
+      {activeTab === 'mypage' && (
         <div>
-           {profile ? 
-             <span style={styles.pointBadge}>💎 {profile.point_balance.toLocaleString()} pt</span> 
-             : 
-             <button onClick={handleLogin} style={styles.loginBtn}>ログインして参加</button>
-           }
+           <div style={{background:'linear-gradient(135deg, #2563eb, #1e40af)', color:'white', padding:'40px 20px', borderRadius:'20px', textAlign:'center', marginBottom:'30px', boxShadow:'0 10px 25px rgba(37,99,235,0.2)'}}>
+              <div style={{fontSize:'14px', opacity:0.8, marginBottom:'5px'}}>あなたの総資産</div>
+              <div style={{fontSize:'45px', fontWeight:'900'}}>{profile?.point_balance?.toLocaleString() || 0} pt</div>
+              <div style={{marginTop:'20px'}}>
+                {!isEditingName ? <div onClick={()=>setIsEditingName(true)} style={{cursor:'pointer', fontSize:'18px', background:'rgba(255,255,255,0.1)', display:'inline-block', padding:'8px 20px', borderRadius:'25px'}}>👤 {profile?.username || '名無しさん'} ✎</div>
+                : <div style={{display:'flex', justifyContent:'center', gap:'10px'}}><input value={editName} onChange={e=>setEditName(e.target.value)} style={{color:'black', padding:'10px', borderRadius:'8px', border:'none', width:'150px'}} /><button onClick={handleUpdateName} style={{background:'#22c55e', color:'white', border:'none', padding:'10px 20px', borderRadius:'8px', fontWeight:'bold'}}>保存</button></div>}
+              </div>
+           </div>
+           <button onClick={()=>supabase.auth.signOut().then(()=>window.location.reload())} style={{width:'100%', padding:'15px', background:'none', border:'1px solid #e2e8f0', borderRadius:'12px', marginTop:'40px', color:'#94a3b8', cursor:'pointer', fontWeight:'bold'}}>ログアウト</button>
         </div>
-      </div>
+      )}
 
-      {activeTab === 'home' && renderHome()}
-      {activeTab === 'ranking' && renderRanking()}
-      {activeTab === 'mypage' && renderMyPage()}
-
-      <div style={{ textAlign: 'center', paddingBottom: '80px', fontSize: '12px', color: '#ccc' }}>
-        <Link href="/admin" style={{ textDecoration: 'none', color: '#e5e7eb' }}>Admin Login</Link>
-      </div>
-
-      <nav style={styles.navBar}>
-        <button onClick={() => setActiveTab('home')} style={styles.navBtn(activeTab === 'home')}><span style={{fontSize:'20px'}}>🏠</span>ホーム</button>
-        <button onClick={() => setActiveTab('ranking')} style={styles.navBtn(activeTab === 'ranking')}><span style={{fontSize:'20px'}}>👑</span>ランキング</button>
-        <button onClick={() => { if(!session) handleLogin(); setActiveTab('mypage') }} style={styles.navBtn(activeTab === 'mypage')}><span style={{fontSize:'20px'}}>👤</span>マイページ</button>
+      <nav style={styles.nav}>
+        <button onClick={()=>setActiveTab('home')} style={{background:'none', border:'none', color:activeTab==='home'?'#2563eb':'#94a3b8', cursor:'pointer', textAlign:'center'}}><span style={{fontSize:'24px'}}>🏠</span><br/><span style={{fontSize:'11px', fontWeight:'bold'}}>ホーム</span></button>
+        <button onClick={()=>setActiveTab('ranking')} style={{background:'none', border:'none', color:activeTab==='ranking'?'#2563eb':'#94a3b8', cursor:'pointer', textAlign:'center'}}><span style={{fontSize:'24px'}}>👑</span><br/><span style={{fontSize:'11px', fontWeight:'bold'}}>ランク</span></button>
+        <button onClick={()=>{if(!session)handleGoogleLogin(); else setActiveTab('mypage')}} style={{background:'none', border:'none', color:activeTab==='mypage'?'#2563eb':'#94a3b8', cursor:'pointer', textAlign:'center'}}><span style={{fontSize:'24px'}}>👤</span><br/><span style={{fontSize:'11px', fontWeight:'bold'}}>マイページ</span></button>
       </nav>
     </div>
   )
