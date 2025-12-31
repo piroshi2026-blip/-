@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
+import Link from 'next/link'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -13,12 +14,10 @@ export default function Admin() {
   const [users, setUsers] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
-  // 編集用ステート
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editForm, setEditForm] = useState<any>({})
   const [uploading, setUploading] = useState(false)
 
-  // 新規追加用
   const [newMarket, setNewMarket] = useState({ title: '', category: '', end_date: '', description: '', image_url: '', options: '' })
   const [newCategory, setNewCategory] = useState({ name: '', icon: '', display_order: 0 })
 
@@ -39,7 +38,6 @@ export default function Admin() {
     setIsLoading(false)
   }
 
-  // --- 画像アップロード ---
   async function uploadImage(e: any, isEdit: boolean = false) {
     try {
       setUploading(true)
@@ -55,7 +53,6 @@ export default function Admin() {
     } catch (error: any) { alert(error.message) } finally { setUploading(false) }
   }
 
-  // --- 問い（マーケット）操作 ---
   async function handleCreateMarket() {
     const optArray = newMarket.options.split(',').map(s => s.trim())
     const { error } = await supabase.rpc('create_market_with_options', {
@@ -67,7 +64,7 @@ export default function Admin() {
   }
 
   async function handleUpdateMarket() {
-    const { error: mError } = await supabase.from('markets').update({
+    await supabase.from('markets').update({
       title: editForm.title, description: editForm.description, category: editForm.category,
       end_date: new Date(editForm.end_date).toISOString(), image_url: editForm.image_url
     }).eq('id', editingId)
@@ -89,33 +86,8 @@ export default function Admin() {
     if (!error) { alert('確定成功'); fetchData(); } else alert(error.message)
   }
 
-  // --- カテゴリー操作 ---
-  async function handleCreateCategory() {
-    await supabase.from('categories').insert([newCategory])
-    setNewCategory({ name: '', icon: '', display_order: 0 })
-    fetchData()
-  }
-
   async function handleUpdateCategory(id: number, updates: any) {
     await supabase.from('categories').update(updates).eq('id', id)
-    fetchData()
-  }
-
-  async function handleDeleteCategory(id: number) {
-    if(!confirm('削除しますか？')) return
-    await supabase.from('categories').delete().eq('id', id)
-    fetchData()
-  }
-
-  // --- ユーザー・ランキング操作 ---
-  async function toggleUserVisibility(id: string, hide: boolean) {
-    await supabase.from('profiles').update({ is_hidden_from_ranking: hide }).eq('id', id)
-    fetchData()
-  }
-
-  async function handleDeleteUser(id: string) {
-    if(!confirm('ユーザーデータを削除しますか？(認証データは残ります)')) return
-    await supabase.from('profiles').delete().eq('id', id)
     fetchData()
   }
 
@@ -123,7 +95,12 @@ export default function Admin() {
 
   return (
     <div style={{ maxWidth: '950px', margin: '0 auto', padding: '20px', fontFamily: 'sans-serif' }}>
-      <h1>🛠 YOSOL 管理パネル</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <h1 style={{ margin: 0 }}>🛠 YOSOL 管理パネル</h1>
+        <Link href="/" style={{ textDecoration: 'none', background: '#f3f4f6', color: '#374151', padding: '8px 16px', borderRadius: '8px', fontWeight: 'bold', border: '1px solid #d1d5db' }}>
+          🏠 アプリに戻る
+        </Link>
+      </div>
 
       <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
         <button onClick={() => setActiveTab('markets')} style={tabStyle(activeTab === 'markets')}>問い管理</button>
@@ -195,15 +172,6 @@ export default function Admin() {
 
       {activeTab === 'categories' && (
         <>
-          <section style={sectionStyle}>
-            <h3>🆕 カテゴリ追加</h3>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <input placeholder="名前" value={newCategory.name} onChange={e => setNewCategory({...newCategory, name: e.target.value})} style={inpStyle} />
-              <input placeholder="アイコン" value={newCategory.icon} onChange={e => setNewCategory({...newCategory, icon: e.target.value})} style={{...inpStyle, width:'60px'}} />
-              <input type="number" value={newCategory.display_order} onChange={e => setNewCategory({...newCategory, display_order: Number(e.target.value)})} style={{...inpStyle, width:'60px'}} />
-              <button onClick={handleCreateCategory} style={btnPrimary}>追加</button>
-            </div>
-          </section>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead><tr style={{textAlign:'left'}}><th style={{padding:'10px'}}>順序</th><th>名前</th><th>アイコン</th><th>操作</th></tr></thead>
             <tbody>
@@ -212,11 +180,10 @@ export default function Admin() {
                   <td><input type="number" defaultValue={c.display_order} onBlur={e => handleUpdateCategory(c.id, {display_order: Number(e.target.value)})} style={{width:'50px'}} /></td>
                   <td><input defaultValue={c.name} onBlur={e => handleUpdateCategory(c.id, {name: e.target.value})} style={{border:'none'}} /></td>
                   <td><input defaultValue={c.icon} onBlur={e => handleUpdateCategory(c.id, {icon: e.target.value})} style={{width:'40px', border:'none'}} /></td>
-                  <td><button onClick={() => handleDeleteCategory(c.id)} style={{color:'red', border:'none', background:'none'}}>削除</button></td>
+                  <td><button onClick={() => { if(confirm('削除しますか？')) supabase.from('categories').delete().eq('id', c.id).then(()=>fetchData()) }} style={{color:'red', border:'none', background:'none'}}>削除</button></td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
         </>
       )}
 
@@ -226,14 +193,14 @@ export default function Admin() {
           <tbody>
             {users.map(u => (
               <tr key={u.id} style={{borderBottom:'1px solid #eee'}}>
-                <td style={{padding:'10px'}}>{u.username}</td>
+                <td style={{padding:'10px'}}>{u.username || '名無しさん'}</td>
                 <td>{u.point_balance.toLocaleString()}</td>
                 <td>{u.is_hidden_from_ranking ? '🙈 非表示' : '👁 表示中'}</td>
                 <td>
-                  <button onClick={() => toggleUserVisibility(u.id, !u.is_hidden_from_ranking)} style={{background: u.is_hidden_from_ranking ? '#22c55e' : '#f59e0b', color:'white', border:'none', padding:'5px', borderRadius:'4px', marginRight:'5px'}}>
+                  <button onClick={() => supabase.from('profiles').update({ is_hidden_from_ranking: !u.is_hidden_from_ranking }).eq('id', u.id).then(()=>fetchData())} style={{background: u.is_hidden_from_ranking ? '#22c55e' : '#f59e0b', color:'white', border:'none', padding:'5px', borderRadius:'4px', marginRight:'5px'}}>
                     {u.is_hidden_from_ranking ? '戻す' : '隠す'}
                   </button>
-                  <button onClick={() => handleDeleteUser(u.id)} style={{background:'red', color:'white', border:'none', padding:'5px', borderRadius:'4px'}}>削除</button>
+                  <button onClick={() => { if(confirm('削除？')) supabase.from('profiles').delete().eq('id', u.id).then(()=>fetchData()) }} style={{background:'red', color:'white', border:'none', padding:'5px', borderRadius:'4px'}}>削除</button>
                 </td>
               </tr>
             ))}
@@ -244,7 +211,6 @@ export default function Admin() {
   )
 }
 
-// 共通スタイル
 const tabStyle = (active: boolean) => ({ flex: 1, padding: '12px', background: active ? '#2563eb' : '#eee', color: active ? 'white' : 'black', border:'none', cursor:'pointer' });
 const sectionStyle = { background: '#f8fafc', padding: '20px', borderRadius: '12px', marginBottom: '20px', border: '1px solid #eee' };
 const cardStyle = { border: '1px solid #ddd', padding: '15px', borderRadius: '10px', marginBottom: '10px', background: 'white' };
@@ -254,3 +220,5 @@ const btnEdit = { background: '#eee', border: 'none', padding: '5px 10px', borde
 const btnSave = { flex: 1, background: '#059669', color: 'white', padding: '10px', border: 'none', borderRadius: '6px' };
 const btnCancel = { flex: 1, background: '#94a3b8', color: 'white', padding: '10px', border: 'none', borderRadius: '6px' };
 const btnResolve = { background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1d4ed8', padding: '5px 10px', borderRadius: '4px', fontSize: '11px', cursor: 'pointer' };
+
+          
