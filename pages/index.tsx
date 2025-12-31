@@ -1,3 +1,17 @@
+// Homeコンポーネント内の最初の方に追加
+const [debugInfo, setDebugInfo] = useState("");
+
+useEffect(() => {
+  const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+    setDebugInfo(`Event: ${event} | Session: ${session ? "あり" : "なし"}`);
+    if (event === "SIGNED_IN") window.location.hash = ""; // URLのゴミを掃除
+  });
+  return () => authListener.subscription.unsubscribe();
+}, []);
+
+// return内の <h1>YOSOL</h1> のすぐ下に追加
+<div style={{fontSize:'10px', color:'red', wordBreak:'break-all'}}>{debugInfo}</div>
+
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
