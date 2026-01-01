@@ -15,12 +15,13 @@ export default function Home() {
   const [markets, setMarkets] = useState<any[]>([])
   const [ranking, setRanking] = useState<any[]>([])
   const [myBets, setMyBets] = useState<any[]>([])
+  const [dbCategories, setDbCategories] = useState<any[]>([{ name: 'すべて' }]) // 初期値
+
   const [config, setConfig] = useState<any>({ 
     site_title: 'ヨソる', 
     site_description: '未来をヨソる予測市場',
     admin_message: '',
-    show_ranking: true, 
-    categories: 'すべて' 
+    show_ranking: true 
   })
 
   const [showAuthModal, setShowAuthModal] = useState(false)
@@ -70,8 +71,17 @@ export default function Home() {
 
   useEffect(() => {
     const init = async () => {
-      const { data: cfg } = await supabase.from('site_config').select('*').single()
-      if (cfg) setConfig(cfg)
+      // 1. 設定とカテゴリーをDBから取得（ここを確実に修正）
+      const [cfgRes, catRes] = await Promise.all([
+        supabase.from('site_config').select('*').single(),
+        supabase.from('categories').select('*').order('display_order', { ascending: true })
+      ])
+
+      if (cfgRes.data) setConfig(cfgRes.data)
+      if (catRes.data && catRes.data.length > 0) {
+        setDbCategories([{ name: 'すべて' }, ...catRes.data])
+      }
+
       const { data: { session: s } } = await supabase.auth.getSession()
       setSession(s)
       if (s) initUserData(s.user.id)
@@ -79,17 +89,21 @@ export default function Home() {
       fetchRanking()
       setIsLoading(false)
     }
-    init()
+    const { data: authListener } = supabase.auth.onAuthStateChange((_, s) => {
+      setSession(s); if (s) initUserData(s.user.id);
+    })
+    init(); return () => authListener.subscription.unsubscribe()
   }, [sortBy, fetchMarkets, fetchRanking, initUserData])
 
   const handleUpdateName = async () => {
     if (!profile) return
     const { error } = await supabase.from('profiles').update({ username: newUsername }).eq('id', profile.id)
-    if (error) alert('更新失敗'); else { alert('更新完了'); setIsEditingName(false); initUserData(profile.id); }
+    if (error) alert('失敗'); else { alert('更新'); setIsEditingName(false); initUserData(profile.id); }
   }
 
   const handleVote = async () => {
     if (!session) { setShowAuthModal(true); return; }
+    if (!selectedOptionId) return alert('選択肢を選んでください')
     const { error } = await supabase.rpc('place_bet', { market_id_input: selectedMarketId, option_id_input: selectedOptionId, amount_input: voteAmount })
     if (!error) { alert('ヨソりました！'); setSelectedMarketId(null); fetchMarkets(); initUserData(session.user.id); }
     else alert(error.message)
@@ -103,22 +117,17 @@ export default function Home() {
   const getOdds = (t: number, p: number) => (p === 0 ? 0 : (t / p).toFixed(1))
   const getPercent = (t: number, p: number) => (t === 0 ? 0 : Math.round((p / t) * 100))
 
-  // カテゴリー分割
-  const dynamicCategories = config.categories ? config.categories.split(',').map((c: string) => c.trim()) : ['すべて']
-
   const s: any = {
     container: { maxWidth: '500px', margin: '0 auto', padding: '10px 10px 80px', fontFamily: 'sans-serif', background: '#fff' },
     title: { fontSize: '26px', fontWeight: '900', textAlign: 'center', margin: '0', background: 'linear-gradient(to right, #2563eb, #9333ea)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' },
     siteDesc: { fontSize: '11px', color: '#999', textAlign: 'center', marginBottom: '4px' },
-    adminMsg: { fontSize: '11px', background: '#f0f9ff', color: '#0369a1', padding: '6px 10px', borderRadius: '6px', marginBottom: '12px', border: '1px solid #bae6fd', textAlign: 'center' },
-    // カテゴリー：6個×2行を想定したグリッド
+    adminMsg: { fontSize: '11px', background: '#f0f9ff', color: '#0369a1', padding: '6px 10px', borderRadius: '6px', marginBottom: '10px', border: '1px solid #bae6fd', textAlign: 'center' },
+    // カテゴリー：6列グリッド
     catGrid: { display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '3px', marginBottom: '10px' },
-    catBtn: (active: boolean) => ({ padding: '5px 0', borderRadius: '4px', border: '1px solid #eee', background: active ? '#1f2937' : '#fff', color: active ? '#fff' : '#666', fontSize: '9px', fontWeight: 'bold', textAlign: 'center' }),
+    catBtn: (active: boolean) => ({ padding: '5px 0', borderRadius: '4px', border: '1px solid #eee', background: active ? '#1f2937' : '#fff', color: active ? '#fff' : '#666', fontSize: '9px', fontWeight: 'bold', overflow: 'hidden', whiteSpace: 'nowrap' }),
     card: { borderRadius: '12px', marginBottom: '12px', border: '1px solid #eee', overflow: 'hidden', position: 'relative' },
-    imgOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: '8px', background: 'linear-gradient(to top, rgba(0,0,0,0.85), transparent)', color: '#fff' },
-    desc: { fontSize: '10px', color: '#555', background: '#f8f8f8', padding: '3px 6px', borderRadius: '4px', margin: '2px 0', lineHeight: '1.3' },
-    modal: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' },
-    modalContent: { background: 'white', padding: '20px', borderRadius: '16px', width: '100%', maxWidth: '400px', textAlign: 'center' }
+    imgOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: '10px', background: 'linear-gradient(to top, rgba(0,0,0,0.85), transparent)', color: '#fff' },
+    desc: { fontSize: '10px', color: '#555', background: '#f8f8f8', padding: '3px 6px', borderRadius: '4px', margin: '2px 0', lineHeight: '1.3' }
   }
 
   return (
@@ -142,17 +151,16 @@ export default function Home() {
         <h1 style={s.title}>{config.site_title}</h1>
         <div style={s.siteDesc}>{config.site_description}</div>
 
-        {/* ホームタブ選択時のみ表示されるUI群 */}
         {activeTab === 'home' && (
           <>
-            {/* メッセージ欄（通信欄）の復活 */}
+            {/* メッセージ欄（通信欄） */}
             {config.admin_message && <div style={s.adminMsg}>{config.admin_message}</div>}
 
-            {/* カテゴリー：6列グリッドで2行表示に対応 */}
+            {/* カテゴリー表示（DBから動的に6列生成） */}
             <div style={s.catGrid}>
-              {dynamicCategories.map(c => (
-                <button key={c} onClick={() => setActiveCategory(c)} style={s.catBtn(activeCategory === c)}>
-                  {c}
+              {dbCategories.map(c => (
+                <button key={c.name} onClick={() => setActiveCategory(c.name)} style={s.catBtn(activeCategory === c.name)}>
+                  {c.name}
                 </button>
               ))}
             </div>
@@ -208,7 +216,7 @@ export default function Home() {
                         </div>
                       </div>
                     ) : ( <button onClick={() => setSelectedMarketId(m.id)} style={{ width: '100%', padding: '8px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '13px', marginTop: '4px' }}>ヨソる</button> )
-                  ) : <div style={{ textAlign: 'center', fontSize: '11px', color: '#999', marginTop: '4px' }}>終了</div>}
+                  ) : <div style={{ textAlign: 'center', fontSize: '11px', color: '#999', marginTop: '4px' }}>判定中</div>}
                 </div>
               </div>
             )
