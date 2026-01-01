@@ -21,7 +21,6 @@ export default function Home() {
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [isSignUp, setIsSignUp] = useState(false)
   const [newUsername, setNewUsername] = useState('')
   const [isEditingName, setIsEditingName] = useState(false)
   const [activeCategory, setActiveCategory] = useState('すべて')
@@ -74,8 +73,20 @@ export default function Home() {
     if (error) alert('失敗'); else { alert('更新完了'); setIsEditingName(false); initUserData(profile.id); }
   }
 
-  const handleEmailAuth = async () => {
-    const { error } = isSignUp ? await supabase.auth.signUp({ email, password }) : await supabase.auth.signInWithPassword({ email, password })
+  // Googleログイン機能
+  const handleGoogleLogin = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin }
+    })
+    if (error) alert(error.message)
+  }
+
+  // メールログイン（並列ボタン用）
+  const handleEmailAuth = async (type: 'login' | 'signup') => {
+    const { error } = type === 'signup' 
+      ? await supabase.auth.signUp({ email, password }) 
+      : await supabase.auth.signInWithPassword({ email, password })
     if (error) alert(error.message); else setShowAuthModal(false)
   }
 
@@ -109,13 +120,42 @@ export default function Home() {
     imgOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: '10px', background: 'linear-gradient(to top, rgba(0,0,0,0.85), transparent)', color: '#fff' },
     desc: { fontSize: '10px', color: '#555', background: '#f8f8f8', padding: '4px 8px', borderRadius: '4px', margin: '2px 0', lineHeight: '1.4' },
     modal: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' },
-    modalContent: { background: 'white', padding: '20px', borderRadius: '16px', width: '100%', maxWidth: '400px', textAlign: 'center' }
+    modalContent: { background: 'white', padding: '24px', borderRadius: '20px', width: '100%', maxWidth: '380px', textAlign: 'center' }
   }
 
   return (
     <div style={s.container}>
       {justVoted && <div style={s.modal as any}><div style={s.modalContent as any}><h3>🎯 ヨソりました！</h3><button onClick={openXShare} style={{ background: '#000', color: '#fff', border: 'none', padding: '12px', borderRadius: '8px', width: '100%', marginTop: '10px', fontWeight: 'bold' }}>𝕏に投稿する</button><button onClick={() => setJustVoted(null)} style={{ background: 'none', border: 'none', color: '#999', marginTop: '10px' }}>閉じる</button></div></div>}
-      {showAuthModal && <div style={s.modal as any}><div style={s.modalContent as any}><h2>ログイン</h2><input type="email" placeholder="メール" value={email} onChange={e => setEmail(e.target.value)} style={{ width: '100%', padding: '10px', marginBottom: '8px' }} /><input type="password" placeholder="パス" value={password} onChange={e => setPassword(e.target.value)} style={{ width: '100%', padding: '10px', marginBottom: '10px' }} /><button onClick={handleEmailAuth} style={{ width: '100%', padding: '12px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px' }}>{isSignUp ? '登録' : 'ログイン'}</button><button onClick={() => setIsSignUp(!isSignUp)} style={{ background: 'none', border: 'none', color: '#3b82f6', marginTop: '10px' }}>切替</button><button onClick={() => { supabase.auth.signInAnonymously(); setShowAuthModal(false); }} style={{ display: 'block', margin: '15px auto', color: '#999' }}>匿名ログイン</button></div></div>}
+
+      {showAuthModal && (
+        <div style={s.modal as any}>
+          <div style={s.modalContent as any}>
+            <h2 style={{ fontSize: '20px', marginBottom: '20px', fontWeight: '900' }}>ヨソるを開始</h2>
+
+            {/* Googleログイン復活 */}
+            <button onClick={handleGoogleLogin} style={{ width: '100%', padding: '12px', marginBottom: '16px', borderRadius: '8px', border: '1px solid #ddd', background: '#fff', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+              <img src="https://www.google.com/favicon.ico" width="16" height="16" /> Googleでつづける
+            </button>
+
+            <div style={{ fontSize: '12px', color: '#999', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ flex: 1, height: '1px', background: '#eee' }}></div>または<div style={{ flex: 1, height: '1px', background: '#eee' }}></div>
+            </div>
+
+            <input type="email" placeholder="メールアドレス" value={email} onChange={e => setEmail(e.target.value)} style={{ width: '100%', padding: '12px', marginBottom: '8px', borderRadius: '8px', border: '1px solid #eee', boxSizing: 'border-box' }} />
+            <input type="password" placeholder="パスワード" value={password} onChange={e => setPassword(e.target.value)} style={{ width: '100%', padding: '12px', marginBottom: '16px', borderRadius: '8px', border: '1px solid #eee', boxSizing: 'border-box' }} />
+
+            {/* メール登録・ログイン並列配置 */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+              <button onClick={() => handleEmailAuth('login')} style={{ flex: 1, padding: '12px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>ログイン</button>
+              <button onClick={() => handleEmailAuth('signup')} style={{ flex: 1, padding: '12px', background: '#1f2937', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>新規登録</button>
+            </div>
+
+            <button onClick={() => { supabase.auth.signInAnonymously(); setShowAuthModal(false); }} style={{ background: 'none', border: 'none', color: '#999', fontSize: '13px', textDecoration: 'underline' }}>ゲストとして利用</button>
+            <br />
+            <button onClick={() => setShowAuthModal(false)} style={{ marginTop: '16px', color: '#666', border: 'none', background: 'none' }}>キャンセル</button>
+          </div>
+        </div>
+      )}
 
       <header>
         <h1 style={s.title}>{config.site_title}</h1>
@@ -145,7 +185,7 @@ export default function Home() {
           {isEditingName ? (<div><input value={newUsername} onChange={e => setNewUsername(e.target.value)} style={{ color: '#333' }} /><button onClick={handleUpdateName}>保存</button></div>) : (<div><span style={{ fontSize: '18px', fontWeight: 'bold' }}>{profile?.username || '名無し'}</span><button onClick={() => setIsEditingName(true)} style={{ fontSize: '10px', marginLeft: '8px' }}>編集</button></div>)}
           <div style={{ fontSize: '24px', fontWeight: '900' }}>{profile?.point_balance?.toLocaleString()} pt</div></div>
           {myBets.map(b => (<div key={b.id} style={{ padding: '10px', borderBottom: '1px solid #eee', fontSize: '12px' }}><div>{b.markets?.title}</div><div style={{ fontWeight: 'bold' }}>{b.market_options?.name} / {b.amount}pt</div></div>))}
-          <button onClick={() => supabase.auth.signOut()} style={{ width: '100%', marginTop: '20px', color: '#ef4444' }}>ログアウト</button></div>
+          <button onClick={() => supabase.auth.signOut()} style={{ width: '100%', marginTop: '20px', color: '#ef4444', background: 'none', border: '1px solid #ef4444', padding: '10px', borderRadius: '8px' }}>ログアウト</button></div>
       )}
 
       {activeTab === 'info' && (
@@ -163,10 +203,10 @@ export default function Home() {
       )}
 
       <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: '#fff', display: 'flex', justifyContent: 'space-around', padding: '10px 0', borderTop: '1px solid #eee', zIndex: 100 }}>
-        <button onClick={() => setActiveTab('home')} style={{ color: activeTab === 'home' ? '#3b82f6' : '#999' }}>🏠<br />ホーム</button>
-        {config.show_ranking && <button onClick={() => setActiveTab('ranking')} style={{ color: activeTab === 'ranking' ? '#3b82f6' : '#999' }}>👑<br />ランク</button>}
-        <button onClick={() => { if (!session) setShowAuthModal(true); else setActiveTab('mypage') }} style={{ color: activeTab === 'mypage' ? '#3b82f6' : '#999' }}>👤<br />マイペ</button>
-        <button onClick={() => setActiveTab('info')} style={{ color: activeTab === 'info' ? '#3b82f6' : '#999' }}>📖<br />ガイド</button>
+        <button onClick={() => setActiveTab('home')} style={{ background: 'none', border: 'none', color: activeTab === 'home' ? '#3b82f6' : '#999' }}>🏠<br />ホーム</button>
+        {config.show_ranking && <button onClick={() => setActiveTab('ranking')} style={{ background: 'none', border: 'none', color: activeTab === 'ranking' ? '#3b82f6' : '#999' }}>👑<br />ランク</button>}
+        <button onClick={() => { if (!session) setShowAuthModal(true); else setActiveTab('mypage') }} style={{ background: 'none', border: 'none', color: activeTab === 'mypage' ? '#3b82f6' : '#999' }}>👤<br />マイペ</button>
+        <button onClick={() => setActiveTab('info')} style={{ background: 'none', border: 'none', color: activeTab === 'info' ? '#3b82f6' : '#999' }}>📖<br />ガイド</button>
       </nav>
     </div>
   )
