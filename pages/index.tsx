@@ -38,7 +38,7 @@ export default function Home() {
   const [selectedMarketId, setSelectedMarketId] = useState<number | null>(null)
   const [selectedOptionId, setSelectedOptionId] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [justVoted, setJustVoted] = useState<any>(null) // 𝕏投稿ボタン表示用
+  const [justVoted, setJustVoted] = useState<any>(null)
 
   const categoryMeta: any = {
     'こども': { icon: '🎒', color: '#f43f5e' },
@@ -99,6 +99,14 @@ export default function Home() {
     if (error) alert('失敗'); else { alert('更新'); setIsEditingName(false); initUserData(profile.id); }
   }
 
+  // ビルドエラー修正：コンポーネント内に正しく配置
+  const handleEmailAuth = async () => {
+    const { error } = isSignUp 
+      ? await supabase.auth.signUp({ email, password }) 
+      : await supabase.auth.signInWithPassword({ email, password })
+    if (error) alert(error.message); else setShowAuthModal(false)
+  }
+
   const handleVote = async () => {
     if (!session) { setShowAuthModal(true); return; }
     if (!selectedOptionId) return alert('選択肢を選んでください')
@@ -108,13 +116,7 @@ export default function Home() {
     if (!error) {
       const market = markets.find(m => m.id === selectedMarketId)
       const option = market?.market_options.find((o: any) => o.id === selectedOptionId)
-
-      // 𝕏投稿用の情報をセット
-      setJustVoted({
-        title: market?.title,
-        option: option?.name
-      })
-
+      setJustVoted({ title: market?.title, option: option?.name })
       setSelectedMarketId(null)
       fetchMarkets()
       initUserData(session.user.id)
@@ -145,24 +147,19 @@ export default function Home() {
     imgOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: '10px', background: 'linear-gradient(to top, rgba(0,0,0,0.85), transparent)', color: '#fff' },
     desc: { fontSize: '10px', color: '#555', background: '#f8f8f8', padding: '3px 6px', borderRadius: '4px', margin: '2px 0', lineHeight: '1.3' },
     modal: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' },
-    modalContent: { background: 'white', padding: '20px', borderRadius: '16px', width: '100%', maxWidth: '400px', textAlign: 'center' },
-    xBtn: { background: '#000', color: '#fff', border: 'none', padding: '12px', borderRadius: '8px', fontWeight: 'bold', width: '100%', marginTop: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }
+    modalContent: { background: 'white', padding: '20px', borderRadius: '16px', width: '100%', maxWidth: '400px', textAlign: 'center' }
   }
 
   if (isLoading) return <div style={{ textAlign: 'center', paddingTop: '50px' }}>読み込み中...</div>
 
   return (
     <div style={s.container}>
-      {/* 𝕏投稿用モーダル（確定直後に表示） */}
       {justVoted && (
         <div style={s.modal as any}>
           <div style={s.modalContent as any}>
             <div style={{ fontSize: '40px', marginBottom: '10px' }}>🎯</div>
             <h2 style={{ fontSize: '18px', margin: '0 0 10px' }}>ヨソりました！</h2>
-            <p style={{ fontSize: '13px', color: '#666', marginBottom: '20px' }}>「{justVoted.title}」の予想を𝕏で共有しましょう！</p>
-            <button onClick={openXShare} style={s.xBtn}>
-              𝕏 (Twitter) に投稿する
-            </button>
+            <button onClick={openXShare} style={{ background: '#000', color: '#fff', border: 'none', padding: '12px', borderRadius: '8px', fontWeight: 'bold', width: '100%', marginTop: '10px' }}>𝕏に投稿する</button>
             <button onClick={() => setJustVoted(null)} style={{ background: 'none', border: 'none', color: '#999', marginTop: '15px', fontSize: '12px' }}>閉じる</button>
           </div>
         </div>
@@ -186,7 +183,6 @@ export default function Home() {
       <header>
         <h1 style={s.title}>{config.site_title}</h1>
         <div style={s.siteDesc}>{config.site_description}</div>
-
         {activeTab === 'home' && (
           <>
             {config.admin_message && <div style={s.adminMsg}>{config.admin_message}</div>}
@@ -252,7 +248,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* ランキング・マイページ・規約などはそのまま維持 */}
       {activeTab === 'ranking' && (
         <div style={{ border: '1px solid #eee', borderRadius: '12px' }}>
           {ranking.map((u, i) => (
@@ -288,7 +283,7 @@ export default function Home() {
             <div key={b.id} style={{ padding: '10px', border: '1px solid #eee', borderRadius: '8px', marginBottom: '8px', fontSize: '12px' }}>
               <div style={{ color: '#999', fontSize: '10px' }}>{b.markets.title}</div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', marginTop: '2px' }}>
-                <span>{b.market_options.name} / {b.amount}pt</span>
+                <span>{b.market_options?.name} / {b.amount}pt</span>
                 <span style={{ color: b.markets.is_resolved ? (b.markets.result_option_id === b.market_option_id ? '#10b981' : '#ef4444') : '#666' }}>
                   {b.markets.is_resolved ? (b.markets.result_option_id === b.market_option_id ? '的中' : '終了') : '判定中'}
                 </span>
@@ -306,11 +301,9 @@ export default function Home() {
             <p>1. 未来の問いを選ぶ<br/>2. 予想を立ててポイントをヨソる<br/>3. 当たるとプールから配当をゲット！</p>
           </section>
           <section style={{ marginBottom: '20px' }}>
-            <h3 style={{ borderLeft: '4px solid #3b82f6', paddingLeft: '8px', marginBottom: '8px' }}>利用規約（法的通知）</h3>
+            <h3 style={{ borderLeft: '4px solid #3b82f6', paddingLeft: '8px', marginBottom: '8px' }}>利用規約</h3>
             <div style={{ fontSize: '11px', color: '#666', background: '#f5f5f5', padding: '10px', borderRadius: '8px' }}>
-              <p><strong>1. ポイントの性質</strong><br/>本サービスで使用されるポイントはゲーム内通貨であり、金銭への換金、代替、譲渡は一切できません。景品表示法及び賭博罪に該当しない娯楽用サービスです。</p>
-              <p><strong>2. 禁止事項</strong><br/>複数アカウントの所持、不正なポイント取得、他ユーザーへの誹謗中傷を禁止します。違反時はアカウントを凍結します。</p>
-              <p><strong>3. 免責事項</strong><br/>判定は運営が独自の基準で行います。システム不具合等による損失について、一切の責任を負いません。お問い合わせは𝕏公式アカウントまで。</p>
+              <p>本サービスで使用されるポイントはゲーム内通貨であり、換金はできません。</p>
             </div>
           </section>
           <div style={{ textAlign: 'center', marginTop: '40px' }}><Link href="/admin" style={{ color: '#f0f0f0', textDecoration: 'none' }}>admin</Link></div>
@@ -326,4 +319,3 @@ export default function Home() {
     </div>
   )
 }
-
