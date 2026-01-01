@@ -21,7 +21,8 @@ export default function Home() {
     site_title: 'ヨソる', 
     site_description: '未来をヨソる予測市場',
     admin_message: '',
-    show_ranking: true 
+    show_ranking: true,
+    share_text_base: '「{title}」の「{option}」にヨソりました！ #ヨソる'
   })
 
   const [showAuthModal, setShowAuthModal] = useState(false)
@@ -75,11 +76,8 @@ export default function Home() {
         supabase.from('site_config').select('*').single(),
         supabase.from('categories').select('*').order('display_order', { ascending: true })
       ])
-
       if (cfgRes.data) setConfig(cfgRes.data)
-      if (catRes.data && catRes.data.length > 0) {
-        setDbCategories([{ name: 'すべて' }, ...catRes.data])
-      }
+      if (catRes.data && catRes.data.length > 0) setDbCategories([{ name: 'すべて' }, ...catRes.data])
 
       const { data: { session: s } } = await supabase.auth.getSession()
       setSession(s)
@@ -103,9 +101,27 @@ export default function Home() {
   const handleVote = async () => {
     if (!session) { setShowAuthModal(true); return; }
     if (!selectedOptionId) return alert('選択肢を選んでください')
+
     const { error } = await supabase.rpc('place_bet', { market_id_input: selectedMarketId, option_id_input: selectedOptionId, amount_input: voteAmount })
-    if (!error) { alert('ヨソりました！'); setSelectedMarketId(null); fetchMarkets(); initUserData(session.user.id); }
-    else alert(error.message)
+
+    if (!error) {
+      // 𝕏共有ロジック
+      const market = markets.find(m => m.id === selectedMarketId)
+      const option = market?.market_options.find((o: any) => o.id === selectedOptionId)
+      const shareText = (config.share_text_base || '「{title}」の「{option}」にヨソりました！')
+        .replace('{title}', market?.title || '')
+        .replace('{option}', option?.name || '')
+
+      const xUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(window.location.origin)}`
+
+      if (confirm('ヨソりました！𝕏でみんなに教えますか？')) {
+        window.open(xUrl, '_blank')
+      }
+
+      setSelectedMarketId(null)
+      fetchMarkets()
+      initUserData(session.user.id)
+    } else alert(error.message)
   }
 
   const handleEmailAuth = async () => {
@@ -129,6 +145,8 @@ export default function Home() {
     modal: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' },
     modalContent: { background: 'white', padding: '20px', borderRadius: '16px', width: '100%', maxWidth: '400px', textAlign: 'center' }
   }
+
+  if (isLoading) return <div style={{ textAlign: 'center', paddingTop: '50px' }}>読み込み中...</div>
 
   return (
     <div style={s.container}>
@@ -155,11 +173,7 @@ export default function Home() {
           <>
             {config.admin_message && <div style={s.adminMsg}>{config.admin_message}</div>}
             <div style={s.catGrid}>
-              {dbCategories.map(c => (
-                <button key={c.name} onClick={() => setActiveCategory(c.name)} style={s.catBtn(activeCategory === c.name)}>
-                  {c.name}
-                </button>
-              ))}
+              {dbCategories.map(c => <button key={c.name} onClick={() => setActiveCategory(c.name)} style={s.catBtn(activeCategory === c.name)}>{c.name}</button>)}
             </div>
             <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '12px' }}>
               {['new', 'deadline', 'popular'].map(type => (
@@ -250,12 +264,11 @@ export default function Home() {
             <div style={{ fontSize: '11px', opacity: 0.8 }}>資産</div>
             <div style={{ fontSize: '30px', fontWeight: '900' }}>{profile?.point_balance?.toLocaleString()} pt</div>
           </div>
-          <h3 style={{ fontSize: '14px', marginBottom: '10px' }}>📜 履歴</h3>
           {myBets.map(b => (
             <div key={b.id} style={{ padding: '10px', border: '1px solid #eee', borderRadius: '8px', marginBottom: '8px', fontSize: '12px' }}>
               <div style={{ color: '#999', fontSize: '10px' }}>{b.markets.title}</div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', marginTop: '2px' }}>
-                <span>{b.market_option_id ? b.market_options.name : ''} / {b.amount}pt</span>
+                <span>{b.market_options.name} / {b.amount}pt</span>
                 <span style={{ color: b.markets.is_resolved ? (b.markets.result_option_id === b.market_option_id ? '#10b981' : '#ef4444') : '#666' }}>
                   {b.markets.is_resolved ? (b.markets.result_option_id === b.market_option_id ? '的中' : '終了') : '判定中'}
                 </span>
@@ -272,7 +285,6 @@ export default function Home() {
             <h3 style={{ borderLeft: '4px solid #3b82f6', paddingLeft: '8px', marginBottom: '8px' }}>ヨソるの遊び方</h3>
             <p>1. 未来の問いを選ぶ<br/>2. 予想を立ててポイントをヨソる<br/>3. 当たるとプールから配当をゲット！</p>
           </section>
-
           <section style={{ marginBottom: '20px' }}>
             <h3 style={{ borderLeft: '4px solid #3b82f6', paddingLeft: '8px', marginBottom: '8px' }}>利用規約（法的通知）</h3>
             <div style={{ fontSize: '11px', color: '#666', background: '#f5f5f5', padding: '10px', borderRadius: '8px' }}>
@@ -281,7 +293,6 @@ export default function Home() {
               <p><strong>3. 免責事項</strong><br/>判定は運営が独自の基準で行います。システム不具合等による損失について、一切の責任を負いません。お問い合わせは𝕏公式アカウントまで。</p>
             </div>
           </section>
-
           <div style={{ textAlign: 'center', marginTop: '40px' }}><Link href="/admin" style={{ color: '#f0f0f0', textDecoration: 'none' }}>admin</Link></div>
         </div>
       )}
