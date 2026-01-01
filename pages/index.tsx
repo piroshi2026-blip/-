@@ -57,13 +57,7 @@ export default function Home() {
   }, [sortBy])
 
   const fetchRanking = useCallback(async () => {
-    // 管理画面で「隠す」に設定されたユーザー(is_hidden_from_ranking)を除外して取得
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('is_hidden_from_ranking', false)
-      .order('point_balance', { ascending: false })
-      .limit(20)
+    const { data } = await supabase.from('profiles').select('*').eq('is_hidden_from_ranking', false).order('point_balance', { ascending: false }).limit(20)
     if (data) setRanking(data)
   }, [])
 
@@ -78,7 +72,6 @@ export default function Home() {
     const init = async () => {
       const { data: cfg } = await supabase.from('site_config').select('*').single()
       if (cfg) setConfig(cfg)
-
       const { data: { session: s } } = await supabase.auth.getSession()
       setSession(s)
       if (s) initUserData(s.user.id)
@@ -97,7 +90,6 @@ export default function Home() {
 
   const handleVote = async () => {
     if (!session) { setShowAuthModal(true); return; }
-    if (!selectedOptionId) return alert('選択肢を選んでください')
     const { error } = await supabase.rpc('place_bet', { market_id_input: selectedMarketId, option_id_input: selectedOptionId, amount_input: voteAmount })
     if (!error) { alert('ヨソりました！'); setSelectedMarketId(null); fetchMarkets(); initUserData(session.user.id); }
     else alert(error.message)
@@ -111,20 +103,20 @@ export default function Home() {
   const getOdds = (t: number, p: number) => (p === 0 ? 0 : (t / p).toFixed(1))
   const getPercent = (t: number, p: number) => (t === 0 ? 0 : Math.round((p / t) * 100))
 
-  // 管理画面で設定したカテゴリーをすべて取得し、2行で表示するための配列
+  // カテゴリー分割
   const dynamicCategories = config.categories ? config.categories.split(',').map((c: string) => c.trim()) : ['すべて']
 
   const s: any = {
     container: { maxWidth: '500px', margin: '0 auto', padding: '10px 10px 80px', fontFamily: 'sans-serif', background: '#fff' },
     title: { fontSize: '26px', fontWeight: '900', textAlign: 'center', margin: '0', background: 'linear-gradient(to right, #2563eb, #9333ea)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' },
-    siteDesc: { fontSize: '11px', color: '#999', textAlign: 'center', marginBottom: '8px' },
-    adminMsg: { fontSize: '12px', background: '#eff6ff', color: '#1e40af', padding: '8px 12px', borderRadius: '8px', marginBottom: '15px', border: '1px solid #bfdbfe' },
-    // カテゴリーボタンを2行以上で並べる設定
-    catGrid: { display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '10px', justifyContent: 'center' },
-    catBtn: (active: boolean) => ({ padding: '6px 8px', borderRadius: '4px', border: '1px solid #eee', background: active ? '#1f2937' : '#fff', color: active ? '#fff' : '#666', fontSize: '10px', fontWeight: 'bold', minWidth: 'calc(25% - 4px)' }),
+    siteDesc: { fontSize: '11px', color: '#999', textAlign: 'center', marginBottom: '4px' },
+    adminMsg: { fontSize: '11px', background: '#f0f9ff', color: '#0369a1', padding: '6px 10px', borderRadius: '6px', marginBottom: '12px', border: '1px solid #bae6fd', textAlign: 'center' },
+    // カテゴリー：6個×2行を想定したグリッド
+    catGrid: { display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '3px', marginBottom: '10px' },
+    catBtn: (active: boolean) => ({ padding: '5px 0', borderRadius: '4px', border: '1px solid #eee', background: active ? '#1f2937' : '#fff', color: active ? '#fff' : '#666', fontSize: '9px', fontWeight: 'bold', textAlign: 'center' }),
     card: { borderRadius: '12px', marginBottom: '12px', border: '1px solid #eee', overflow: 'hidden', position: 'relative' },
-    imgOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: '10px', background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)', color: '#fff' },
-    desc: { fontSize: '10px', color: '#666', background: '#f9f9f9', padding: '4px 8px', borderRadius: '4px', margin: '2px 0' },
+    imgOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: '8px', background: 'linear-gradient(to top, rgba(0,0,0,0.85), transparent)', color: '#fff' },
+    desc: { fontSize: '10px', color: '#555', background: '#f8f8f8', padding: '3px 6px', borderRadius: '4px', margin: '2px 0', lineHeight: '1.3' },
     modal: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' },
     modalContent: { background: 'white', padding: '20px', borderRadius: '16px', width: '100%', maxWidth: '400px', textAlign: 'center' }
   }
@@ -150,9 +142,13 @@ export default function Home() {
         <h1 style={s.title}>{config.site_title}</h1>
         <div style={s.siteDesc}>{config.site_description}</div>
 
+        {/* ホームタブ選択時のみ表示されるUI群 */}
         {activeTab === 'home' && (
           <>
+            {/* メッセージ欄（通信欄）の復活 */}
             {config.admin_message && <div style={s.adminMsg}>{config.admin_message}</div>}
+
+            {/* カテゴリー：6列グリッドで2行表示に対応 */}
             <div style={s.catGrid}>
               {dynamicCategories.map(c => (
                 <button key={c} onClick={() => setActiveCategory(c)} style={s.catBtn(activeCategory === c)}>
@@ -160,6 +156,7 @@ export default function Home() {
                 </button>
               ))}
             </div>
+
             <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '12px' }}>
               {['new', 'deadline', 'popular'].map(type => (
                 <button key={type} onClick={() => setSortBy(type as any)} style={{ padding: '4px 12px', borderRadius: '15px', border: 'none', background: sortBy === type ? '#3b82f6' : '#eee', color: sortBy === type ? '#fff' : '#666', fontSize: '10px', fontWeight: 'bold' }}>
