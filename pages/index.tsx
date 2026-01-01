@@ -4,170 +4,315 @@ import Link from 'next/link'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
-  { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } }
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 )
 
-export default function Home() {
-  const [activeTab, setActiveTab] = useState<'home' | 'ranking' | 'mypage' | 'info'>('home')
-  const [session, setSession] = useState<any>(null)
-  const [profile, setProfile] = useState<any>(null)
+export default function Admin() {
+  const [activeTab, setActiveTab] = useState<'markets' | 'categories' | 'users' | 'config'>('markets')
+  const [marketSort, setMarketSort] = useState<'date' | 'category'>('date')
   const [markets, setMarkets] = useState<any[]>([])
-  const [ranking, setRanking] = useState<any[]>([])
-  const [myBets, setMyBets] = useState<any[]>([])
-  const [dbCategories, setDbCategories] = useState<any[]>([{ name: 'すべて' }])
-  const [config, setConfig] = useState<any>({ site_title: 'ヨソる', site_description: '未来をヨソる予測市場', admin_message: '', show_ranking: true, share_text_base: '「{title}」の「{option}」にヨソりました！ #ヨソる' })
-
-  const [showAuthModal, setShowAuthModal] = useState(false)
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [isSignUp, setIsSignUp] = useState(false)
-  const [newUsername, setNewUsername] = useState('')
-  const [isEditingName, setIsEditingName] = useState(false)
-  const [activeCategory, setActiveCategory] = useState('すべて')
-  const [sortBy, setSortBy] = useState<'new' | 'deadline' | 'popular'>('new')
-  const [voteAmount, setVoteAmount] = useState(100)
-  const [selectedMarketId, setSelectedMarketId] = useState<number | null>(null)
-  const [selectedOptionId, setSelectedOptionId] = useState<number | null>(null)
+  const [categories, setCategories] = useState<any[]>([])
+  const [users, setUsers] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [justVoted, setJustVoted] = useState<any>(null)
 
-  const categoryMeta: any = { 'こども': { color: '#f43f5e' }, '経済・政治': { color: '#3b82f6' }, 'エンタメ': { color: '#a855f7' }, 'スポーツ': { color: '#22c55e' }, 'ライフ': { color: '#f59e0b' }, 'ゲーム': { color: '#10b981' }, 'その他': { color: '#6b7280' } }
+  // サイト設定用のState
+  const [siteConfig, setSiteConfig] = useState<any>({ 
+    id: 1, site_title: '', site_description: '', admin_message: '', show_ranking: true, share_text_base: '' 
+  })
 
-  const fetchMarkets = useCallback(async () => {
-    let query = supabase.from('markets').select('*, market_options(*)')
-    if (sortBy === 'new') query = query.order('created_at', { ascending: false })
-    else if (sortBy === 'deadline') query = query.order('end_date', { ascending: true })
-    else if (sortBy === 'popular') query = query.order('total_pool', { ascending: false })
-    const { data } = await query
-    if (data) setMarkets(data.map((m: any) => ({ ...m, market_options: m.market_options.sort((a: any, b: any) => a.id - b.id) })))
-  }, [sortBy])
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editForm, setEditForm] = useState<any>({})
+  const [uploading, setUploading] = useState(false)
+  const [generating, setGenerating] = useState(false)
 
-  const fetchRanking = useCallback(async () => {
-    const { data } = await supabase.from('profiles').select('*').eq('is_hidden_from_ranking', false).order('point_balance', { ascending: false }).limit(20)
-    if (data) setRanking(data)
+  const [newMarket, setNewMarket] = useState({ title: '', category: '', end_date: '', description: '', image_url: '', options: '' })
+  const [newCategory, setNewCategory] = useState({ name: '', icon: '', display_order: 0 })
+
+  const fetchConfig = useCallback(async () => {
+    const { data } = await supabase.from('site_config').select('*').single()
+    if (data) setSiteConfig(data)
   }, [])
 
-  const initUserData = useCallback(async (userId: string) => {
-    const { data: p } = await supabase.from('profiles').select('*').eq('id', userId).single()
-    if (p) { setProfile(p); setNewUsername(p.username || ''); }
-    const { data: b } = await supabase.from('bets').select('*, markets(title, is_resolved, result_option_id), market_options(name)').eq('user_id', userId).order('created_at', { ascending: false })
-    if (b) setMyBets(b)
-  }, [])
+  const fetchData = useCallback(async () => {
+    setIsLoading(true)
+    let mQuery = supabase.from('markets').select('*, market_options(*)')
+    if (marketSort === 'date') mQuery = mQuery.order('end_date', { ascending: true })
+    else mQuery = mQuery.order('category', { ascending: true })
+
+    const [m, c, u] = await Promise.all([
+      mQuery,
+      supabase.from('categories').select('*').order('display_order', { ascending: true }),
+      supabase.from('profiles').select('*').order('point_balance', { ascending: false })
+    ])
+    if (m.data) setMarkets(m.data)
+    if (c.data) setCategories(c.data)
+    if (u.data) setUsers(u.data)
+    setIsLoading(false)
+  }, [marketSort])
 
   useEffect(() => {
-    const init = async () => {
-      const [cfgRes, catRes] = await Promise.all([supabase.from('site_config').select('*').single(), supabase.from('categories').select('*').order('display_order', { ascending: true })])
-      if (cfgRes.data) setConfig(cfgRes.data)
-      if (catRes.data && catRes.data.length > 0) setDbCategories([{ name: 'すべて' }, ...catRes.data])
-      const { data: { session: s } } = await supabase.auth.getSession()
-      setSession(s); if (s) initUserData(s.user.id)
-      fetchMarkets(); fetchRanking(); setIsLoading(false)
+    fetchData()
+    fetchConfig()
+  }, [fetchData, fetchConfig])
+
+  // --- サイト設定・𝕏投稿編集 ---
+  async function handleUpdateConfig() {
+    const { error } = await supabase.from('site_config').update({
+      site_title: siteConfig.site_title,
+      site_description: siteConfig.site_description,
+      admin_message: siteConfig.admin_message,
+      show_ranking: siteConfig.show_ranking,
+      share_text_base: siteConfig.share_text_base
+    }).eq('id', siteConfig.id)
+    if (!error) alert('設定を保存しました')
+    else alert('保存エラー: ' + error.message)
+  }
+
+  // --- ユーザー管理機能 (復活) ---
+  async function handleUserUpdate(id: string, updates: any) {
+    const { error } = await supabase.from('profiles').update(updates).eq('id', id)
+    if (!error) fetchData()
+    else alert(error.message)
+  }
+
+  async function handleDeleteUser(id: string) {
+    if (!confirm('このユーザーを完全に削除しますか？')) return
+    const { error } = await supabase.from('profiles').delete().eq('id', id)
+    if (!error) fetchData()
+    else alert(error.message)
+  }
+
+  // --- 画像関連機能 ---
+  async function uploadImage(e: any, isEdit: boolean = false) {
+    try {
+      setUploading(true)
+      const file = e.target.files[0]
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${Math.random()}.${fileExt}`
+      const { error: uploadError } = await supabase.storage.from('market-images').upload(fileName, file)
+      if (uploadError) throw uploadError
+      const { data: { publicUrl } } = supabase.storage.from('market-images').getPublicUrl(fileName)
+      if (isEdit) setEditForm({ ...editForm, image_url: publicUrl })
+      else setNewMarket({ ...newMarket, image_url: publicUrl })
+      alert('アップロード完了')
+    } catch (error: any) { alert(error.message) } finally { setUploading(false) }
+  }
+
+  async function generateAIImage(prompt: string, isEdit: boolean = false) {
+    if (!prompt) return alert('プロンプトを入力してください')
+    setGenerating(true)
+    // 実装に応じてAPIを叩く
+    setTimeout(() => { setGenerating(false); alert('AI生成APIが未設定です。'); }, 1000)
+  }
+
+  // --- 市場・問い管理 ---
+  async function handleCreateMarket() {
+    if(!newMarket.title || !newMarket.end_date || !newMarket.options) return alert('必須項目を入力してください')
+    const optArray = newMarket.options.split(',').map(s => s.trim())
+    const { error } = await supabase.rpc('create_market_with_options', {
+      title_input: newMarket.title, category_input: newMarket.category,
+      end_date_input: new Date(newMarket.end_date).toISOString(), description_input: newMarket.description,
+      image_url_input: newMarket.image_url, options_input: optArray
+    })
+    if (!error) { alert('作成成功'); fetchData(); } else alert(error.message)
+  }
+
+  async function handleUpdateMarket() {
+    await supabase.from('markets').update({
+      title: editForm.title, description: editForm.description, category: editForm.category,
+      end_date: new Date(editForm.end_date).toISOString(), image_url: editForm.image_url
+    }).eq('id', editingId)
+    for (const opt of editForm.market_options) {
+      await supabase.from('market_options').update({ name: opt.name }).eq('id', opt.id)
     }
-    const { data: authListener } = supabase.auth.onAuthStateChange((_, s) => { setSession(s); if (s) initUserData(s.user.id); })
-    init(); return () => authListener.subscription.unsubscribe()
-  }, [sortBy, fetchMarkets, fetchRanking, initUserData])
-
-  const handleUpdateName = async () => {
-    if (!profile) return
-    const { error } = await supabase.from('profiles').update({ username: newUsername }).eq('id', profile.id)
-    if (error) alert('失敗'); else { alert('更新完了'); setIsEditingName(false); initUserData(profile.id); }
+    alert('保存しました'); setEditingId(null); fetchData();
   }
 
-  const handleEmailAuth = async () => {
-    const { error } = isSignUp ? await supabase.auth.signUp({ email, password }) : await supabase.auth.signInWithPassword({ email, password })
-    if (error) alert(error.message); else setShowAuthModal(false)
+  async function handleResolve(marketId: number, optionId: number) {
+    if(!confirm('この結果で確定させますか？')) return
+    const { error } = await supabase.rpc('resolve_market', { market_id_input: marketId, winning_option_id: optionId })
+    if (!error) { alert('確定成功'); fetchData(); } else alert(error.message)
   }
 
-  const handleVote = async () => {
-    if (!session) { setShowAuthModal(true); return; }
-    if (!selectedOptionId) return alert('選択肢を選んでください')
-    const { error } = await supabase.rpc('place_bet', { market_id_input: selectedMarketId, option_id_input: selectedOptionId, amount_input: voteAmount })
-    if (!error) {
-      const market = markets.find(m => m.id === selectedMarketId); const option = market?.market_options.find((o: any) => o.id === selectedOptionId)
-      setJustVoted({ title: market?.title, option: option?.name })
-      setSelectedMarketId(null); fetchMarkets(); initUserData(session.user.id)
-    } else alert(error.message)
+  async function handleUpdateCategory(id: number, updates: any) {
+    await supabase.from('categories').update(updates).eq('id', id)
+    fetchData()
   }
-
-  const openXShare = () => {
-    const shareText = (config.share_text_base || '「{title}」の「{option}」にヨソりました！').replace('{title}', justVoted.title).replace('{option}', justVoted.option)
-    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(window.location.origin)}`, '_blank')
-    setJustVoted(null)
-  }
-
-  const getOdds = (t: number, p: number) => (p === 0 ? 0 : (t / p).toFixed(1)); const getPercent = (t: number, p: number) => (t === 0 ? 0 : Math.round((p / t) * 100))
 
   const s: any = {
-    container: { maxWidth: '500px', margin: '0 auto', padding: '10px 10px 80px', fontFamily: 'sans-serif', background: '#fff' },
-    title: { fontSize: '26px', fontWeight: '900', textAlign: 'center', margin: '0', background: 'linear-gradient(to right, #2563eb, #9333ea)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' },
-    siteDesc: { fontSize: '11px', color: '#999', textAlign: 'center', marginBottom: '4px' },
-    adminMsg: { fontSize: '11px', background: '#f0f9ff', color: '#0369a1', padding: '6px 10px', borderRadius: '6px', marginBottom: '10px', border: '1px solid #bae6fd', textAlign: 'center' },
-    catGrid: { display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '3px', marginBottom: '10px' },
-    catBtn: (active: boolean) => ({ padding: '5px 0', borderRadius: '4px', border: '1px solid #eee', background: active ? '#1f2937' : '#fff', color: active ? '#fff' : '#666', fontSize: '9px', fontWeight: 'bold', overflow: 'hidden' }),
-    card: { borderRadius: '12px', marginBottom: '12px', border: '1px solid #eee', overflow: 'hidden', position: 'relative' },
-    imgOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: '10px', background: 'linear-gradient(to top, rgba(0,0,0,0.85), transparent)', color: '#fff' },
-    desc: { fontSize: '10px', color: '#555', background: '#f8f8f8', padding: '4px 8px', borderRadius: '4px', margin: '2px 0', lineHeight: '1.4' },
-    modal: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' },
-    modalContent: { background: 'white', padding: '20px', borderRadius: '16px', width: '100%', maxWidth: '400px', textAlign: 'center' }
+    inp: { padding: '8px', border: '1px solid #ddd', borderRadius: '6px', fontSize:'13px', width: '100%', boxSizing: 'border-box' },
+    btn: { background: '#1f2937', color: 'white', padding: '10px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' },
+    section: { background: '#f8fafc', padding: '15px', borderRadius: '12px', marginBottom: '20px', border: '1px solid #e2e8f0' },
+    tab: (active: boolean) => ({ flex: 1, padding: '10px', background: active ? '#1f2937' : '#f3f4f6', color: active ? 'white' : '#4b5563', border:'none', cursor:'pointer', fontWeight:'bold', borderRadius:'4px', fontSize:'12px' })
   }
 
+  if (isLoading) return <div style={{padding:'20px'}}>読み込み中...</div>
+
   return (
-    <div style={s.container}>
-      {justVoted && <div style={s.modal as any}><div style={s.modalContent as any}><h3>🎯 ヨソりました！</h3><button onClick={openXShare} style={{ background: '#000', color: '#fff', border: 'none', padding: '12px', borderRadius: '8px', width: '100%', marginTop: '10px', fontWeight: 'bold' }}>𝕏に投稿する</button><button onClick={() => setJustVoted(null)} style={{ background: 'none', border: 'none', color: '#999', marginTop: '10px' }}>閉じる</button></div></div>}
-      {showAuthModal && <div style={s.modal as any}><div style={s.modalContent as any}><h2>ログイン</h2><input type="email" placeholder="メール" value={email} onChange={e => setEmail(e.target.value)} style={{ width: '100%', padding: '10px', marginBottom: '8px' }} /><input type="password" placeholder="パス" value={password} onChange={e => setPassword(e.target.value)} style={{ width: '100%', padding: '10px', marginBottom: '10px' }} /><button onClick={handleEmailAuth} style={{ width: '100%', padding: '12px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px' }}>{isSignUp ? '登録' : 'ログイン'}</button><button onClick={() => setIsSignUp(!isSignUp)} style={{ background: 'none', border: 'none', color: '#3b82f6', marginTop: '10px' }}>切替</button><button onClick={() => { supabase.auth.signInAnonymously(); setShowAuthModal(false); }} style={{ display: 'block', margin: '15px auto', color: '#999' }}>匿名ログイン</button></div></div>}
+    <div style={{ maxWidth: '950px', margin: '0 auto', padding: '20px', fontFamily: 'sans-serif' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <h1 style={{ margin: 0, fontSize: '20px' }}>🛠 管理パネル</h1>
+        <Link href="/" style={{ textDecoration: 'none', background: '#3b82f6', color: 'white', padding: '8px 16px', borderRadius: '8px', fontSize:'14px' }}>🏠 戻る</Link>
+      </div>
 
-      <header>
-        <h1 style={s.title}>{config.site_title}</h1>
-        <div style={s.siteDesc}>{config.site_description}</div>
-        {activeTab === 'home' && (
-          <><div style={s.adminMsg}>{config.admin_message}</div>
-            <div style={s.catGrid}>{dbCategories.map(c => <button key={c.name} onClick={() => setActiveCategory(c.name)} style={s.catBtn(activeCategory === c.name)}>{c.name}</button>)}</div>
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '10px' }}>{['new', 'deadline', 'popular'].map(t => <button key={t} onClick={() => setSortBy(t as any)} style={{ padding: '4px 12px', borderRadius: '15px', border: 'none', background: sortBy === t ? '#3b82f6' : '#eee', color: sortBy === t ? '#fff' : '#666', fontSize: '10px', fontWeight: 'bold' }}>{t === 'new' ? '✨新着' : t === 'deadline' ? '⏰締切' : '🔥人気'}</button>)}</div></>
-        )}
-      </header>
+      <div style={{ display: 'flex', gap: '5px', marginBottom: '20px' }}>
+        <button onClick={() => setActiveTab('markets')} style={s.tab(activeTab === 'markets')}>問い管理</button>
+        <button onClick={() => setActiveTab('categories')} style={s.tab(activeTab === 'categories')}>カテゴリ設定</button>
+        <button onClick={() => setActiveTab('users')} style={s.tab(activeTab === 'users')}>ユーザー管理</button>
+        <button onClick={() => setActiveTab('config')} style={s.tab(activeTab === 'config')}>サイト設定</button>
+      </div>
 
-      {activeTab === 'home' && (
-        <div>{markets.filter(m => activeCategory === 'すべて' || m.category === activeCategory).map(m => {
-          const active = !m.is_resolved && new Date(m.end_date) > new Date();
-          return (<div key={m.id} style={s.card}><div style={{ height: '140px', position: 'relative', background: '#eee' }}>{m.image_url && <img src={m.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}<div style={s.imgOverlay}><h2 style={{ fontSize: '15px', margin: 0 }}>{m.title}</h2></div></div>
-            <div style={{ padding: '8px 10px' }}><div style={s.desc}>{m.description}</div>
-              {m.market_options.map((opt: any, i: number) => { const pct = getPercent(m.total_pool, opt.pool); return (<div key={opt.id} style={{ marginBottom: '4px' }}><div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}><span>{m.result_option_id === opt.id ? '👑 ' : ''}{opt.name}</span><span style={{ color: '#3b82f6' }}>{getOdds(m.total_pool, opt.pool)}倍 ({pct}%)</span></div><div style={{ height: '5px', background: '#eee', borderRadius: '3px', overflow: 'hidden' }}><div style={{ width: `${pct}%`, height: '100%', background: ['#3b82f6', '#ef4444', '#10b981'][i % 3] }} /></div></div>) })}
-              {active ? (selectedMarketId === m.id ? (<div style={{ marginTop: '8px' }}><div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>{m.market_options.map((o: any) => (<button key={o.id} onClick={() => setSelectedOptionId(o.id)} style={{ padding: '4px 8px', borderRadius: '15px', border: selectedOptionId === o.id ? '2px solid #3b82f6' : '1px solid #ddd', fontSize: '10px' }}>{o.name}</button>))}</div><div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '6px' }}><input type="range" min="10" max={profile?.point_balance || 1000} step="10" value={voteAmount} onChange={e => setVoteAmount(Number(e.target.value))} style={{ flex: 1 }} /><button onClick={handleVote} style={{ background: '#1f2937', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold' }}>確定({voteAmount}pt)</button></div></div>) : (<button onClick={() => setSelectedMarketId(m.id)} style={{ width: '100%', padding: '8px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', marginTop: '6px' }}>ヨソる</button>)) : <div style={{ textAlign: 'center', fontSize: '11px', color: '#999', marginTop: '6px' }}>終了</div>}
-            </div></div>)
-        })}</div>
+      {activeTab === 'config' && (
+        <section style={s.section}>
+          <h3>📢 サイト設定・𝕏共有設定</h3>
+          <div style={{ display: 'grid', gap: '15px' }}>
+            <div>
+              <label style={{fontSize:'12px', fontWeight:'bold'}}>サイトタイトル</label>
+              <input value={siteConfig.site_title} onChange={e => setSiteConfig({...siteConfig, site_title: e.target.value})} style={s.inp} />
+            </div>
+            <div>
+              <label style={{fontSize:'12px', fontWeight:'bold'}}>通信欄 (ホームメッセージ)</label>
+              <textarea value={siteConfig.admin_message} onChange={e => setSiteConfig({...siteConfig, admin_message: e.target.value})} style={{...s.inp, height:'60px'}} />
+            </div>
+            <div>
+              <label style={{fontSize:'12px', fontWeight:'bold'}}>𝕏投稿定型文</label>
+              <div style={{fontSize:'10px', color:'#666', marginBottom:'4px'}}>{`{title} はタイトル、 {option} は選択肢名に置換`}</div>
+              <textarea value={siteConfig.share_text_base} onChange={e => setSiteConfig({...siteConfig, share_text_base: e.target.value})} style={{...s.inp, height:'60px'}} />
+            </div>
+            <label style={{fontSize:'12px'}}><input type="checkbox" checked={siteConfig.show_ranking} onChange={e => setSiteConfig({...siteConfig, show_ranking: e.target.checked})} /> ランキングを表示する</label>
+            <button onClick={handleUpdateConfig} style={{...s.btn, background:'#10b981'}}>設定を保存</button>
+          </div>
+        </section>
       )}
 
-      {activeTab === 'ranking' && <div style={{ border: '1px solid #eee', borderRadius: '12px' }}>{ranking.map((u, i) => (<div key={u.id} style={{ display: 'flex', padding: '10px', borderBottom: '1px solid #eee', fontSize: '13px', background: u.id === profile?.id ? '#fffbeb' : '#fff' }}><span style={{ width: '30px', fontWeight: 'bold' }}>{i + 1}</span><span style={{ flex: 1 }}>{u.username || '名無しさん'}{u.id === profile?.id && ' (あなた)'}</span><span style={{ fontWeight: 'bold' }}>{u.point_balance.toLocaleString()}pt</span></div>))}</div>}
-
-      {activeTab === 'mypage' && (
-        <div><div style={{ background: 'linear-gradient(135deg, #1e3a8a, #3b82f6)', color: '#fff', padding: '20px', borderRadius: '12px', textAlign: 'center' }}>
-          {isEditingName ? (<div><input value={newUsername} onChange={e => setNewUsername(e.target.value)} style={{ color: '#333' }} /><button onClick={handleUpdateName}>保存</button></div>) : (<div><span style={{ fontSize: '18px', fontWeight: 'bold' }}>{profile?.username || '名無し'}</span><button onClick={() => setIsEditingName(true)} style={{ fontSize: '10px', marginLeft: '8px' }}>編集</button></div>)}
-          <div style={{ fontSize: '24px', fontWeight: '900' }}>{profile?.point_balance?.toLocaleString()} pt</div></div>
-          {myBets.map(b => (<div key={b.id} style={{ padding: '10px', borderBottom: '1px solid #eee', fontSize: '12px' }}><div>{b.markets?.title}</div><div style={{ fontWeight: 'bold' }}>{b.market_options?.name} / {b.amount}pt</div></div>))}
-          <button onClick={() => supabase.auth.signOut()} style={{ width: '100%', marginTop: '20px', color: '#ef4444' }}>ログアウト</button></div>
-      )}
-
-      {activeTab === 'info' && (
-        <div style={{ fontSize: '12px', lineHeight: '1.6', padding: '10px' }}>
-          <section><h3>ヨソるの遊び方</h3><p>未来の問いを予想し、ポイントをヨソるシミュレーションゲームです。</p></section>
-          <section style={{ background: '#f9f9f9', padding: '15px', borderRadius: '10px', border: '1px solid #eee' }}>
-            <h3 style={{ borderBottom: '2px solid #3b82f6', paddingBottom: '5px' }}>⚖️ 法的ガイドライン及び利用規約</h3>
-            <p><strong>1. ポイントの性質</strong><br />取得されるポイントはゲーム内通貨であり、金銭への換金機能は提供しません。本サービスは刑法第185条の賭博には該当しません。</p>
-            <p><strong>2. 景品・キャンペーンについて</strong><br />ランキング上位者等へ賞品や**デジタル特典（NFT等を含む）**の提供を行う場合は、景品表示法が定める「懸賞」の限度額（最高10万円等）および総額制限の範囲内で行うものとします。</p>
-            <p><strong>3. 禁止事項</strong><br />複数垢、不正取得、およびポイントや**付与されたデジタル資産**のリアルマネー取引（RMT）を固く禁じます。違反時はアカウントを凍結します。</p>
-            <p><strong>4. 免責事項</strong><br />判定は客観的事実に基づきますが、最終決定は運営によります。システム不具合等による損失について、運営は一切の責任を負いません。</p>
-          </section>
-          <div style={{ textAlign: 'center', marginTop: '30px' }}><Link href="/admin" style={{ color: '#ccc' }}>admin</Link></div>
+      {activeTab === 'users' && (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize:'12px' }}>
+            <thead><tr style={{textAlign:'left', borderBottom:'2px solid #eee'}}><th style={{padding:'10px'}}>ユーザー</th><th>ポイント編集</th><th>ランキング</th><th>操作</th></tr></thead>
+            <tbody>
+              {users.map(u => (
+                <tr key={u.id} style={{borderBottom:'1px solid #eee'}}>
+                  <td style={{padding:'10px'}}>{u.username || '匿名'}</td>
+                  <td>
+                    <input type="number" defaultValue={u.point_balance} onBlur={e => handleUserUpdate(u.id, { point_balance: Number(e.target.value) })} style={{width:'80px', padding:'4px'}} />
+                  </td>
+                  <td>
+                    <select defaultValue={u.is_hidden_from_ranking ? 'hide' : 'show'} onChange={e => handleUserUpdate(u.id, { is_hidden_from_ranking: e.target.value === 'hide' })} style={{padding:'4px'}}>
+                      <option value="show">表示</option><option value="hide">非表示</option>
+                    </select>
+                  </td>
+                  <td><button onClick={() => handleDeleteUser(u.id)} style={{color:'red', border:'none', background:'none', cursor:'pointer'}}>削除</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
-      <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: '#fff', display: 'flex', justifyContent: 'space-around', padding: '10px 0', borderTop: '1px solid #eee', zIndex: 100 }}>
-        <button onClick={() => setActiveTab('home')} style={{ color: activeTab === 'home' ? '#3b82f6' : '#999' }}>🏠<br />ホーム</button>
-        {config.show_ranking && <button onClick={() => setActiveTab('ranking')} style={{ color: activeTab === 'ranking' ? '#3b82f6' : '#999' }}>👑<br />ランク</button>}
-        <button onClick={() => { if (!session) setShowAuthModal(true); else setActiveTab('mypage') }} style={{ color: activeTab === 'mypage' ? '#3b82f6' : '#999' }}>👤<br />マイペ</button>
-        <button onClick={() => setActiveTab('info')} style={{ color: activeTab === 'info' ? '#3b82f6' : '#999' }}>📖<br />ガイド</button>
-      </nav>
+      {activeTab === 'markets' && (
+        <>
+          <section style={s.section}>
+            <h3 style={{fontSize:'16px'}}>🆕 新規作成</h3>
+            <div style={{ display: 'grid', gap: '10px' }}>
+              <input placeholder="タイトル" value={newMarket.title} onChange={e => setNewMarket({...newMarket, title: e.target.value})} style={s.inp} />
+              <textarea placeholder="判定基準" value={newMarket.description} onChange={e => setNewMarket({...newMarket, description: e.target.value})} style={s.inp} />
+              <div style={{display:'flex', gap:'10px'}}>
+                <select value={newMarket.category} onChange={e => setNewMarket({...newMarket, category: e.target.value})} style={{...s.inp, flex:1}}>
+                  <option value="">カテゴリ選択</option>
+                  {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                </select>
+                <input type="datetime-local" onChange={e => setNewMarket({...newMarket, end_date: e.target.value})} style={{...s.inp, flex:1}} />
+              </div>
+              <div style={{ padding: '10px', border: '1px dashed #ccc', borderRadius: '8px', background: '#fff' }}>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <input type="file" accept="image/*" onChange={(e) => uploadImage(e, false)} style={{ fontSize: '11px' }} />
+                  <button onClick={() => generateAIImage(newMarket.title)} style={{ ...s.btn, background: '#a855f7', padding: '5px 10px', fontSize: '11px' }}>{generating ? '生成中...' : '🪄 AI生成'}</button>
+                </div>
+                <input placeholder="画像URL" value={newMarket.image_url} onChange={e => setNewMarket({...newMarket, image_url: e.target.value})} style={{ ...s.inp, marginTop: '5px' }} />
+              </div>
+              <input placeholder="選択肢 (カンマ区切り)" onChange={e => setNewMarket({...newMarket, options: e.target.value})} style={s.inp} />
+              <button onClick={handleCreateMarket} style={s.btn}>公開</button>
+            </div>
+          </section>
+
+          <div style={{display:'flex', gap:'10px', marginBottom:'15px'}}>
+            <button onClick={()=>setMarketSort('date')} style={{padding:'6px 12px', borderRadius:'20px', border: marketSort==='date'?'none':'1px solid #ddd', background:marketSort==='date'?'#3b82f6':'white', color:marketSort==='date'?'white':'#666', fontSize:'11px'}}>📅 締切順</button>
+            <button onClick={()=>setMarketSort('category')} style={{padding:'6px 12px', borderRadius:'20px', border: marketSort==='category'?'none':'1px solid #ddd', background:marketSort==='category'?'#3b82f6':'white', color:marketSort==='category'?'white':'#666', fontSize:'11px'}}>📁 カテゴリ順</button>
+          </div>
+
+          {markets.map(m => (
+            <div key={m.id} style={{ border: '1px solid #f1f5f9', padding: '15px', borderRadius: '10px', marginBottom: '10px', background: 'white' }}>
+              {editingId === m.id ? (
+                <div style={{ display: 'grid', gap: '10px' }}>
+                  <input value={editForm.title} onChange={e => setEditForm({...editForm, title: e.target.value})} style={s.inp} />
+                  <textarea value={editForm.description} onChange={e => setEditForm({...editForm, description: e.target.value})} style={s.inp} />
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <select value={editForm.category} onChange={e => setEditForm({...editForm, category: e.target.value})} style={{ ...s.inp, flex: 1 }}>
+                      {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                    </select>
+                    <input type="datetime-local" value={editForm.end_date} onChange={e => setEditForm({...editForm, end_date: e.target.value})} style={{ ...s.inp, flex: 1 }} />
+                  </div>
+                  <input type="file" onChange={(e) => uploadImage(e, true)} style={{ fontSize: '11px' }} />
+                  <div style={{ padding: '10px', background: '#f8f9fa', borderRadius: '6px' }}>
+                    {editForm.market_options.map((opt: any, idx: number) => (
+                      <input key={opt.id} value={opt.name} onChange={e => {
+                        const newOpts = [...editForm.market_options]; newOpts[idx].name = e.target.value; setEditForm({ ...editForm, market_options: newOpts })
+                      }} style={{ ...s.inp, marginBottom: '5px' }} />
+                    ))}
+                  </div>
+                  <div style={{display:'flex', gap:'10px'}}>
+                    <button onClick={handleUpdateMarket} style={{...s.btn, flex:1, background:'#10b981'}}>保存</button>
+                    <button onClick={() => setEditingId(null)} style={{...s.btn, flex:1, background:'#94a3b8'}}>中止</button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <div>
+                      <strong>{m.title}</strong>
+                      <div style={{fontSize:'11px', color:'#666'}}>{m.category} | ⏰ {new Date(m.end_date).toLocaleString()}</div>
+                    </div>
+                    <div>
+                      <button onClick={() => { setEditingId(m.id); setEditForm({...m, end_date: new Date(m.end_date).toISOString().slice(0,16)}); }} style={{marginRight:'5px'}}>編集</button>
+                      <button onClick={() => { if(confirm('削除？')) supabase.from('markets').delete().eq('id', m.id).then(()=>fetchData()) }} style={{color:'red'}}>削除</button>
+                    </div>
+                  </div>
+                  {!m.is_resolved && (
+                    <div style={{marginTop:'10px', display:'flex', gap:'5px', flexWrap:'wrap'}}>
+                      {m.market_options.map((opt: any) => (
+                        <button key={opt.id} onClick={() => handleResolve(m.id, opt.id)} style={{fontSize:'11px'}}>「{opt.name}」で確定</button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          ))}
+        </>
+      )}
+
+      {activeTab === 'categories' && (
+        <section style={s.section}>
+          <h3>📁 カテゴリ・順序設定</h3>
+          <div style={{ display: 'flex', gap: '5px', marginBottom: '15px' }}>
+            <input placeholder="名前" value={newCategory.name} onChange={e => setNewCategory({...newCategory, name: e.target.value})} style={s.inp} />
+            <input placeholder="順序" type="number" value={newCategory.display_order} onChange={e => setNewCategory({...newCategory, display_order: Number(e.target.value)})} style={{...s.inp, width:'60px'}} />
+            <button onClick={() => { supabase.from('categories').insert([newCategory]).then(()=>fetchData()); setNewCategory({name:'', icon:'', display_order:0}); }} style={s.btn}>追加</button>
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <thead><tr style={{ background: '#f1f5f9', textAlign: 'left' }}><th style={{ padding: '10px' }}>順序</th><th>名</th><th>操作</th></tr></thead>
+            <tbody>
+              {categories.map(c => (
+                <tr key={c.id} style={{ borderBottom: '1px solid #eee' }}>
+                  <td><input type="number" defaultValue={c.display_order} onBlur={e => handleUpdateCategory(c.id, { display_order: Number(e.target.value) })} style={{ width: '40px' }} /></td>
+                  <td><input defaultValue={c.name} onBlur={e => handleUpdateCategory(c.id, { name: e.target.value })} style={{ border: 'none' }} /></td>
+                  <td><button onClick={() => { if(confirm('削除？')) supabase.from('categories').delete().eq('id', c.id).then(()=>fetchData()) }} style={{ color: 'red', border: 'none', background: 'none' }}>削除</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
     </div>
   )
 }
