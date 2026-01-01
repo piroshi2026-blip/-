@@ -49,24 +49,55 @@ export default function Home() {
   const [isSignUp, setIsSignUp] = useState(false)
 
   // --- デバッグ：認証状態の監視 ---
+  // --- ここから差し替え ---
   useEffect(() => {
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, currentSession) => {
-      const msg = `イベント: ${event} | セッション: ${currentSession ? "あり(UID:" + currentSession.user.id.slice(0,5) + ")" : "なし"}`
-      setDebugInfo(msg)
-      console.log(msg)
-      setSession(currentSession)
-      if (currentSession) initUserData(currentSession.user.id)
-      else setProfile(null)
-    })
+    const initAuth = async () => {
+      // 1. URLから直接セッションを取得・解析（Googleログイン後のハッシュ読み取りを強化）
+      const { data: { session: s }, error: sessionError } = await supabase.auth.getSession();
 
-    // 初回セッション確認
-    supabase.auth.getSession().then(({ data: { session: initSession } }) => {
-      setSession(initSession)
-      if (initSession) initUserData(initSession.user.id)
-    })
+      if (sessionError) {
+        setDebugInfo(`セッション取得エラー: ${sessionError.message}`);
+        return;
+      }
 
-    return () => authListener.subscription.unsubscribe()
-  }, [])
+      if (s) {
+        setSession(s);
+        setDebugInfo(`認証成功: ${s.user.id.slice(0,5)}`);
+        await initUserData(s.user.id);
+      } else {
+        // 2. セッションがない場合、URL自体にエラーが返ってきていないか詳細を解析
+        const hash = window.location.hash.substring(1);
+        const params = new URLSearchParams(hash);
+        const errorDesc = params.get('error_description');
+        const errorName = params.get('error');
+
+        if (errorDesc || errorName) {
+          setDebugInfo(`OAuthエラー: ${errorName} - ${errorDesc}`);
+        } else {
+          setDebugInfo("セッションなし（待機中/初期状態）");
+        }
+      }
+    };
+
+    // 認証状態の変化をリアルタイム監視
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+      setDebugInfo(`イベント: ${event} | セッション: ${currentSession ? "あり" : "なし"}`);
+      if (currentSession) {
+        setSession(currentSession);
+        await initUserData(currentSession.user.id);
+      } else {
+        setSession(null);
+        setProfile(null);
+      }
+    });
+
+    initAuth();
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+  // --- ここまで差し替え ---
 
   useEffect(() => {
     // 1. URLに認証情報（#access_token）が含まれているか最優先でチェック
@@ -86,11 +117,8 @@ export default function Home() {
       setDebugInfo(`イベント: ${event} | セッション: ${currentSession ? "あり" : "なし"}`);
       if (currentSession) {
         setSession(currentSession);
-        initUserData(currentSession.user.id);
-      }
-    });
-
-    checkHash();
+        initUserData
+        
     return () => authListener.subscription.unsubscribe();
   }, []);
 
