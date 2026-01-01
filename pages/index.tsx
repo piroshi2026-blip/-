@@ -38,6 +38,7 @@ export default function Home() {
   const [selectedMarketId, setSelectedMarketId] = useState<number | null>(null)
   const [selectedOptionId, setSelectedOptionId] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [justVoted, setJustVoted] = useState<any>(null) // 𝕏投稿ボタン表示用
 
   const categoryMeta: any = {
     'こども': { icon: '🎒', color: '#f43f5e' },
@@ -105,18 +106,14 @@ export default function Home() {
     const { error } = await supabase.rpc('place_bet', { market_id_input: selectedMarketId, option_id_input: selectedOptionId, amount_input: voteAmount })
 
     if (!error) {
-      // 𝕏共有ロジック
       const market = markets.find(m => m.id === selectedMarketId)
       const option = market?.market_options.find((o: any) => o.id === selectedOptionId)
-      const shareText = (config.share_text_base || '「{title}」の「{option}」にヨソりました！')
-        .replace('{title}', market?.title || '')
-        .replace('{option}', option?.name || '')
 
-      const xUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(window.location.origin)}`
-
-      if (confirm('ヨソりました！𝕏でみんなに教えますか？')) {
-        window.open(xUrl, '_blank')
-      }
+      // 𝕏投稿用の情報をセット
+      setJustVoted({
+        title: market?.title,
+        option: option?.name
+      })
 
       setSelectedMarketId(null)
       fetchMarkets()
@@ -124,9 +121,14 @@ export default function Home() {
     } else alert(error.message)
   }
 
-  const handleEmailAuth = async () => {
-    const { error } = isSignUp ? await supabase.auth.signUp({ email, password }) : await supabase.auth.signInWithPassword({ email, password })
-    if (error) alert(error.message); else setShowAuthModal(false)
+  const openXShare = () => {
+    if (!justVoted) return
+    const shareText = (config.share_text_base || '「{title}」の「{option}」にヨソりました！')
+      .replace('{title}', justVoted.title || '')
+      .replace('{option}', justVoted.option || '')
+    const xUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(window.location.origin)}`
+    window.open(xUrl, '_blank')
+    setJustVoted(null)
   }
 
   const getOdds = (t: number, p: number) => (p === 0 ? 0 : (t / p).toFixed(1))
@@ -140,16 +142,32 @@ export default function Home() {
     catGrid: { display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '3px', marginBottom: '10px' },
     catBtn: (active: boolean) => ({ padding: '5px 0', borderRadius: '4px', border: '1px solid #eee', background: active ? '#1f2937' : '#fff', color: active ? '#fff' : '#666', fontSize: '9px', fontWeight: 'bold', overflow: 'hidden', whiteSpace: 'nowrap' }),
     card: { borderRadius: '12px', marginBottom: '12px', border: '1px solid #eee', overflow: 'hidden', position: 'relative' },
-    imgOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: '8px', background: 'linear-gradient(to top, rgba(0,0,0,0.85), transparent)', color: '#fff' },
+    imgOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: '10px', background: 'linear-gradient(to top, rgba(0,0,0,0.85), transparent)', color: '#fff' },
     desc: { fontSize: '10px', color: '#555', background: '#f8f8f8', padding: '3px 6px', borderRadius: '4px', margin: '2px 0', lineHeight: '1.3' },
     modal: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' },
-    modalContent: { background: 'white', padding: '20px', borderRadius: '16px', width: '100%', maxWidth: '400px', textAlign: 'center' }
+    modalContent: { background: 'white', padding: '20px', borderRadius: '16px', width: '100%', maxWidth: '400px', textAlign: 'center' },
+    xBtn: { background: '#000', color: '#fff', border: 'none', padding: '12px', borderRadius: '8px', fontWeight: 'bold', width: '100%', marginTop: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }
   }
 
   if (isLoading) return <div style={{ textAlign: 'center', paddingTop: '50px' }}>読み込み中...</div>
 
   return (
     <div style={s.container}>
+      {/* 𝕏投稿用モーダル（確定直後に表示） */}
+      {justVoted && (
+        <div style={s.modal as any}>
+          <div style={s.modalContent as any}>
+            <div style={{ fontSize: '40px', marginBottom: '10px' }}>🎯</div>
+            <h2 style={{ fontSize: '18px', margin: '0 0 10px' }}>ヨソりました！</h2>
+            <p style={{ fontSize: '13px', color: '#666', marginBottom: '20px' }}>「{justVoted.title}」の予想を𝕏で共有しましょう！</p>
+            <button onClick={openXShare} style={s.xBtn}>
+              𝕏 (Twitter) に投稿する
+            </button>
+            <button onClick={() => setJustVoted(null)} style={{ background: 'none', border: 'none', color: '#999', marginTop: '15px', fontSize: '12px' }}>閉じる</button>
+          </div>
+        </div>
+      )}
+
       {showAuthModal && (
         <div style={s.modal as any}>
           <div style={s.modalContent as any}>
@@ -234,6 +252,7 @@ export default function Home() {
         </div>
       )}
 
+      {/* ランキング・マイページ・規約などはそのまま維持 */}
       {activeTab === 'ranking' && (
         <div style={{ border: '1px solid #eee', borderRadius: '12px' }}>
           {ranking.map((u, i) => (
@@ -264,6 +283,7 @@ export default function Home() {
             <div style={{ fontSize: '11px', opacity: 0.8 }}>資産</div>
             <div style={{ fontSize: '30px', fontWeight: '900' }}>{profile?.point_balance?.toLocaleString()} pt</div>
           </div>
+          <h3 style={{ fontSize: '14px', marginBottom: '10px' }}>📜 履歴</h3>
           {myBets.map(b => (
             <div key={b.id} style={{ padding: '10px', border: '1px solid #eee', borderRadius: '8px', marginBottom: '8px', fontSize: '12px' }}>
               <div style={{ color: '#999', fontSize: '10px' }}>{b.markets.title}</div>
@@ -306,3 +326,4 @@ export default function Home() {
     </div>
   )
 }
+
