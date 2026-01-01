@@ -15,6 +15,7 @@ export default function Admin() {
   const [users, setUsers] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
+  // サイト設定用のState
   const [siteConfig, setSiteConfig] = useState<any>({ 
     id: 1, site_title: '', site_description: '', admin_message: '', show_ranking: true, share_text_base: '' 
   })
@@ -54,6 +55,33 @@ export default function Admin() {
     fetchConfig()
   }, [fetchData, fetchConfig])
 
+  // --- サイト設定・𝕏投稿編集 ---
+  async function handleUpdateConfig() {
+    const { error } = await supabase.from('site_config').update({
+      site_title: siteConfig.site_title,
+      site_description: siteConfig.site_description,
+      admin_message: siteConfig.admin_message,
+      show_ranking: siteConfig.show_ranking,
+      share_text_base: siteConfig.share_text_base
+    }).eq('id', siteConfig.id)
+    if (!error) alert('設定を保存しました')
+    else alert('保存エラー: ' + error.message)
+  }
+
+  // --- ユーザー管理機能 (復活) ---
+  async function handleUserUpdate(id: string, updates: any) {
+    const { error } = await supabase.from('profiles').update(updates).eq('id', id)
+    if (!error) fetchData()
+    else alert(error.message)
+  }
+
+  async function handleDeleteUser(id: string) {
+    if (!confirm('このユーザーを完全に削除しますか？')) return
+    const { error } = await supabase.from('profiles').delete().eq('id', id)
+    if (!error) fetchData()
+    else alert(error.message)
+  }
+
   // --- 画像関連機能 ---
   async function uploadImage(e: any, isEdit: boolean = false) {
     try {
@@ -70,31 +98,14 @@ export default function Admin() {
     } catch (error: any) { alert(error.message) } finally { setUploading(false) }
   }
 
-  // AI画像生成 (Edge Function等でDALL-Eを叩く想定)
   async function generateAIImage(prompt: string, isEdit: boolean = false) {
-    if (!prompt) return alert('プロンプト（タイトルのキーワード等）を入力してください')
-    try {
-      setGenerating(true)
-      // ここにAI生成API（OpenAI等）を呼び出すロジック、または生成用のEdge Function呼び出しを記述
-      // 現状はプレースホルダとして機能のみ定義
-      const response = await fetch('/api/generate-image', { 
-        method: 'POST', 
-        body: JSON.stringify({ prompt }) 
-      })
-      const { url } = await response.json()
-      if (isEdit) setEditForm({ ...editForm, image_url: url })
-      else setNewMarket({ ...newMarket, image_url: url })
-    } catch (e) {
-      alert('AI生成にはAPIの設定が必要です。URLを直接入力するかアップロードしてください。')
-    } finally { setGenerating(false) }
+    if (!prompt) return alert('プロンプトを入力してください')
+    setGenerating(true)
+    // 実装に応じてAPIを叩く
+    setTimeout(() => { setGenerating(false); alert('AI生成APIが未設定です。'); }, 1000)
   }
 
-  // --- 更新・作成ロジック ---
-  async function handleUpdateConfig() {
-    const { error } = await supabase.from('site_config').update(siteConfig).eq('id', siteConfig.id)
-    if (!error) alert('保存しました')
-  }
-
+  // --- 市場・問い管理 ---
   async function handleCreateMarket() {
     if(!newMarket.title || !newMarket.end_date || !newMarket.options) return alert('必須項目を入力してください')
     const optArray = newMarket.options.split(',').map(s => s.trim())
@@ -117,6 +128,12 @@ export default function Admin() {
     alert('保存しました'); setEditingId(null); fetchData();
   }
 
+  async function handleResolve(marketId: number, optionId: number) {
+    if(!confirm('この結果で確定させますか？')) return
+    const { error } = await supabase.rpc('resolve_market', { market_id_input: marketId, winning_option_id: optionId })
+    if (!error) { alert('確定成功'); fetchData(); } else alert(error.message)
+  }
+
   async function handleUpdateCategory(id: number, updates: any) {
     await supabase.from('categories').update(updates).eq('id', id)
     fetchData()
@@ -133,9 +150,9 @@ export default function Admin() {
 
   return (
     <div style={{ maxWidth: '950px', margin: '0 auto', padding: '20px', fontFamily: 'sans-serif' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '2px solid #eee', paddingBottom: '15px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h1 style={{ margin: 0, fontSize: '20px' }}>🛠 管理パネル</h1>
-        <Link href="/" style={{ textDecoration: 'none', background: '#3b82f6', color: 'white', padding: '8px 16px', borderRadius: '8px', fontWeight: 'bold', fontSize:'14px' }}>🏠 戻る</Link>
+        <Link href="/" style={{ textDecoration: 'none', background: '#3b82f6', color: 'white', padding: '8px 16px', borderRadius: '8px', fontSize:'14px' }}>🏠 戻る</Link>
       </div>
 
       <div style={{ display: 'flex', gap: '5px', marginBottom: '20px' }}>
@@ -145,10 +162,57 @@ export default function Admin() {
         <button onClick={() => setActiveTab('config')} style={s.tab(activeTab === 'config')}>サイト設定</button>
       </div>
 
+      {activeTab === 'config' && (
+        <section style={s.section}>
+          <h3>📢 サイト設定・𝕏共有設定</h3>
+          <div style={{ display: 'grid', gap: '15px' }}>
+            <div>
+              <label style={{fontSize:'12px', fontWeight:'bold'}}>サイトタイトル</label>
+              <input value={siteConfig.site_title} onChange={e => setSiteConfig({...siteConfig, site_title: e.target.value})} style={s.inp} />
+            </div>
+            <div>
+              <label style={{fontSize:'12px', fontWeight:'bold'}}>通信欄 (ホームメッセージ)</label>
+              <textarea value={siteConfig.admin_message} onChange={e => setSiteConfig({...siteConfig, admin_message: e.target.value})} style={{...s.inp, height:'60px'}} />
+            </div>
+            <div>
+              <label style={{fontSize:'12px', fontWeight:'bold'}}>𝕏投稿定型文</label>
+              <div style={{fontSize:'10px', color:'#666', marginBottom:'4px'}}>{`{title} はタイトル、 {option} は選択肢名に置換`}</div>
+              <textarea value={siteConfig.share_text_base} onChange={e => setSiteConfig({...siteConfig, share_text_base: e.target.value})} style={{...s.inp, height:'60px'}} />
+            </div>
+            <label style={{fontSize:'12px'}}><input type="checkbox" checked={siteConfig.show_ranking} onChange={e => setSiteConfig({...siteConfig, show_ranking: e.target.checked})} /> ランキングを表示する</label>
+            <button onClick={handleUpdateConfig} style={{...s.btn, background:'#10b981'}}>設定を保存</button>
+          </div>
+        </section>
+      )}
+
+      {activeTab === 'users' && (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize:'12px' }}>
+            <thead><tr style={{textAlign:'left', borderBottom:'2px solid #eee'}}><th style={{padding:'10px'}}>ユーザー</th><th>ポイント編集</th><th>ランキング</th><th>操作</th></tr></thead>
+            <tbody>
+              {users.map(u => (
+                <tr key={u.id} style={{borderBottom:'1px solid #eee'}}>
+                  <td style={{padding:'10px'}}>{u.username || '匿名'}</td>
+                  <td>
+                    <input type="number" defaultValue={u.point_balance} onBlur={e => handleUserUpdate(u.id, { point_balance: Number(e.target.value) })} style={{width:'80px', padding:'4px'}} />
+                  </td>
+                  <td>
+                    <select defaultValue={u.is_hidden_from_ranking ? 'hide' : 'show'} onChange={e => handleUserUpdate(u.id, { is_hidden_from_ranking: e.target.value === 'hide' })} style={{padding:'4px'}}>
+                      <option value="show">表示</option><option value="hide">非表示</option>
+                    </select>
+                  </td>
+                  <td><button onClick={() => handleDeleteUser(u.id)} style={{color:'red', border:'none', background:'none', cursor:'pointer'}}>削除</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       {activeTab === 'markets' && (
         <>
           <section style={s.section}>
-            <h3>🆕 新規問い作成</h3>
+            <h3 style={{fontSize:'16px'}}>🆕 新規作成</h3>
             <div style={{ display: 'grid', gap: '10px' }}>
               <input placeholder="タイトル" value={newMarket.title} onChange={e => setNewMarket({...newMarket, title: e.target.value})} style={s.inp} />
               <textarea placeholder="判定基準" value={newMarket.description} onChange={e => setNewMarket({...newMarket, description: e.target.value})} style={s.inp} />
@@ -159,24 +223,22 @@ export default function Admin() {
                 </select>
                 <input type="datetime-local" onChange={e => setNewMarket({...newMarket, end_date: e.target.value})} style={{...s.inp, flex:1}} />
               </div>
-
-              {/* 画像操作エリア */}
               <div style={{ padding: '10px', border: '1px dashed #ccc', borderRadius: '8px', background: '#fff' }}>
-                <div style={{ fontSize: '12px', marginBottom: '8px', fontWeight: 'bold' }}>画像設定</div>
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                   <input type="file" accept="image/*" onChange={(e) => uploadImage(e, false)} style={{ fontSize: '11px' }} />
-                  <button onClick={() => generateAIImage(newMarket.title)} style={{ ...s.btn, background: '#a855f7', padding: '5px 10px', fontSize: '11px' }}>
-                    {generating ? '生成中...' : '🪄 AIで生成'}
-                  </button>
+                  <button onClick={() => generateAIImage(newMarket.title)} style={{ ...s.btn, background: '#a855f7', padding: '5px 10px', fontSize: '11px' }}>{generating ? '生成中...' : '🪄 AI生成'}</button>
                 </div>
-                <input placeholder="画像URLを直接入力も可" value={newMarket.image_url} onChange={e => setNewMarket({...newMarket, image_url: e.target.value})} style={{ ...s.inp, marginTop: '8px' }} />
-                {newMarket.image_url && <img src={newMarket.image_url} style={{ height: '50px', marginTop: '5px', borderRadius: '4px' }} />}
+                <input placeholder="画像URL" value={newMarket.image_url} onChange={e => setNewMarket({...newMarket, image_url: e.target.value})} style={{ ...s.inp, marginTop: '5px' }} />
               </div>
-
-              <input placeholder="選択肢 (カンマ区切り)" value={newMarket.options} onChange={e => setNewMarket({...newMarket, options: e.target.value})} style={s.inp} />
-              <button onClick={handleCreateMarket} style={s.btn}>問いを公開</button>
+              <input placeholder="選択肢 (カンマ区切り)" onChange={e => setNewMarket({...newMarket, options: e.target.value})} style={s.inp} />
+              <button onClick={handleCreateMarket} style={s.btn}>公開</button>
             </div>
           </section>
+
+          <div style={{display:'flex', gap:'10px', marginBottom:'15px'}}>
+            <button onClick={()=>setMarketSort('date')} style={{padding:'6px 12px', borderRadius:'20px', border: marketSort==='date'?'none':'1px solid #ddd', background:marketSort==='date'?'#3b82f6':'white', color:marketSort==='date'?'white':'#666', fontSize:'11px'}}>📅 締切順</button>
+            <button onClick={()=>setMarketSort('category')} style={{padding:'6px 12px', borderRadius:'20px', border: marketSort==='category'?'none':'1px solid #ddd', background:marketSort==='category'?'#3b82f6':'white', color:marketSort==='category'?'white':'#666', fontSize:'11px'}}>📁 カテゴリ順</button>
+          </div>
 
           {markets.map(m => (
             <div key={m.id} style={{ border: '1px solid #f1f5f9', padding: '15px', borderRadius: '10px', marginBottom: '10px', background: 'white' }}>
@@ -190,14 +252,7 @@ export default function Admin() {
                     </select>
                     <input type="datetime-local" value={editForm.end_date} onChange={e => setEditForm({...editForm, end_date: e.target.value})} style={{ ...s.inp, flex: 1 }} />
                   </div>
-
-                  {/* 編集時の画像操作 */}
-                  <div style={{ padding: '10px', border: '1px solid #eee', borderRadius: '8px' }}>
-                    <input type="file" onChange={(e) => uploadImage(e, true)} style={{ fontSize: '11px' }} />
-                    <button onClick={() => generateAIImage(editForm.title, true)} style={{ ...s.btn, background: '#a855f7', padding: '5px 10px', fontSize: '11px', marginLeft: '10px' }}>AI生成</button>
-                    <input value={editForm.image_url} onChange={e => setEditForm({ ...editForm, image_url: e.target.value })} style={{ ...s.inp, marginTop: '5px' }} />
-                  </div>
-
+                  <input type="file" onChange={(e) => uploadImage(e, true)} style={{ fontSize: '11px' }} />
                   <div style={{ padding: '10px', background: '#f8f9fa', borderRadius: '6px' }}>
                     {editForm.market_options.map((opt: any, idx: number) => (
                       <input key={opt.id} value={opt.name} onChange={e => {
@@ -211,13 +266,25 @@ export default function Admin() {
                   </div>
                 </div>
               ) : (
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <div>
-                    <strong>{m.title}</strong>
-                    <div style={{fontSize:'11px', color:'#666'}}>{m.category} | {new Date(m.end_date).toLocaleString()}</div>
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <div>
+                      <strong>{m.title}</strong>
+                      <div style={{fontSize:'11px', color:'#666'}}>{m.category} | ⏰ {new Date(m.end_date).toLocaleString()}</div>
+                    </div>
+                    <div>
+                      <button onClick={() => { setEditingId(m.id); setEditForm({...m, end_date: new Date(m.end_date).toISOString().slice(0,16)}); }} style={{marginRight:'5px'}}>編集</button>
+                      <button onClick={() => { if(confirm('削除？')) supabase.from('markets').delete().eq('id', m.id).then(()=>fetchData()) }} style={{color:'red'}}>削除</button>
+                    </div>
                   </div>
-                  <button onClick={() => { setEditingId(m.id); setEditForm({...m, end_date: new Date(m.end_date).toISOString().slice(0,16)}); }} style={{...s.btn, padding: '5px 10px'}}>編集</button>
-                </div>
+                  {!m.is_resolved && (
+                    <div style={{marginTop:'10px', display:'flex', gap:'5px', flexWrap:'wrap'}}>
+                      {m.market_options.map((opt: any) => (
+                        <button key={opt.id} onClick={() => handleResolve(m.id, opt.id)} style={{fontSize:'11px'}}>「{opt.name}」で確定</button>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           ))}
@@ -226,48 +293,24 @@ export default function Admin() {
 
       {activeTab === 'categories' && (
         <section style={s.section}>
-          <h3>📁 カテゴリ設定（名称編集・順序変更）</h3>
+          <h3>📁 カテゴリ・順序設定</h3>
           <div style={{ display: 'flex', gap: '5px', marginBottom: '15px' }}>
-            <input placeholder="新カテゴリ名" value={newCategory.name} onChange={e => setNewCategory({...newCategory, name: e.target.value})} style={s.inp} />
+            <input placeholder="名前" value={newCategory.name} onChange={e => setNewCategory({...newCategory, name: e.target.value})} style={s.inp} />
             <input placeholder="順序" type="number" value={newCategory.display_order} onChange={e => setNewCategory({...newCategory, display_order: Number(e.target.value)})} style={{...s.inp, width:'60px'}} />
             <button onClick={() => { supabase.from('categories').insert([newCategory]).then(()=>fetchData()); setNewCategory({name:'', icon:'', display_order:0}); }} style={s.btn}>追加</button>
           </div>
-
-          <div style={{ background: '#fff', borderRadius: '8px', border: '1px solid #eee' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-              <thead><tr style={{ background: '#f1f5f9', textAlign: 'left' }}><th style={{ padding: '10px' }}>表示順</th><th>アイコン</th><th>カテゴリー名</th><th>操作</th></tr></thead>
-              <tbody>
-                {categories.map(c => (
-                  <tr key={c.id} style={{ borderBottom: '1px solid #eee' }}>
-                    <td style={{ padding: '10px' }}>
-                      <input type="number" defaultValue={c.display_order} onBlur={e => handleUpdateCategory(c.id, { display_order: Number(e.target.value) })} style={{ width: '40px' }} />
-                    </td>
-                    <td>
-                      <input defaultValue={c.icon} onBlur={e => handleUpdateCategory(c.id, { icon: e.target.value })} style={{ width: '30px', border: 'none' }} />
-                    </td>
-                    <td>
-                      <input defaultValue={c.name} onBlur={e => handleUpdateCategory(c.id, { name: e.target.value })} style={{ border: 'none', width: '100%' }} />
-                    </td>
-                    <td>
-                      <button onClick={() => { if(confirm('削除？')) supabase.from('categories').delete().eq('id', c.id).then(()=>fetchData()) }} style={{ color: 'red', border: 'none', background: 'none', cursor: 'pointer' }}>削除</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {/* ユーザー管理・サイト設定は前回機能を維持 */}
-      {activeTab === 'config' && (
-        <section style={s.section}>
-          <h3>📢 サイト基本設定</h3>
-          <div style={{ display: 'grid', gap: '10px' }}>
-            <input value={siteConfig.site_title} onChange={e => setSiteConfig({...siteConfig, site_title: e.target.value})} placeholder="サイト名" style={s.inp} />
-            <textarea value={siteConfig.admin_message} onChange={e => setSiteConfig({...siteConfig, admin_message: e.target.value})} placeholder="通信欄" style={{...s.inp, height: '60px'}} />
-            <button onClick={handleUpdateConfig} style={{...s.btn, background: '#10b981'}}>設定を保存</button>
-          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <thead><tr style={{ background: '#f1f5f9', textAlign: 'left' }}><th style={{ padding: '10px' }}>順序</th><th>名</th><th>操作</th></tr></thead>
+            <tbody>
+              {categories.map(c => (
+                <tr key={c.id} style={{ borderBottom: '1px solid #eee' }}>
+                  <td><input type="number" defaultValue={c.display_order} onBlur={e => handleUpdateCategory(c.id, { display_order: Number(e.target.value) })} style={{ width: '40px' }} /></td>
+                  <td><input defaultValue={c.name} onBlur={e => handleUpdateCategory(c.id, { name: e.target.value })} style={{ border: 'none' }} /></td>
+                  <td><button onClick={() => { if(confirm('削除？')) supabase.from('categories').delete().eq('id', c.id).then(()=>fetchData()) }} style={{ color: 'red', border: 'none', background: 'none' }}>削除</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </section>
       )}
     </div>
