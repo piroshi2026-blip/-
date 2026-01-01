@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 
@@ -17,12 +17,11 @@ export default function Home() {
   const [myBets, setMyBets] = useState<any[]>([])
   const [config, setConfig] = useState<any>({ site_title: 'ヨソる', show_ranking: true, categories: 'すべて' })
 
-  // 認証・編集用
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isSignUp, setIsSignUp] = useState(false)
-  const [newUsername, setNewUsername] = useState('') // 名前編集用
+  const [newUsername, setNewUsername] = useState('')
   const [isEditingName, setIsEditingName] = useState(false)
 
   const [activeCategory, setActiveCategory] = useState('すべて')
@@ -42,6 +41,28 @@ export default function Home() {
     'その他': { icon: '🎲', color: '#6b7280' },
   }
 
+  // データの取得関数を useCallback で包み、警告を回避
+  const fetchMarkets = useCallback(async () => {
+    let query = supabase.from('markets').select('*, market_options(*)')
+    if (sortBy === 'new') query = query.order('created_at', { ascending: false })
+    else if (sortBy === 'deadline') query = query.order('end_date', { ascending: true })
+    else if (sortBy === 'popular') query = query.order('total_pool', { ascending: false })
+    const { data } = await query
+    if (data) setMarkets(data.map((m: any) => ({ ...m, market_options: m.market_options.sort((a: any, b: any) => a.id - b.id) })))
+  }, [sortBy])
+
+  const fetchRanking = useCallback(async () => {
+    const { data } = await supabase.from('profiles').select('*').order('point_balance', { ascending: false }).limit(10)
+    if (data) setRanking(data)
+  }, [])
+
+  const initUserData = useCallback(async (userId: string) => {
+    const { data: p } = await supabase.from('profiles').select('*').eq('id', userId).single()
+    if (p) { setProfile(p); setNewUsername(p.username || ''); }
+    const { data: b } = await supabase.from('bets').select('*, markets(title, is_resolved, result_option_id), market_options(name)').eq('user_id', userId).order('created_at', { ascending: false })
+    if (b) setMyBets(b)
+  }, [])
+
   useEffect(() => {
     const init = async () => {
       const { data: cfg } = await supabase.from('site_config').select('*').single()
@@ -57,50 +78,34 @@ export default function Home() {
       setSession(s); if (s) initUserData(s.user.id);
     })
     init(); return () => authListener.subscription.unsubscribe()
-  }, [sortBy])
+  }, [sortBy, fetchMarkets, fetchRanking, initUserData])
 
-  async function initUserData(userId: string) {
-    const { data: p } = await supabase.from('profiles').select('*').eq('id', userId).single()
-    if (p) { setProfile(p); setNewUsername(p.username || ''); }
-    const { data: b } = await supabase.from('bets').select('*, markets(title, is_resolved, result_option_id), market_options(name)').eq('user_id', userId).order('created_at', { ascending: false })
-    if (b) setMyBets(b)
-  }
-
-  // 名前更新処理
-  async function handleUpdateName() {
+  const handleUpdateName = async () => {
     if (!profile) return
     const { error } = await supabase.from('profiles').update({ username: newUsername }).eq('id', profile.id)
-    if (error) alert('更新に失敗しました')
-    else { alert('名前を更新しました'); setIsEditingName(false); initUserData(profile.id); }
-  }
-
-  async function fetchMarkets() {
-    let query = supabase.from('markets').select('*, market_options(*)')
-    if (sortBy === 'new') query = query.order('created_at', { ascending: false })
-    else if (sortBy === 'deadline') query = query.order('end_date', { ascending: true })
-    else if (sortBy === 'popular') query = query.order('total_pool', { ascending: false })
-    const { data } = await query
-    if (data) setMarkets(data.map((m: any) => ({ ...m, market_options: m.market_options.sort((a: any, b: any) => a.id - b.id) })))
-  }
-
-  async function fetchRanking() {
-    const { data } = await supabase.from('profiles').select('*').order('point_balance', { ascending: false }).limit(10)
-    if (data) setRanking(data)
+    if (error) alert('更新失敗'); else { alert('更新完了'); setIsEditingName(false); initUserData(profile.id); }
   }
 
   const handleVote = async () => {
     if (!session) { setShowAuthModal(true); return; }
-    if (!selectedOptionId) return alert('選択肢を選んでください');
+    if (!selectedOptionId) return alert('選択肢を選んでください')
     const { error } = await supabase.rpc('place_bet', { market_id_input: selectedMarketId, option_id_input: selectedOptionId, amount_input: voteAmount })
     if (!error) { alert('ヨソりました！'); setSelectedMarketId(null); fetchMarkets(); initUserData(session.user.id); }
     else alert(error.message)
+  }
+
+  // ビルドエラーの原因となった関数をコンポーネント内に移動し、型を整理
+  const handleEmailAuth = async () => {
+    const { error } = isSignUp 
+      ? await supabase.auth.signUp({ email, password }) 
+      : await supabase.auth.signInWithPassword({ email, password })
+    if (error) alert(error.message); else setShowAuthModal(false)
   }
 
   const getOdds = (t: number, p: number) => (p === 0 ? 0 : (t / p).toFixed(1))
   const getPercent = (t: number, p: number) => (t === 0 ? 0 : Math.round((p / t) * 100))
   const dynamicCategories = config.categories ? config.categories.split(',').map((c: string) => c.trim()) : ['すべて']
 
-  // スタイル設定
   const s: any = {
     container: { maxWidth: '500px', margin: '0 auto', padding: '10px 10px 80px', fontFamily: 'sans-serif', background: '#fff' },
     title: { fontSize: '24px', fontWeight: '900', textAlign: 'center', margin: '0 0 10px', background: 'linear-gradient(to right, #2563eb, #9333ea)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' },
@@ -115,7 +120,6 @@ export default function Home() {
 
   return (
     <div style={s.container}>
-      {/* 認証モーダル */}
       {showAuthModal && (
         <div style={s.modal as any}>
           <div style={s.modalContent as any}>
@@ -153,7 +157,7 @@ export default function Home() {
             return (
               <div key={m.id} style={s.card}>
                 <div style={{ height: '140px', position: 'relative', background: '#eee' }}>
-                  {m.image_url && <img src={m.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+                  {m.image_url && <img src={m.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
                   <div style={{ position: 'absolute', top: 8, left: 8, background: categoryMeta[m.category]?.color || '#666', color: '#fff', fontSize: '9px', padding: '2px 6px', borderRadius: '4px' }}>{m.category}</div>
                   {active && <div style={{ position: 'absolute', top: 8, right: 8, background: '#fff', color: '#ef4444', fontSize: '9px', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold', border: '1px solid #ef4444' }}>あと{daysLeft}日</div>}
                   <div style={s.imgOverlay}><h2 style={{ fontSize: '15px', margin: 0, textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>{m.title}</h2></div>
@@ -186,7 +190,7 @@ export default function Home() {
                         </div>
                       </div>
                     ) : ( <button onClick={() => setSelectedMarketId(m.id)} style={{ width: '100%', padding: '8px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '13px', marginTop: '6px' }}>ヨソる</button> )
-                  ) : <div style={{ textAlign: 'center', fontSize: '11px', color: '#999', marginTop: '6px' }}>終了</div>}
+                  ) : <div style={{ textAlign: 'center', fontSize: '11px', color: '#999', marginTop: '6px' }}>{m.is_resolved ? '終了（確定）' : '判定中'}</div>}
                 </div>
               </div>
             )
@@ -209,7 +213,6 @@ export default function Home() {
       {activeTab === 'mypage' && (
         <div>
           <div style={{ background: 'linear-gradient(135deg, #1e3a8a, #3b82f6)', color: '#fff', padding: '20px', borderRadius: '12px', textAlign: 'center', marginBottom: '15px' }}>
-            {/* 名前表示・編集エリア */}
             {isEditingName ? (
               <div style={{ display: 'flex', gap: '5px', justifyContent: 'center', marginBottom: '10px' }}>
                 <input value={newUsername} onChange={e => setNewUsername(e.target.value)} style={{ padding: '5px', borderRadius: '4px', border: 'none', color: '#333' }} />
@@ -222,17 +225,16 @@ export default function Home() {
                 <button onClick={() => setIsEditingName(true)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '10px' }}>編集</button>
               </div>
             )}
-            <div style={{ fontSize: '11px', opacity: 0.8 }}>現在の資産</div>
+            <div style={{ fontSize: '11px', opacity: 0.8 }}>資産</div>
             <div style={{ fontSize: '30px', fontWeight: '900' }}>{profile?.point_balance?.toLocaleString()} pt</div>
           </div>
-          <h3 style={{ fontSize: '14px', marginBottom: '10px' }}>📜 履歴</h3>
           {myBets.map(b => (
             <div key={b.id} style={{ padding: '10px', border: '1px solid #eee', borderRadius: '8px', marginBottom: '8px', fontSize: '12px' }}>
               <div style={{ color: '#999', fontSize: '10px' }}>{b.markets.title}</div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', marginTop: '2px' }}>
                 <span>{b.market_options.name} / {b.amount}pt</span>
                 <span style={{ color: b.markets.is_resolved ? (b.markets.result_option_id === b.market_option_id ? '#10b981' : '#ef4444') : '#666' }}>
-                  {b.markets.is_resolved ? (b.markets.result_option_id === b.market_option_id ? '✅的中' : '❌終了') : '判定中'}
+                  {b.markets.is_resolved ? (b.markets.result_option_id === b.market_option_id ? '的中' : '終了') : '判定中'}
                 </span>
               </div>
             </div>
@@ -243,7 +245,7 @@ export default function Home() {
 
       {activeTab === 'info' && (
         <div style={{ fontSize: '12px', padding: '10px' }}>
-          <h3 style={{ borderLeft: '4px solid #3b82f6', paddingLeft: '8px', marginBottom: '8px' }}>遊び方</h3>
+          <h3 style={{ borderLeft: '4px solid #3b82f6', paddingLeft: '8px', marginBottom: '8px' }}>ヨソるの遊び方</h3>
           <p>未来の問いを選び、ポイントを「ヨソる」！的中すれば配当獲得。</p>
           <div style={{ textAlign: 'center', marginTop: '40px' }}><Link href="/admin" style={{ color: '#f0f0f0', textDecoration: 'none' }}>admin</Link></div>
         </div>
@@ -257,10 +259,4 @@ export default function Home() {
       </nav>
     </div>
   )
-}
-
-// 既存のhandleEmailAuth等の補助関数
-async function handleEmailAuth(isSignUp: boolean, email: string, password: string, setShow: Function) {
-  const { error } = isSignUp ? await supabase.auth.signUp({ email, password }) : await supabase.auth.signInWithPassword({ email, password })
-  if (error) alert(error.message); else setShow(false)
 }
