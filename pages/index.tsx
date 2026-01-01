@@ -47,6 +47,7 @@ export default function Home() {
     'その他': { icon: '🎲', color: '#6b7280' },
   }
 
+  // データ取得ロジック
   const fetchMarkets = useCallback(async () => {
     let query = supabase.from('markets').select('*, market_options(*)')
     if (sortBy === 'new') query = query.order('created_at', { ascending: false })
@@ -70,8 +71,10 @@ export default function Home() {
 
   useEffect(() => {
     const init = async () => {
+      // 設定読み込みを最優先
       const { data: cfg } = await supabase.from('site_config').select('*').single()
       if (cfg) setConfig(cfg)
+
       const { data: { session: s } } = await supabase.auth.getSession()
       setSession(s)
       if (s) initUserData(s.user.id)
@@ -85,7 +88,7 @@ export default function Home() {
   const handleUpdateName = async () => {
     if (!profile) return
     const { error } = await supabase.from('profiles').update({ username: newUsername }).eq('id', profile.id)
-    if (error) alert('更新失敗'); else { alert('更新完了'); setIsEditingName(false); initUserData(profile.id); }
+    if (error) alert('失敗'); else { alert('更新'); setIsEditingName(false); initUserData(profile.id); }
   }
 
   const handleVote = async () => {
@@ -103,52 +106,37 @@ export default function Home() {
   const getOdds = (t: number, p: number) => (p === 0 ? 0 : (t / p).toFixed(1))
   const getPercent = (t: number, p: number) => (t === 0 ? 0 : Math.round((p / t) * 100))
 
-  // カテゴリー分割
-  const dynamicCategories = config.categories ? config.categories.split(',').map((c: string) => c.trim()) : ['すべて']
+  // カテゴリーボタン用の配列生成（確実に「すべて」を先頭に）
+  const dynamicCategories = config.categories 
+    ? Array.from(new Set(['すべて', ...config.categories.split(',').map((c: string) => c.trim()).filter((c: string) => c !== '')]))
+    : ['すべて']
 
   const s: any = {
     container: { maxWidth: '500px', margin: '0 auto', padding: '10px 10px 80px', fontFamily: 'sans-serif', background: '#fff' },
     title: { fontSize: '26px', fontWeight: '900', textAlign: 'center', margin: '0', background: 'linear-gradient(to right, #2563eb, #9333ea)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' },
     siteDesc: { fontSize: '11px', color: '#999', textAlign: 'center', marginBottom: '4px' },
-    adminMsg: { fontSize: '11px', background: '#f0f9ff', color: '#0369a1', padding: '6px 10px', borderRadius: '6px', marginBottom: '12px', border: '1px solid #bae6fd', textAlign: 'center' },
-    // カテゴリー：6個×2行を想定したグリッド
+    adminMsg: { fontSize: '11px', background: '#f0f9ff', color: '#0369a1', padding: '6px 10px', borderRadius: '6px', marginBottom: '10px', border: '1px solid #bae6fd', textAlign: 'center' },
+    // カテゴリー：6列グリッド
     catGrid: { display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '3px', marginBottom: '10px' },
-    catBtn: (active: boolean) => ({ padding: '5px 0', borderRadius: '4px', border: '1px solid #eee', background: active ? '#1f2937' : '#fff', color: active ? '#fff' : '#666', fontSize: '9px', fontWeight: 'bold', textAlign: 'center' }),
+    catBtn: (active: boolean) => ({ padding: '5px 0', borderRadius: '4px', border: '1px solid #eee', background: active ? '#1f2937' : '#fff', color: active ? '#fff' : '#666', fontSize: '9px', fontWeight: 'bold', overflow: 'hidden' }),
     card: { borderRadius: '12px', marginBottom: '12px', border: '1px solid #eee', overflow: 'hidden', position: 'relative' },
     imgOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: '8px', background: 'linear-gradient(to top, rgba(0,0,0,0.85), transparent)', color: '#fff' },
     desc: { fontSize: '10px', color: '#555', background: '#f8f8f8', padding: '3px 6px', borderRadius: '4px', margin: '2px 0', lineHeight: '1.3' },
-    modal: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' },
-    modalContent: { background: 'white', padding: '20px', borderRadius: '16px', width: '100%', maxWidth: '400px', textAlign: 'center' }
+    nav: { position: 'fixed', bottom: 0, left: 0, right: 0, background: '#fff', display: 'flex', justifyContent: 'space-around', padding: '8px 0', borderTop: '1px solid #eee', zIndex: 100 }
   }
 
   return (
     <div style={s.container}>
-      {showAuthModal && (
-        <div style={s.modal as any}>
-          <div style={s.modalContent as any}>
-            <h2 style={{ fontSize: '18px', marginBottom: '15px' }}>ヨソるを開始</h2>
-            <button onClick={() => supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } })} style={{ width: '100%', padding: '12px', marginBottom: '10px', borderRadius: '8px', border: '1px solid #ddd', background: '#fff', fontWeight: 'bold' }}>Googleで続ける</button>
-            <input type="email" placeholder="メール" value={email} onChange={e => setEmail(e.target.value)} style={{ width: '100%', padding: '10px', marginBottom: '8px', borderRadius: '6px', border: '1px solid #ddd' }} />
-            <input type="password" placeholder="パス" value={password} onChange={e => setPassword(e.target.value)} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '6px', border: '1px solid #ddd' }} />
-            <button onClick={handleEmailAuth} style={{ width: '100%', padding: '12px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>{isSignUp ? '登録' : 'ログイン'}</button>
-            <button onClick={() => setIsSignUp(!isSignUp)} style={{ background: 'none', border: 'none', color: '#3b82f6', fontSize: '11px', marginTop: '10px' }}>切替</button>
-            <button onClick={() => { supabase.auth.signInAnonymously(); setShowAuthModal(false); }} style={{ display: 'block', margin: '15px auto', fontSize: '11px', color: '#999' }}>匿名ログイン</button>
-            <button onClick={() => setShowAuthModal(false)} style={{ color: '#666', border: 'none', background: 'none' }}>閉じる</button>
-          </div>
-        </div>
-      )}
-
       <header>
         <h1 style={s.title}>{config.site_title}</h1>
         <div style={s.siteDesc}>{config.site_description}</div>
 
-        {/* ホームタブ選択時のみ表示されるUI群 */}
         {activeTab === 'home' && (
           <>
-            {/* メッセージ欄（通信欄）の復活 */}
+            {/* メッセージ欄（通信欄） */}
             {config.admin_message && <div style={s.adminMsg}>{config.admin_message}</div>}
 
-            {/* カテゴリー：6列グリッドで2行表示に対応 */}
+            {/* カテゴリー表示 */}
             <div style={s.catGrid}>
               {dynamicCategories.map(c => (
                 <button key={c} onClick={() => setActiveCategory(c)} style={s.catBtn(activeCategory === c)}>
@@ -208,7 +196,7 @@ export default function Home() {
                         </div>
                       </div>
                     ) : ( <button onClick={() => setSelectedMarketId(m.id)} style={{ width: '100%', padding: '8px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '13px', marginTop: '4px' }}>ヨソる</button> )
-                  ) : <div style={{ textAlign: 'center', fontSize: '11px', color: '#999', marginTop: '4px' }}>終了</div>}
+                  ) : <div style={{ textAlign: 'center', fontSize: '11px', color: '#999', marginTop: '4px' }}>判定中</div>}
                 </div>
               </div>
             )
@@ -216,6 +204,7 @@ export default function Home() {
         </div>
       )}
 
+      {/* --- 以降、ランキング・マイペ・ガイド・ナビ等のコード（規約等含む）は前回と同一 --- */}
       {activeTab === 'ranking' && (
         <div style={{ border: '1px solid #eee', borderRadius: '12px' }}>
           {ranking.map((u, i) => (
@@ -282,7 +271,7 @@ export default function Home() {
         </div>
       )}
 
-      <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: '#fff', display: 'flex', justifyContent: 'space-around', padding: '8px 0', borderTop: '1px solid #eee', zIndex: 100 }}>
+      <nav style={s.nav}>
         <button onClick={() => setActiveTab('home')} style={{ background: 'none', border: 'none', fontSize: '10px', color: activeTab === 'home' ? '#3b82f6' : '#999' }}>🏠<br/>ホーム</button>
         {config.show_ranking && <button onClick={() => setActiveTab('ranking')} style={{ background: 'none', border: 'none', fontSize: '10px', color: activeTab === 'ranking' ? '#3b82f6' : '#999' }}>👑<br/>ランク</button>}
         <button onClick={() => { if(!session) setShowAuthModal(true); else setActiveTab('mypage') }} style={{ background: 'none', border: 'none', fontSize: '10px', color: activeTab === 'mypage' ? '#3b82f6' : '#9ca3af' }}>👤<br/>マイペ</button>
