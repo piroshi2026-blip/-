@@ -15,13 +15,12 @@ export default function Home() {
   const [markets, setMarkets] = useState<any[]>([])
   const [ranking, setRanking] = useState<any[]>([])
   const [myBets, setMyBets] = useState<any[]>([])
-  // 管理画面連動の設定
   const [config, setConfig] = useState<any>({ 
     site_title: 'ヨソる', 
     site_description: '未来をヨソる予測市場',
-    admin_message: 'ようこそ！新しい問いを追加しました。',
+    admin_message: '',
     show_ranking: true, 
-    categories: 'すべて,こども,エンタメ,スポーツ' 
+    categories: 'すべて' 
   })
 
   const [showAuthModal, setShowAuthModal] = useState(false)
@@ -58,7 +57,13 @@ export default function Home() {
   }, [sortBy])
 
   const fetchRanking = useCallback(async () => {
-    const { data } = await supabase.from('profiles').select('*').order('point_balance', { ascending: false }).limit(20)
+    // 管理画面で「隠す」に設定されたユーザー(is_hidden_from_ranking)を除外して取得
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('is_hidden_from_ranking', false)
+      .order('point_balance', { ascending: false })
+      .limit(20)
     if (data) setRanking(data)
   }, [])
 
@@ -71,7 +76,6 @@ export default function Home() {
 
   useEffect(() => {
     const init = async () => {
-      // 管理画面からの設定を読み込み
       const { data: cfg } = await supabase.from('site_config').select('*').single()
       if (cfg) setConfig(cfg)
 
@@ -82,10 +86,7 @@ export default function Home() {
       fetchRanking()
       setIsLoading(false)
     }
-    const { data: authListener } = supabase.auth.onAuthStateChange((_, s) => {
-      setSession(s); if (s) initUserData(s.user.id);
-    })
-    init(); return () => authListener.subscription.unsubscribe()
+    init()
   }, [sortBy, fetchMarkets, fetchRanking, initUserData])
 
   const handleUpdateName = async () => {
@@ -109,6 +110,8 @@ export default function Home() {
 
   const getOdds = (t: number, p: number) => (p === 0 ? 0 : (t / p).toFixed(1))
   const getPercent = (t: number, p: number) => (t === 0 ? 0 : Math.round((p / t) * 100))
+
+  // 管理画面で設定したカテゴリーをすべて取得し、2行で表示するための配列
   const dynamicCategories = config.categories ? config.categories.split(',').map((c: string) => c.trim()) : ['すべて']
 
   const s: any = {
@@ -116,8 +119,9 @@ export default function Home() {
     title: { fontSize: '26px', fontWeight: '900', textAlign: 'center', margin: '0', background: 'linear-gradient(to right, #2563eb, #9333ea)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' },
     siteDesc: { fontSize: '11px', color: '#999', textAlign: 'center', marginBottom: '8px' },
     adminMsg: { fontSize: '12px', background: '#eff6ff', color: '#1e40af', padding: '8px 12px', borderRadius: '8px', marginBottom: '15px', border: '1px solid #bfdbfe' },
-    catGrid: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px', marginBottom: '10px' },
-    catBtn: (active: boolean) => ({ padding: '6px 0', borderRadius: '4px', border: '1px solid #eee', background: active ? '#1f2937' : '#fff', color: active ? '#fff' : '#666', fontSize: '10px', fontWeight: 'bold' }),
+    // カテゴリーボタンを2行以上で並べる設定
+    catGrid: { display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '10px', justifyContent: 'center' },
+    catBtn: (active: boolean) => ({ padding: '6px 8px', borderRadius: '4px', border: '1px solid #eee', background: active ? '#1f2937' : '#fff', color: active ? '#fff' : '#666', fontSize: '10px', fontWeight: 'bold', minWidth: 'calc(25% - 4px)' }),
     card: { borderRadius: '12px', marginBottom: '12px', border: '1px solid #eee', overflow: 'hidden', position: 'relative' },
     imgOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: '10px', background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)', color: '#fff' },
     desc: { fontSize: '10px', color: '#666', background: '#f9f9f9', padding: '4px 8px', borderRadius: '4px', margin: '2px 0' },
@@ -127,7 +131,6 @@ export default function Home() {
 
   return (
     <div style={s.container}>
-      {/* 認証モーダル */}
       {showAuthModal && (
         <div style={s.modal as any}>
           <div style={s.modalContent as any}>
@@ -147,12 +150,15 @@ export default function Home() {
         <h1 style={s.title}>{config.site_title}</h1>
         <div style={s.siteDesc}>{config.site_description}</div>
 
-        {/* ホーム画面限定のUI */}
         {activeTab === 'home' && (
           <>
             {config.admin_message && <div style={s.adminMsg}>{config.admin_message}</div>}
             <div style={s.catGrid}>
-              {dynamicCategories.map(c => <button key={c} onClick={() => setActiveCategory(c)} style={s.catBtn(activeCategory === c)}>{c}</button>)}
+              {dynamicCategories.map(c => (
+                <button key={c} onClick={() => setActiveCategory(c)} style={s.catBtn(activeCategory === c)}>
+                  {c}
+                </button>
+              ))}
             </div>
             <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '12px' }}>
               {['new', 'deadline', 'popular'].map(type => (
