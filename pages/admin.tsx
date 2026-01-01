@@ -8,12 +8,15 @@ const supabase = createClient(
 )
 
 export default function Admin() {
-  const [activeTab, setActiveTab] = useState<'markets' | 'categories' | 'users'>('markets')
-  const [marketSort, setMarketSort] = useState<'date' | 'category'>('date') // ソート用
+  const [activeTab, setActiveTab] = useState<'markets' | 'categories' | 'users' | 'config'>('markets')
+  const [marketSort, setMarketSort] = useState<'date' | 'category'>('date')
   const [markets, setMarkets] = useState<any[]>([])
   const [categories, setCategories] = useState<any[]>([])
   const [users, setUsers] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
+
+  // サイト設定用のState
+  const [siteConfig, setSiteConfig] = useState<any>({ id: null, site_title: '', admin_message: '', site_description: '', show_ranking: true })
 
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editForm, setEditForm] = useState<any>({})
@@ -24,13 +27,17 @@ export default function Admin() {
 
   useEffect(() => {
     fetchData()
-  }, [marketSort]) // ソート変更時に再取得
+    fetchConfig()
+  }, [marketSort])
+
+  async function fetchConfig() {
+    const { data } = await supabase.from('site_config').select('*').single()
+    if (data) setSiteConfig(data)
+  }
 
   async function fetchData() {
     setIsLoading(true)
     let mQuery = supabase.from('markets').select('*, market_options(*)')
-
-    // ソート条件の切り替え
     if (marketSort === 'date') mQuery = mQuery.order('end_date', { ascending: true })
     else mQuery = mQuery.order('category', { ascending: true })
 
@@ -45,7 +52,19 @@ export default function Admin() {
     setIsLoading(false)
   }
 
-  // --- (uploadImageなどは既存のまま維持) ---
+  // サイト設定の保存
+  async function handleUpdateConfig() {
+    const { error } = await supabase.from('site_config').update({
+      site_title: siteConfig.site_title,
+      site_description: siteConfig.site_description,
+      admin_message: siteConfig.admin_message,
+      show_ranking: siteConfig.show_ranking
+    }).eq('id', siteConfig.id)
+
+    if (!error) alert('サイト設定を保存しました。ホーム画面に反映されます。')
+    else alert('保存エラー: ' + error.message)
+  }
+
   async function uploadImage(e: any, isEdit: boolean = false) {
     try {
       setUploading(true)
@@ -67,7 +86,7 @@ export default function Admin() {
     const { error } = await supabase.rpc('create_market_with_options', {
       title_input: newMarket.title, 
       category_input: newMarket.category,
-      end_date_input: new Date(newMarket.end_date).toISOString(), // 型変換
+      end_date_input: new Date(newMarket.end_date).toISOString(),
       description_input: newMarket.description,
       image_url_input: newMarket.image_url, 
       options_input: optArray
@@ -76,10 +95,15 @@ export default function Admin() {
   }
 
   async function handleUpdateMarket() {
+    // 修正：カテゴリーの更新も含める
     await supabase.from('markets').update({
-      title: editForm.title, description: editForm.description, category: editForm.category,
-      end_date: new Date(editForm.end_date).toISOString(), image_url: editForm.image_url
+      title: editForm.title, 
+      description: editForm.description, 
+      category: editForm.category,
+      end_date: new Date(editForm.end_date).toISOString(), 
+      image_url: editForm.image_url
     }).eq('id', editingId)
+
     for (const opt of editForm.market_options) {
       await supabase.from('market_options').update({ name: opt.name }).eq('id', opt.id)
     }
@@ -114,8 +138,34 @@ export default function Admin() {
       <div style={{ display: 'flex', gap: '5px', marginBottom: '20px' }}>
         <button onClick={() => setActiveTab('markets')} style={tabStyle(activeTab === 'markets')}>問い管理</button>
         <button onClick={() => setActiveTab('categories')} style={tabStyle(activeTab === 'categories')}>カテゴリ設定</button>
-        <button onClick={() => setActiveTab('users')} style={tabStyle(activeTab === 'users')}>ランキング・ユーザー</button>
+        <button onClick={() => setActiveTab('users')} style={tabStyle(activeTab === 'users')}>ユーザー管理</button>
+        <button onClick={() => setActiveTab('config')} style={tabStyle(activeTab === 'config')}>サイト設定</button>
       </div>
+
+      {activeTab === 'config' && (
+        <section style={sectionStyle}>
+          <h3>📢 サイト基本設定・通信欄</h3>
+          <div style={{ display: 'grid', gap: '10px' }}>
+            <div>
+              <label style={{fontSize:'12px', fontWeight:'bold'}}>サイトタイトル</label>
+              <input value={siteConfig.site_title} onChange={e => setSiteConfig({...siteConfig, site_title: e.target.value})} style={inpStyle} />
+            </div>
+            <div>
+              <label style={{fontSize:'12px', fontWeight:'bold'}}>一口説明文</label>
+              <input value={siteConfig.site_description} onChange={e => setSiteConfig({...siteConfig, site_description: e.target.value})} style={inpStyle} />
+            </div>
+            <div>
+              <label style={{fontSize:'12px', fontWeight:'bold'}}>通信欄 (ホーム画面に表示されるメッセージ)</label>
+              <textarea value={siteConfig.admin_message} onChange={e => setSiteConfig({...siteConfig, admin_message: e.target.value})} style={{...inpStyle, height:'80px'}} />
+            </div>
+            <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
+              <input type="checkbox" checked={siteConfig.show_ranking} onChange={e => setSiteConfig({...siteConfig, show_ranking: e.target.checked})} />
+              <label style={{fontSize:'12px'}}>ランキング機能を表示する</label>
+            </div>
+            <button onClick={handleUpdateConfig} style={{...btnPrimary, background:'#10b981'}}>設定を保存する</button>
+          </div>
+        </section>
+      )}
 
       {activeTab === 'markets' && (
         <>
@@ -139,7 +189,6 @@ export default function Admin() {
             </div>
           </section>
 
-          {/* 問いのソートタブ */}
           <div style={{display:'flex', gap:'10px', marginBottom:'15px'}}>
             <button onClick={()=>setMarketSort('date')} style={sortTabStyle(marketSort==='date')}>📅 締切順</button>
             <button onClick={()=>setMarketSort('category')} style={sortTabStyle(marketSort==='category')}>📁 カテゴリ順</button>
@@ -151,7 +200,12 @@ export default function Admin() {
                 <div style={{ display: 'grid', gap: '10px' }}>
                   <input value={editForm.title} onChange={e => setEditForm({...editForm, title: e.target.value})} style={inpStyle} />
                   <textarea value={editForm.description} onChange={e => setEditForm({...editForm, description: e.target.value})} style={inpStyle} />
-                  <input type="datetime-local" value={editForm.end_date} onChange={e => setEditForm({...editForm, end_date: e.target.value})} style={inpStyle} />
+                  <div style={{display:'flex', gap:'10px'}}>
+                    <select value={editForm.category} onChange={e => setEditForm({...editForm, category: e.target.value})} style={{...inpStyle, flex:1}}>
+                      {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                    </select>
+                    <input type="datetime-local" value={editForm.end_date} onChange={e => setEditForm({...editForm, end_date: e.target.value})} style={{...inpStyle, flex:1}} />
+                  </div>
                   <input type="file" accept="image/*" onChange={(e) => uploadImage(e, true)} />
                   <div style={{display:'flex', gap:'10px'}}>
                     <button onClick={handleUpdateMarket} style={btnSave}>保存</button>
@@ -168,7 +222,7 @@ export default function Admin() {
                     </div>
                     <div>
                       <button onClick={() => { setEditingId(m.id); setEditForm({...m, end_date: new Date(m.end_date).toISOString().slice(0,16)}); }} style={btnEdit}>編集</button>
-                      <button onClick={() => { if(confirm('完全に削除しますか？')) supabase.from('markets').delete().eq('id', m.id).then(()=>fetchData()) }} style={{...btnEdit, color:'red'}}>削除</button>
+                      <button onClick={() => { if(confirm('削除？')) supabase.from('markets').delete().eq('id', m.id).then(()=>fetchData()) }} style={{...btnEdit, color:'red'}}>削除</button>
                     </div>
                   </div>
                   {!m.is_resolved && (
@@ -178,7 +232,6 @@ export default function Admin() {
                       ))}
                     </div>
                   )}
-                  {m.is_resolved && <div style={{marginTop:'10px', background:'#f0fdf4', color:'#16a34a', fontSize:'11px', padding:'4px 8px', borderRadius:'4px', display:'inline-block', fontWeight:'bold'}}>✅ 確定済み</div>}
                 </>
               )}
             </div>
@@ -226,7 +279,7 @@ export default function Admin() {
                   <button onClick={() => supabase.from('profiles').update({ is_hidden_from_ranking: !u.is_hidden_from_ranking }).eq('id', u.id).then(()=>fetchData())} style={{background: u.is_hidden_from_ranking ? '#10b981' : '#f59e0b', color:'white', border:'none', padding:'4px 8px', borderRadius:'4px', marginRight:'5px', cursor:'pointer', fontSize:'10px'}}>
                     {u.is_hidden_from_ranking ? '戻す' : '隠す'}
                   </button>
-                  <button onClick={() => { if(confirm('このユーザーを削除しますか？')) supabase.from('profiles').delete().eq('id', u.id).then(()=>fetchData()) }} style={{background:'#ef4444', color:'white', border:'none', padding:'4px 8px', borderRadius:'4px', cursor:'pointer', fontSize:'10px'}}>削除</button>
+                  <button onClick={() => { if(confirm('削除？')) supabase.from('profiles').delete().eq('id', u.id).then(()=>fetchData()) }} style={{background:'#ef4444', color:'white', border:'none', padding:'4px 8px', borderRadius:'4px', cursor:'pointer', fontSize:'10px'}}>削除</button>
                 </td>
               </tr>
             ))}
@@ -241,9 +294,9 @@ const tabStyle = (active: boolean) => ({ flex: 1, padding: '10px', background: a
 const sortTabStyle = (active: boolean) => ({ padding: '6px 12px', background: active ? '#3b82f6' : 'white', color: active ? 'white' : '#666', border: '1px solid #ddd', borderRadius: '20px', fontSize: '11px', cursor: 'pointer', fontWeight: 'bold' });
 const sectionStyle = { background: '#f8fafc', padding: '15px', borderRadius: '12px', marginBottom: '20px', border: '1px solid #e2e8f0' };
 const cardStyle = { border: '1px solid #f1f5f9', padding: '15px', borderRadius: '10px', marginBottom: '10px', background: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' };
-const inpStyle = { padding: '8px', border: '1px solid #ddd', borderRadius: '6px', fontSize:'13px' };
-const btnPrimary = { background: '#1f2937', color: 'white', padding: '12px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' };
+const inpStyle = { padding: '8px', border: '1px solid #ddd', borderRadius: '6px', fontSize:'13px', width: '100%', boxSizing: 'border-box' as const };
+const btnPrimary = { background: '#1f2937', color: 'white', padding: '12px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' as const };
 const btnEdit = { background: '#f1f5f9', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', marginRight: '5px', fontSize:'11px' };
-const btnSave = { flex: 1, background: '#10b981', color: 'white', padding: '10px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight:'bold' };
+const btnSave = { flex: 1, background: '#10b981', color: 'white', padding: '10px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight:'bold' as const };
 const btnCancel = { flex: 1, background: '#94a3b8', color: 'white', padding: '10px', border: 'none', borderRadius: '6px', cursor: 'pointer' };
-const btnResolve = { background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1d4ed8', padding: '6px 10px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', fontWeight:'bold' };
+const btnResolve = { background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1d4ed8', padding: '6px 10px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', fontWeight:'bold' as const };
