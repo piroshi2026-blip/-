@@ -15,7 +15,7 @@ export default function Home() {
   const [markets, setMarkets] = useState<any[]>([])
   const [ranking, setRanking] = useState<any[]>([])
   const [myBets, setMyBets] = useState<any[]>([])
-  const [dbCategories, setDbCategories] = useState<any[]>([{ name: 'すべて' }]) // 初期値
+  const [dbCategories, setDbCategories] = useState<any[]>([{ name: 'すべて' }])
 
   const [config, setConfig] = useState<any>({ 
     site_title: 'ヨソる', 
@@ -71,7 +71,6 @@ export default function Home() {
 
   useEffect(() => {
     const init = async () => {
-      // 1. 設定とカテゴリーをDBから取得（ここを確実に修正）
       const [cfgRes, catRes] = await Promise.all([
         supabase.from('site_config').select('*').single(),
         supabase.from('categories').select('*').order('display_order', { ascending: true })
@@ -122,12 +121,13 @@ export default function Home() {
     title: { fontSize: '26px', fontWeight: '900', textAlign: 'center', margin: '0', background: 'linear-gradient(to right, #2563eb, #9333ea)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' },
     siteDesc: { fontSize: '11px', color: '#999', textAlign: 'center', marginBottom: '4px' },
     adminMsg: { fontSize: '11px', background: '#f0f9ff', color: '#0369a1', padding: '6px 10px', borderRadius: '6px', marginBottom: '10px', border: '1px solid #bae6fd', textAlign: 'center' },
-    // カテゴリー：6列グリッド
     catGrid: { display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '3px', marginBottom: '10px' },
     catBtn: (active: boolean) => ({ padding: '5px 0', borderRadius: '4px', border: '1px solid #eee', background: active ? '#1f2937' : '#fff', color: active ? '#fff' : '#666', fontSize: '9px', fontWeight: 'bold', overflow: 'hidden', whiteSpace: 'nowrap' }),
     card: { borderRadius: '12px', marginBottom: '12px', border: '1px solid #eee', overflow: 'hidden', position: 'relative' },
-    imgOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: '10px', background: 'linear-gradient(to top, rgba(0,0,0,0.85), transparent)', color: '#fff' },
-    desc: { fontSize: '10px', color: '#555', background: '#f8f8f8', padding: '3px 6px', borderRadius: '4px', margin: '2px 0', lineHeight: '1.3' }
+    imgOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: '8px', background: 'linear-gradient(to top, rgba(0,0,0,0.85), transparent)', color: '#fff' },
+    desc: { fontSize: '10px', color: '#555', background: '#f8f8f8', padding: '3px 6px', borderRadius: '4px', margin: '2px 0', lineHeight: '1.3' },
+    modal: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' },
+    modalContent: { background: 'white', padding: '20px', borderRadius: '16px', width: '100%', maxWidth: '400px', textAlign: 'center' }
   }
 
   return (
@@ -153,10 +153,7 @@ export default function Home() {
 
         {activeTab === 'home' && (
           <>
-            {/* メッセージ欄（通信欄） */}
             {config.admin_message && <div style={s.adminMsg}>{config.admin_message}</div>}
-
-            {/* カテゴリー表示（DBから動的に6列生成） */}
             <div style={s.catGrid}>
               {dbCategories.map(c => (
                 <button key={c.name} onClick={() => setActiveCategory(c.name)} style={s.catBtn(activeCategory === c.name)}>
@@ -164,7 +161,6 @@ export default function Home() {
                 </button>
               ))}
             </div>
-
             <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '12px' }}>
               {['new', 'deadline', 'popular'].map(type => (
                 <button key={type} onClick={() => setSortBy(type as any)} style={{ padding: '4px 12px', borderRadius: '15px', border: 'none', background: sortBy === type ? '#3b82f6' : '#eee', color: sortBy === type ? '#fff' : '#666', fontSize: '10px', fontWeight: 'bold' }}>
@@ -259,7 +255,7 @@ export default function Home() {
             <div key={b.id} style={{ padding: '10px', border: '1px solid #eee', borderRadius: '8px', marginBottom: '8px', fontSize: '12px' }}>
               <div style={{ color: '#999', fontSize: '10px' }}>{b.markets.title}</div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', marginTop: '2px' }}>
-                <span>{b.market_options.name} / {b.amount}pt</span>
+                <span>{b.market_option_id ? b.market_options.name : ''} / {b.amount}pt</span>
                 <span style={{ color: b.markets.is_resolved ? (b.markets.result_option_id === b.market_option_id ? '#10b981' : '#ef4444') : '#666' }}>
                   {b.markets.is_resolved ? (b.markets.result_option_id === b.market_option_id ? '的中' : '終了') : '判定中'}
                 </span>
