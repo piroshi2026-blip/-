@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
-import { useRouter } from 'next/router'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -10,20 +9,21 @@ const supabase = createClient(
 )
 
 export default function Home() {
-  const router = useRouter()
   const [activeTab, setActiveTab] = useState<'home' | 'ranking' | 'mypage' | 'info'>('home')
   const [session, setSession] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const [markets, setMarkets] = useState<any[]>([])
   const [ranking, setRanking] = useState<any[]>([])
   const [myBets, setMyBets] = useState<any[]>([])
-  const [debugInfo, setDebugInfo] = useState("")
+  const [config, setConfig] = useState<any>({ site_title: 'ヨソる', show_ranking: true, categories: 'すべて' })
 
-  // ログインフォーム用
+  // 認証・編集用
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isSignUp, setIsSignUp] = useState(false)
+  const [newUsername, setNewUsername] = useState('') // 名前編集用
+  const [isEditingName, setIsEditingName] = useState(false)
 
   const [activeCategory, setActiveCategory] = useState('すべて')
   const [sortBy, setSortBy] = useState<'new' | 'deadline' | 'popular'>('new')
@@ -32,7 +32,6 @@ export default function Home() {
   const [selectedOptionId, setSelectedOptionId] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  const categories = ['すべて', 'こども', '経済・政治', 'エンタメ', 'スポーツ', 'ライフ', 'ゲーム', 'その他']
   const categoryMeta: any = {
     'こども': { icon: '🎒', color: '#f43f5e' },
     '経済・政治': { icon: '🏛️', color: '#3b82f6' },
@@ -43,9 +42,10 @@ export default function Home() {
     'その他': { icon: '🎲', color: '#6b7280' },
   }
 
-  // 認証およびデータ初期化
   useEffect(() => {
-    const initAuth = async () => {
+    const init = async () => {
+      const { data: cfg } = await supabase.from('site_config').select('*').single()
+      if (cfg) setConfig(cfg)
       const { data: { session: s } } = await supabase.auth.getSession()
       setSession(s)
       if (s) initUserData(s.user.id)
@@ -53,21 +53,25 @@ export default function Home() {
       fetchRanking()
       setIsLoading(false)
     }
-
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, currentSession) => {
-      setSession(currentSession)
-      if (currentSession) initUserData(currentSession.user.id)
+    const { data: authListener } = supabase.auth.onAuthStateChange((_, s) => {
+      setSession(s); if (s) initUserData(s.user.id);
     })
-
-    initAuth()
-    return () => authListener.subscription.unsubscribe()
+    init(); return () => authListener.subscription.unsubscribe()
   }, [sortBy])
 
   async function initUserData(userId: string) {
     const { data: p } = await supabase.from('profiles').select('*').eq('id', userId).single()
-    if (p) setProfile(p)
+    if (p) { setProfile(p); setNewUsername(p.username || ''); }
     const { data: b } = await supabase.from('bets').select('*, markets(title, is_resolved, result_option_id), market_options(name)').eq('user_id', userId).order('created_at', { ascending: false })
     if (b) setMyBets(b)
+  }
+
+  // 名前更新処理
+  async function handleUpdateName() {
+    if (!profile) return
+    const { error } = await supabase.from('profiles').update({ username: newUsername }).eq('id', profile.id)
+    if (error) alert('更新に失敗しました')
+    else { alert('名前を更新しました'); setIsEditingName(false); initUserData(profile.id); }
   }
 
   async function fetchMarkets() {
@@ -84,40 +88,19 @@ export default function Home() {
     if (data) setRanking(data)
   }
 
-  // 各種ログイン処理
-  const handleGoogleLogin = async () => {
-    await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } })
-  }
-
-  const handleAnonLogin = async () => {
-    const { error } = await supabase.auth.signInAnonymously()
-    if (error) alert(error.message)
-    else setShowAuthModal(false)
-  }
-
-  const handleEmailAuth = async () => {
-    const { error } = isSignUp 
-      ? await supabase.auth.signUp({ email, password })
-      : await supabase.auth.signInWithPassword({ email, password })
-    if (error) alert(error.message)
-    else { setShowAuthModal(false); alert(isSignUp ? "登録確認メールを送信しました" : "ログインしました") }
-  }
-
   const handleVote = async () => {
     if (!session) { setShowAuthModal(true); return; }
-    const { error } = await supabase.rpc('place_bet', {
-      market_id_input: selectedMarketId,
-      option_id_input: selectedOptionId,
-      amount_input: voteAmount
-    })
+    if (!selectedOptionId) return alert('選択肢を選んでください');
+    const { error } = await supabase.rpc('place_bet', { market_id_input: selectedMarketId, option_id_input: selectedOptionId, amount_input: voteAmount })
     if (!error) { alert('ヨソりました！'); setSelectedMarketId(null); fetchMarkets(); initUserData(session.user.id); }
     else alert(error.message)
   }
 
-  const getOdds = (total: number, pool: number) => (pool === 0 ? 0 : (total / pool).toFixed(1))
-  const getPercent = (total: number, pool: number) => (total === 0 ? 0 : Math.round((pool / total) * 100))
+  const getOdds = (t: number, p: number) => (p === 0 ? 0 : (t / p).toFixed(1))
+  const getPercent = (t: number, p: number) => (t === 0 ? 0 : Math.round((p / t) * 100))
+  const dynamicCategories = config.categories ? config.categories.split(',').map((c: string) => c.trim()) : ['すべて']
 
-  // --- スタイル (凝縮版) ---
+  // スタイル設定
   const s: any = {
     container: { maxWidth: '500px', margin: '0 auto', padding: '10px 10px 80px', fontFamily: 'sans-serif', background: '#fff' },
     title: { fontSize: '24px', fontWeight: '900', textAlign: 'center', margin: '0 0 10px', background: 'linear-gradient(to right, #2563eb, #9333ea)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' },
@@ -125,37 +108,33 @@ export default function Home() {
     catBtn: (active: boolean) => ({ padding: '6px 0', borderRadius: '4px', border: '1px solid #eee', background: active ? '#1f2937' : '#fff', color: active ? '#fff' : '#666', fontSize: '10px', fontWeight: 'bold' }),
     card: { borderRadius: '12px', marginBottom: '12px', border: '1px solid #eee', overflow: 'hidden', position: 'relative' },
     imgOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: '10px', background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)', color: '#fff' },
-    desc: { fontSize: '11px', color: '#555', background: '#f5f5f5', padding: '4px 8px', borderRadius: '4px', margin: '4px 0', border: '1px solid #eee' },
+    desc: { fontSize: '11px', color: '#555', background: '#f5f5f5', padding: '4px 8px', borderRadius: '4px', margin: '4px 0', border: '1px solid #eee', lineHeight: '1.4' },
     modal: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' },
     modalContent: { background: 'white', padding: '20px', borderRadius: '16px', width: '100%', maxWidth: '400px', textAlign: 'center' }
   }
 
   return (
     <div style={s.container}>
-      {/* ログインモーダル */}
+      {/* 認証モーダル */}
       {showAuthModal && (
         <div style={s.modal as any}>
           <div style={s.modalContent as any}>
-            <h2 style={{ fontSize: '20px', marginBottom: '20px' }}>{isSignUp ? '新規登録' : 'ログイン'}</h2>
-            <button onClick={handleGoogleLogin} style={{ width: '100%', padding: '12px', marginBottom: '10px', borderRadius: '8px', border: '1px solid #ddd', background: '#fff', fontWeight: 'bold' }}>Googleで続ける</button>
-            <div style={{ margin: '15px 0', fontSize: '12px', color: '#999' }}>またはメールアドレスで</div>
-            <input type="email" placeholder="メールアドレス" value={email} onChange={e => setEmail(e.target.value)} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '6px', border: '1px solid #ddd' }} />
-            <input type="password" placeholder="パスワード" value={password} onChange={e => setPassword(e.target.value)} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '6px', border: '1px solid #ddd' }} />
-            <button onClick={handleEmailAuth} style={{ width: '100%', padding: '12px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>{isSignUp ? '登録する' : 'ログインする'}</button>
-            <button onClick={() => setIsSignUp(!isSignUp)} style={{ background: 'none', border: 'none', color: '#3b82f6', fontSize: '12px', marginTop: '10px' }}>{isSignUp ? 'すでにアカウントをお持ちの方' : '新しくアカウントを作る'}</button>
-            <button onClick={handleAnonLogin} style={{ display: 'block', margin: '15px auto 0', color: '#999', fontSize: '11px', border: 'none', background: 'none', textDecoration: 'underline' }}>アカウントなしで試す</button>
-            <button onClick={() => setShowAuthModal(false)} style={{ marginTop: '20px', border: 'none', background: 'none', color: '#666' }}>閉じる</button>
+            <h2 style={{ fontSize: '18px', marginBottom: '15px' }}>ヨソるを開始</h2>
+            <button onClick={() => supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } })} style={{ width: '100%', padding: '12px', marginBottom: '10px', borderRadius: '8px', border: '1px solid #ddd', background: '#fff', fontWeight: 'bold' }}>Googleで続ける</button>
+            <input type="email" placeholder="メール" value={email} onChange={e => setEmail(e.target.value)} style={{ width: '100%', padding: '10px', marginBottom: '8px', borderRadius: '6px', border: '1px solid #ddd' }} />
+            <input type="password" placeholder="パス" value={password} onChange={e => setPassword(e.target.value)} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '6px', border: '1px solid #ddd' }} />
+            <button onClick={handleEmailAuth} style={{ width: '100%', padding: '12px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>{isSignUp ? '登録' : 'ログイン'}</button>
+            <button onClick={() => setIsSignUp(!isSignUp)} style={{ background: 'none', border: 'none', color: '#3b82f6', fontSize: '11px', marginTop: '10px' }}>切替</button>
+            <button onClick={() => { supabase.auth.signInAnonymously(); setShowAuthModal(false); }} style={{ display: 'block', margin: '15px auto', fontSize: '11px', color: '#999' }}>匿名ログイン</button>
+            <button onClick={() => setShowAuthModal(false)} style={{ color: '#666', border: 'none', background: 'none' }}>閉じる</button>
           </div>
         </div>
       )}
 
       <header>
-        <h1 style={s.title}>ヨソる</h1>
-        {!session && (
-          <button onClick={() => setShowAuthModal(true)} style={{ display: 'block', margin: '0 auto 10px', padding: '6px 16px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold' }}>ログイン / 登録</button>
-        )}
+        <h1 style={s.title}>{config.site_title}</h1>
         <div style={s.catGrid}>
-          {categories.map(c => <button key={c} onClick={() => setActiveCategory(c)} style={s.catBtn(activeCategory === c)}>{c}</button>)}
+          {dynamicCategories.map(c => <button key={c} onClick={() => setActiveCategory(c)} style={s.catBtn(activeCategory === c)}>{c}</button>)}
         </div>
         <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '12px' }}>
           {['new', 'deadline', 'popular'].map(type => (
@@ -177,22 +156,20 @@ export default function Home() {
                   {m.image_url && <img src={m.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
                   <div style={{ position: 'absolute', top: 8, left: 8, background: categoryMeta[m.category]?.color || '#666', color: '#fff', fontSize: '9px', padding: '2px 6px', borderRadius: '4px' }}>{m.category}</div>
                   {active && <div style={{ position: 'absolute', top: 8, right: 8, background: '#fff', color: '#ef4444', fontSize: '9px', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold', border: '1px solid #ef4444' }}>あと{daysLeft}日</div>}
-                  <div style={s.imgOverlay}>
-                    <h2 style={{ fontSize: '15px', margin: 0, textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>{m.title}</h2>
-                  </div>
+                  <div style={s.imgOverlay}><h2 style={{ fontSize: '15px', margin: 0, textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>{m.title}</h2></div>
                 </div>
                 <div style={{ padding: '8px 10px' }}>
                   <div style={s.desc}>{m.description}</div>
                   <div style={{ fontSize: '10px', fontWeight: 'bold', marginBottom: '6px' }}>💰 総額: {m.total_pool.toLocaleString()} pt</div>
                   {m.market_options.map((opt: any, i: number) => {
-                    const pct = getPercent(m.total_pool, opt.pool)
+                    const pct = getPercent(m.total_pool, opt.pool);
                     return (
                       <div key={opt.id} style={{ marginBottom: '4px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 'bold' }}>
                           <span>{m.result_option_id === opt.id ? '👑 ' : ''}{opt.name}</span>
                           <span style={{ color: '#3b82f6' }}>{getOdds(m.total_pool, opt.pool)}倍 ({pct}%)</span>
                         </div>
-                        <div style={{ height: '6px', background: '#eee', borderRadius: '3px', overflow: 'hidden', marginTop: '2px' }}><div style={{ width: `${pct}%`, height: '100%', background: ['#3b82f6', '#ef4444', '#10b981'][i % 3] }} /></div>
+                        <div style={{ height: '6px', background: '#eee', borderRadius: '3px', overflow: 'hidden' }}><div style={{ width: `${pct}%`, height: '100%', background: ['#3b82f6', '#ef4444', '#10b981'][i % 3] }} /></div>
                       </div>
                     )
                   })}
@@ -200,20 +177,16 @@ export default function Home() {
                     selectedMarketId === m.id ? (
                       <div style={{ marginTop: '8px', padding: '8px', background: '#f9fafb', borderRadius: '8px' }}>
                         <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '8px' }}>
-                          {m.market_options.map((o: any) => (
-                            <button key={o.id} onClick={() => setSelectedOptionId(o.id)} style={{ padding: '5px 10px', borderRadius: '15px', border: selectedOptionId === o.id ? '2px solid #3b82f6' : '1px solid #ddd', fontSize: '11px', background: '#fff' }}>{o.name}</button>
-                          ))}
+                          {m.market_options.map((o: any) => (<button key={o.id} onClick={() => setSelectedOptionId(o.id)} style={{ padding: '5px 10px', borderRadius: '15px', border: selectedOptionId === o.id ? '2px solid #3b82f6' : '1px solid #ddd', fontSize: '11px', background: '#fff' }}>{o.name}</button>))}
                         </div>
                         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                           <input type="range" min="10" max={profile?.point_balance || 1000} step="10" value={voteAmount} onChange={e => setVoteAmount(Number(e.target.value))} style={{ flex: 1 }} />
-                          <input type="number" value={voteAmount} onChange={e => setVoteAmount(Number(e.target.value))} style={{ width: '50px', fontSize: '11px', padding: '3px' }} />
+                          <input type="number" value={voteAmount} onChange={e => setVoteAmount(Number(e.target.value))} style={{ width: '50px', fontSize: '11px' }} />
                           <button onClick={handleVote} style={{ background: '#1f2937', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold' }}>確定</button>
                         </div>
                       </div>
-                    ) : (
-                      <button onClick={() => setSelectedMarketId(m.id)} style={{ width: '100%', padding: '8px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '13px', marginTop: '6px' }}>ヨソる</button>
-                    )
-                  ) : <div style={{ textAlign: 'center', fontSize: '11px', color: '#999', marginTop: '6px', fontWeight: 'bold' }}>{m.is_resolved ? '結果確定済み' : '判定待ち'}</div>}
+                    ) : ( <button onClick={() => setSelectedMarketId(m.id)} style={{ width: '100%', padding: '8px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '13px', marginTop: '6px' }}>ヨソる</button> )
+                  ) : <div style={{ textAlign: 'center', fontSize: '11px', color: '#999', marginTop: '6px' }}>終了</div>}
                 </div>
               </div>
             )
@@ -236,9 +209,23 @@ export default function Home() {
       {activeTab === 'mypage' && (
         <div>
           <div style={{ background: 'linear-gradient(135deg, #1e3a8a, #3b82f6)', color: '#fff', padding: '20px', borderRadius: '12px', textAlign: 'center', marginBottom: '15px' }}>
-            <div style={{ fontSize: '11px', opacity: 0.8 }}>資産</div>
+            {/* 名前表示・編集エリア */}
+            {isEditingName ? (
+              <div style={{ display: 'flex', gap: '5px', justifyContent: 'center', marginBottom: '10px' }}>
+                <input value={newUsername} onChange={e => setNewUsername(e.target.value)} style={{ padding: '5px', borderRadius: '4px', border: 'none', color: '#333' }} />
+                <button onClick={handleUpdateName} style={{ background: '#fff', border: 'none', padding: '5px 10px', borderRadius: '4px', fontSize: '12px' }}>保存</button>
+                <button onClick={() => setIsEditingName(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: '12px' }}>取消</button>
+              </div>
+            ) : (
+              <div style={{ marginBottom: '5px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '18px', fontWeight: 'bold' }}>{profile?.username || '名無しさん'}</span>
+                <button onClick={() => setIsEditingName(true)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '10px' }}>編集</button>
+              </div>
+            )}
+            <div style={{ fontSize: '11px', opacity: 0.8 }}>現在の資産</div>
             <div style={{ fontSize: '30px', fontWeight: '900' }}>{profile?.point_balance?.toLocaleString()} pt</div>
           </div>
+          <h3 style={{ fontSize: '14px', marginBottom: '10px' }}>📜 履歴</h3>
           {myBets.map(b => (
             <div key={b.id} style={{ padding: '10px', border: '1px solid #eee', borderRadius: '8px', marginBottom: '8px', fontSize: '12px' }}>
               <div style={{ color: '#999', fontSize: '10px' }}>{b.markets.title}</div>
@@ -256,20 +243,24 @@ export default function Home() {
 
       {activeTab === 'info' && (
         <div style={{ fontSize: '12px', padding: '10px' }}>
-          <h3 style={{ borderLeft: '4px solid #3b82f6', paddingLeft: '8px', marginBottom: '8px' }}>ヨソるの遊び方</h3>
-          <p>1. 未来の問いを選ぶ<br/>2. 予想を立ててポイントを賭ける<br/>3. 当たるとプールから配当をゲット！</p>
-          <h3 style={{ borderLeft: '4px solid #3b82f6', paddingLeft: '8px', margin: '15px 0 8px' }}>規約</h3>
-          <p>換金不可のゲームです。不具合報告は𝕏まで。</p>
+          <h3 style={{ borderLeft: '4px solid #3b82f6', paddingLeft: '8px', marginBottom: '8px' }}>遊び方</h3>
+          <p>未来の問いを選び、ポイントを「ヨソる」！的中すれば配当獲得。</p>
           <div style={{ textAlign: 'center', marginTop: '40px' }}><Link href="/admin" style={{ color: '#f0f0f0', textDecoration: 'none' }}>admin</Link></div>
         </div>
       )}
 
       <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: '#fff', display: 'flex', justifyContent: 'space-around', padding: '8px 0', borderTop: '1px solid #eee', zIndex: 100 }}>
         <button onClick={() => setActiveTab('home')} style={{ background: 'none', border: 'none', fontSize: '10px', color: activeTab === 'home' ? '#3b82f6' : '#999' }}>🏠<br/>ホーム</button>
-        <button onClick={() => setActiveTab('ranking')} style={{ background: 'none', border: 'none', fontSize: '10px', color: activeTab === 'ranking' ? '#3b82f6' : '#999' }}>👑<br/>ランク</button>
+        {config.show_ranking && <button onClick={() => setActiveTab('ranking')} style={{ background: 'none', border: 'none', fontSize: '10px', color: activeTab === 'ranking' ? '#3b82f6' : '#999' }}>👑<br/>ランク</button>}
         <button onClick={() => { if(!session) setShowAuthModal(true); else setActiveTab('mypage') }} style={{ background: 'none', border: 'none', fontSize: '10px', color: activeTab === 'mypage' ? '#3b82f6' : '#9ca3af' }}>👤<br/>マイペ</button>
         <button onClick={() => setActiveTab('info')} style={{ background: 'none', border: 'none', fontSize: '10px', color: activeTab === 'info' ? '#3b82f6' : '#999' }}>📖<br/>ガイド</button>
       </nav>
     </div>
   )
+}
+
+// 既存のhandleEmailAuth等の補助関数
+async function handleEmailAuth(isSignUp: boolean, email: string, password: string, setShow: Function) {
+  const { error } = isSignUp ? await supabase.auth.signUp({ email, password }) : await supabase.auth.signInWithPassword({ email, password })
+  if (error) alert(error.message); else setShow(false)
 }
