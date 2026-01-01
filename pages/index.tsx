@@ -15,7 +15,14 @@ export default function Home() {
   const [markets, setMarkets] = useState<any[]>([])
   const [ranking, setRanking] = useState<any[]>([])
   const [myBets, setMyBets] = useState<any[]>([])
-  const [config, setConfig] = useState<any>({ site_title: 'ヨソる', show_ranking: true, categories: 'すべて' })
+  // 管理画面連動の設定
+  const [config, setConfig] = useState<any>({ 
+    site_title: 'ヨソる', 
+    site_description: '未来をヨソる予測市場',
+    admin_message: 'ようこそ！新しい問いを追加しました。',
+    show_ranking: true, 
+    categories: 'すべて,こども,エンタメ,スポーツ' 
+  })
 
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [email, setEmail] = useState('')
@@ -41,7 +48,6 @@ export default function Home() {
     'その他': { icon: '🎲', color: '#6b7280' },
   }
 
-  // データの取得関数を useCallback で包み、警告を回避
   const fetchMarkets = useCallback(async () => {
     let query = supabase.from('markets').select('*, market_options(*)')
     if (sortBy === 'new') query = query.order('created_at', { ascending: false })
@@ -52,7 +58,7 @@ export default function Home() {
   }, [sortBy])
 
   const fetchRanking = useCallback(async () => {
-    const { data } = await supabase.from('profiles').select('*').order('point_balance', { ascending: false }).limit(10)
+    const { data } = await supabase.from('profiles').select('*').order('point_balance', { ascending: false }).limit(20)
     if (data) setRanking(data)
   }, [])
 
@@ -65,8 +71,10 @@ export default function Home() {
 
   useEffect(() => {
     const init = async () => {
+      // 管理画面からの設定を読み込み
       const { data: cfg } = await supabase.from('site_config').select('*').single()
       if (cfg) setConfig(cfg)
+
       const { data: { session: s } } = await supabase.auth.getSession()
       setSession(s)
       if (s) initUserData(s.user.id)
@@ -94,11 +102,8 @@ export default function Home() {
     else alert(error.message)
   }
 
-  // ビルドエラーの原因となった関数をコンポーネント内に移動し、型を整理
   const handleEmailAuth = async () => {
-    const { error } = isSignUp 
-      ? await supabase.auth.signUp({ email, password }) 
-      : await supabase.auth.signInWithPassword({ email, password })
+    const { error } = isSignUp ? await supabase.auth.signUp({ email, password }) : await supabase.auth.signInWithPassword({ email, password })
     if (error) alert(error.message); else setShowAuthModal(false)
   }
 
@@ -108,18 +113,21 @@ export default function Home() {
 
   const s: any = {
     container: { maxWidth: '500px', margin: '0 auto', padding: '10px 10px 80px', fontFamily: 'sans-serif', background: '#fff' },
-    title: { fontSize: '24px', fontWeight: '900', textAlign: 'center', margin: '0 0 10px', background: 'linear-gradient(to right, #2563eb, #9333ea)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' },
+    title: { fontSize: '26px', fontWeight: '900', textAlign: 'center', margin: '0', background: 'linear-gradient(to right, #2563eb, #9333ea)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' },
+    siteDesc: { fontSize: '11px', color: '#999', textAlign: 'center', marginBottom: '8px' },
+    adminMsg: { fontSize: '12px', background: '#eff6ff', color: '#1e40af', padding: '8px 12px', borderRadius: '8px', marginBottom: '15px', border: '1px solid #bfdbfe' },
     catGrid: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px', marginBottom: '10px' },
     catBtn: (active: boolean) => ({ padding: '6px 0', borderRadius: '4px', border: '1px solid #eee', background: active ? '#1f2937' : '#fff', color: active ? '#fff' : '#666', fontSize: '10px', fontWeight: 'bold' }),
     card: { borderRadius: '12px', marginBottom: '12px', border: '1px solid #eee', overflow: 'hidden', position: 'relative' },
     imgOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: '10px', background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)', color: '#fff' },
-    desc: { fontSize: '11px', color: '#555', background: '#f5f5f5', padding: '4px 8px', borderRadius: '4px', margin: '4px 0', border: '1px solid #eee', lineHeight: '1.4' },
+    desc: { fontSize: '10px', color: '#666', background: '#f9f9f9', padding: '4px 8px', borderRadius: '4px', margin: '2px 0' },
     modal: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' },
     modalContent: { background: 'white', padding: '20px', borderRadius: '16px', width: '100%', maxWidth: '400px', textAlign: 'center' }
   }
 
   return (
     <div style={s.container}>
+      {/* 認証モーダル */}
       {showAuthModal && (
         <div style={s.modal as any}>
           <div style={s.modalContent as any}>
@@ -137,16 +145,24 @@ export default function Home() {
 
       <header>
         <h1 style={s.title}>{config.site_title}</h1>
-        <div style={s.catGrid}>
-          {dynamicCategories.map(c => <button key={c} onClick={() => setActiveCategory(c)} style={s.catBtn(activeCategory === c)}>{c}</button>)}
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '12px' }}>
-          {['new', 'deadline', 'popular'].map(type => (
-            <button key={type} onClick={() => setSortBy(type as any)} style={{ padding: '4px 12px', borderRadius: '15px', border: 'none', background: sortBy === type ? '#3b82f6' : '#eee', color: sortBy === type ? '#fff' : '#666', fontSize: '10px', fontWeight: 'bold' }}>
-              {type === 'new' ? '✨新着' : type === 'deadline' ? '⏰締切' : '🔥人気'}
-            </button>
-          ))}
-        </div>
+        <div style={s.siteDesc}>{config.site_description}</div>
+
+        {/* ホーム画面限定のUI */}
+        {activeTab === 'home' && (
+          <>
+            {config.admin_message && <div style={s.adminMsg}>{config.admin_message}</div>}
+            <div style={s.catGrid}>
+              {dynamicCategories.map(c => <button key={c} onClick={() => setActiveCategory(c)} style={s.catBtn(activeCategory === c)}>{c}</button>)}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '12px' }}>
+              {['new', 'deadline', 'popular'].map(type => (
+                <button key={type} onClick={() => setSortBy(type as any)} style={{ padding: '4px 12px', borderRadius: '15px', border: 'none', background: sortBy === type ? '#3b82f6' : '#eee', color: sortBy === type ? '#fff' : '#666', fontSize: '10px', fontWeight: 'bold' }}>
+                  {type === 'new' ? '✨新着' : type === 'deadline' ? '⏰締切' : '🔥人気'}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
       </header>
 
       {activeTab === 'home' && (
@@ -162,9 +178,9 @@ export default function Home() {
                   {active && <div style={{ position: 'absolute', top: 8, right: 8, background: '#fff', color: '#ef4444', fontSize: '9px', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold', border: '1px solid #ef4444' }}>あと{daysLeft}日</div>}
                   <div style={s.imgOverlay}><h2 style={{ fontSize: '15px', margin: 0, textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>{m.title}</h2></div>
                 </div>
-                <div style={{ padding: '8px 10px' }}>
+                <div style={{ padding: '6px 10px' }}>
                   <div style={s.desc}>{m.description}</div>
-                  <div style={{ fontSize: '10px', fontWeight: 'bold', marginBottom: '6px' }}>💰 総額: {m.total_pool.toLocaleString()} pt</div>
+                  <div style={{ fontSize: '10px', fontWeight: 'bold', marginBottom: '4px' }}>💰 総額: {m.total_pool.toLocaleString()} pt</div>
                   {m.market_options.map((opt: any, i: number) => {
                     const pct = getPercent(m.total_pool, opt.pool);
                     return (
@@ -173,24 +189,23 @@ export default function Home() {
                           <span>{m.result_option_id === opt.id ? '👑 ' : ''}{opt.name}</span>
                           <span style={{ color: '#3b82f6' }}>{getOdds(m.total_pool, opt.pool)}倍 ({pct}%)</span>
                         </div>
-                        <div style={{ height: '6px', background: '#eee', borderRadius: '3px', overflow: 'hidden' }}><div style={{ width: `${pct}%`, height: '100%', background: ['#3b82f6', '#ef4444', '#10b981'][i % 3] }} /></div>
+                        <div style={{ height: '5px', background: '#eee', borderRadius: '3px', overflow: 'hidden' }}><div style={{ width: `${pct}%`, height: '100%', background: ['#3b82f6', '#ef4444', '#10b981'][i % 3] }} /></div>
                       </div>
                     )
                   })}
                   {active ? (
                     selectedMarketId === m.id ? (
-                      <div style={{ marginTop: '8px', padding: '8px', background: '#f9fafb', borderRadius: '8px' }}>
-                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '8px' }}>
-                          {m.market_options.map((o: any) => (<button key={o.id} onClick={() => setSelectedOptionId(o.id)} style={{ padding: '5px 10px', borderRadius: '15px', border: selectedOptionId === o.id ? '2px solid #3b82f6' : '1px solid #ddd', fontSize: '11px', background: '#fff' }}>{o.name}</button>))}
+                      <div style={{ marginTop: '6px', padding: '6px', background: '#f9fafb', borderRadius: '8px' }}>
+                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '6px' }}>
+                          {m.market_options.map((o: any) => (<button key={o.id} onClick={() => setSelectedOptionId(o.id)} style={{ padding: '4px 8px', borderRadius: '15px', border: selectedOptionId === o.id ? '2px solid #3b82f6' : '1px solid #ddd', fontSize: '10px', background: '#fff' }}>{o.name}</button>))}
                         </div>
                         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                           <input type="range" min="10" max={profile?.point_balance || 1000} step="10" value={voteAmount} onChange={e => setVoteAmount(Number(e.target.value))} style={{ flex: 1 }} />
-                          <input type="number" value={voteAmount} onChange={e => setVoteAmount(Number(e.target.value))} style={{ width: '50px', fontSize: '11px' }} />
-                          <button onClick={handleVote} style={{ background: '#1f2937', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold' }}>確定</button>
+                          <button onClick={handleVote} style={{ background: '#1f2937', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold' }}>確定({voteAmount}pt)</button>
                         </div>
                       </div>
-                    ) : ( <button onClick={() => setSelectedMarketId(m.id)} style={{ width: '100%', padding: '8px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '13px', marginTop: '6px' }}>ヨソる</button> )
-                  ) : <div style={{ textAlign: 'center', fontSize: '11px', color: '#999', marginTop: '6px' }}>{m.is_resolved ? '終了（確定）' : '判定中'}</div>}
+                    ) : ( <button onClick={() => setSelectedMarketId(m.id)} style={{ width: '100%', padding: '8px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '13px', marginTop: '4px' }}>ヨソる</button> )
+                  ) : <div style={{ textAlign: 'center', fontSize: '11px', color: '#999', marginTop: '4px' }}>終了</div>}
                 </div>
               </div>
             )
@@ -201,9 +216,9 @@ export default function Home() {
       {activeTab === 'ranking' && (
         <div style={{ border: '1px solid #eee', borderRadius: '12px' }}>
           {ranking.map((u, i) => (
-            <div key={u.id} style={{ display: 'flex', padding: '10px', borderBottom: '1px solid #eee', fontSize: '13px' }}>
+            <div key={u.id} style={{ display: 'flex', padding: '10px', borderBottom: '1px solid #eee', fontSize: '13px', background: u.id === profile?.id ? '#fffbeb' : '#fff' }}>
               <span style={{ width: '30px', fontWeight: 'bold', color: i < 3 ? '#d97706' : '#999' }}>{i + 1}</span>
-              <span style={{ flex: 1 }}>{u.username || '名無しさん'}</span>
+              <span style={{ flex: 1, fontWeight: u.id === profile?.id ? 'bold' : 'normal' }}>{u.username || '名無しさん'}{u.id === profile?.id && ' (あなた)'}</span>
               <span style={{ fontWeight: 'bold' }}>{u.point_balance.toLocaleString()}pt</span>
             </div>
           ))}
@@ -228,6 +243,7 @@ export default function Home() {
             <div style={{ fontSize: '11px', opacity: 0.8 }}>資産</div>
             <div style={{ fontSize: '30px', fontWeight: '900' }}>{profile?.point_balance?.toLocaleString()} pt</div>
           </div>
+          <h3 style={{ fontSize: '14px', marginBottom: '10px' }}>📜 履歴</h3>
           {myBets.map(b => (
             <div key={b.id} style={{ padding: '10px', border: '1px solid #eee', borderRadius: '8px', marginBottom: '8px', fontSize: '12px' }}>
               <div style={{ color: '#999', fontSize: '10px' }}>{b.markets.title}</div>
@@ -244,9 +260,21 @@ export default function Home() {
       )}
 
       {activeTab === 'info' && (
-        <div style={{ fontSize: '12px', padding: '10px' }}>
-          <h3 style={{ borderLeft: '4px solid #3b82f6', paddingLeft: '8px', marginBottom: '8px' }}>ヨソるの遊び方</h3>
-          <p>未来の問いを選び、ポイントを「ヨソる」！的中すれば配当獲得。</p>
+        <div style={{ fontSize: '12px', padding: '10px', lineHeight: '1.6' }}>
+          <section style={{ marginBottom: '20px' }}>
+            <h3 style={{ borderLeft: '4px solid #3b82f6', paddingLeft: '8px', marginBottom: '8px' }}>ヨソるの遊び方</h3>
+            <p>1. 未来の問いを選ぶ<br/>2. 予想を立ててポイントをヨソる<br/>3. 当たるとプールから配当をゲット！</p>
+          </section>
+
+          <section style={{ marginBottom: '20px' }}>
+            <h3 style={{ borderLeft: '4px solid #3b82f6', paddingLeft: '8px', marginBottom: '8px' }}>利用規約（法的通知）</h3>
+            <div style={{ fontSize: '11px', color: '#666', background: '#f5f5f5', padding: '10px', borderRadius: '8px' }}>
+              <p><strong>1. ポイントの性質</strong><br/>本サービスで使用されるポイントはゲーム内通貨であり、金銭への換金、代替、譲渡は一切できません。景品表示法及び賭博罪に該当しない娯楽用サービスです。</p>
+              <p><strong>2. 禁止事項</strong><br/>複数アカウントの所持、不正なポイント取得、他ユーザーへの誹謗中傷を禁止します。違反時はアカウントを凍結します。</p>
+              <p><strong>3. 免責事項</strong><br/>判定は運営が独自の基準で行います。システム不具合等による損失について、一切の責任を負いません。お問い合わせは𝕏公式アカウントまで。</p>
+            </div>
+          </section>
+
           <div style={{ textAlign: 'center', marginTop: '40px' }}><Link href="/admin" style={{ color: '#f0f0f0', textDecoration: 'none' }}>admin</Link></div>
         </div>
       )}
