@@ -30,7 +30,6 @@ export default function Admin() {
   const [newMarket, setNewMarket] = useState({ title: '', category: '', end_date: '', description: '', image_url: '', options: '' })
   const [newCategory, setNewCategory] = useState({ name: '', icon: '', display_order: 0 })
 
-  // 認証チェック
   useEffect(() => {
     const authStatus = localStorage.getItem('yosoru_admin_auth')
     if (authStatus === 'true') setIsAuthenticated(true)
@@ -74,13 +73,24 @@ export default function Admin() {
 
   useEffect(() => { fetchData() }, [fetchData])
 
-  // --- サイト設定・メッセージ編集 ---
+  // --- 追加機能：問いの削除 ---
+  async function handleDeleteMarket(id: number, title: string) {
+    if (!confirm(`「${title}」を完全に削除しますか？\nこの問いに関連するすべての投票（bets）データも削除されます。この操作は戻せません。`)) return
+
+    const { error } = await supabase.from('markets').delete().eq('id', id)
+    if (error) {
+      alert('削除に失敗しました: ' + error.message)
+    } else {
+      alert('削除完了しました')
+      fetchData()
+    }
+  }
+
   async function handleUpdateConfig() {
     await supabase.from('site_config').update(siteConfig).eq('id', siteConfig.id)
     alert('設定を保存しました')
   }
 
-  // --- カテゴリー管理（追加・編集・順序変更） ---
   async function handleUpdateCategory(id: number, updates: any) {
     await supabase.from('categories').update(updates).eq('id', id)
     fetchData()
@@ -93,7 +103,6 @@ export default function Admin() {
     fetchData()
   }
 
-  // --- 画像アップロード ---
   async function uploadImage(e: any, isEdit: boolean) {
     setUploading(true)
     const file = e.target.files[0]
@@ -108,7 +117,6 @@ export default function Admin() {
     setUploading(false)
   }
 
-  // --- 問いの作成・編集・配当確定 ---
   async function handleCreateMarket() {
     const optArray = newMarket.options.split(',').map(s => s.trim())
     const { error } = await supabase.rpc('create_market_with_options', {
@@ -167,19 +175,6 @@ export default function Admin() {
         <button onClick={() => setActiveTab('config')} style={s.tab(activeTab === 'config')}>サイト設定</button>
       </div>
 
-      {activeTab === 'config' && (
-        <section style={{ background: '#f8fafc', padding: '24px', borderRadius: '16px', border:'1px solid #e2e8f0' }}>
-          <h3 style={{marginTop:0, fontWeight:'900'}}>📢 サイト基本情報・メッセージ編集</h3>
-          <div style={{display:'grid', gap:'15px'}}>
-            <div><label style={{fontSize:'12px', fontWeight:'bold'}}>サイトタイトル</label><input value={siteConfig.site_title} onChange={e => setSiteConfig({...siteConfig, site_title: e.target.value})} style={s.inp} /></div>
-            <div><label style={{fontSize:'12px', fontWeight:'bold'}}>タイトル下の説明文</label><input value={siteConfig.site_description} onChange={e => setSiteConfig({...siteConfig, site_description: e.target.value})} style={s.inp} /></div>
-            <div><label style={{fontSize:'12px', fontWeight:'bold'}}>通信欄メッセージ (ホーム上部)</label><textarea value={siteConfig.admin_message} onChange={e => setSiteConfig({...siteConfig, admin_message: e.target.value})} style={{...s.inp, height:'80px'}} /></div>
-            <div><label style={{fontSize:'12px', fontWeight:'bold'}}>𝕏投稿テンプレート</label><textarea value={siteConfig.share_text_base} onChange={e => setSiteConfig({...siteConfig, share_text_base: e.target.value})} style={{...s.inp, height:'80px'}} /></div>
-            <button onClick={handleUpdateConfig} style={{...s.btn, background: '#10b981', width:'100%', fontSize:'16px'}}>設定を保存する</button>
-          </div>
-        </section>
-      )}
-
       {activeTab === 'markets' && (
         <>
           <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', alignItems: 'center' }}>
@@ -209,7 +204,11 @@ export default function Admin() {
                   <strong style={{fontSize:'18px'}}>{m.title}</strong>
                   <div style={{fontSize:'12px', color:'#666', marginTop:'5px'}}>{m.category} | ⏰ 締切: {new Date(m.end_date).toLocaleString()} | 🔥 {m.total_pool}pt</div>
                 </div>
-                <button onClick={() => { setEditingId(m.id); setEditForm({...m, end_date: new Date(m.end_date).toISOString().slice(0,16)}); }} style={{...s.btn, background:'#3b82f6', padding:'8px 15px'}}>編集</button>
+                <div style={{ display:'flex', gap:'8px' }}>
+                  <button onClick={() => { setEditingId(m.id); setEditForm({...m, end_date: new Date(m.end_date).toISOString().slice(0,16)}); }} style={{...s.btn, background:'#3b82f6', padding:'8px 15px'}}>編集</button>
+                  {/* 追加：削除ボタン */}
+                  <button onClick={() => handleDeleteMarket(m.id, m.title)} style={{...s.btn, background:'#ef4444', padding:'8px 15px'}}>削除</button>
+                </div>
               </div>
 
               {editingId === m.id && (
@@ -248,9 +247,10 @@ export default function Admin() {
         </>
       )}
 
+      {/* 設定、ユーザー、カテゴリ管理の既存機能も完全に維持 */}
       {activeTab === 'categories' && (
         <section style={{ background: '#fff', padding: '20px', borderRadius: '12px', border:'1px solid #eee' }}>
-          <h3 style={{marginTop:0}}>📁 カテゴリの編集・追加・順序変更</h3>
+          <h3 style={{marginTop:0}}>📁 カテゴリ管理</h3>
           {categories.map(c => (
             <div key={c.id} style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
               <input type="number" defaultValue={c.display_order} onBlur={e => handleUpdateCategory(c.id, { display_order: Number(e.target.value) })} style={{ width: '60px', padding:'8px', border:'1px solid #ddd', borderRadius:'6px' }} />
@@ -260,7 +260,7 @@ export default function Admin() {
           ))}
           <div style={{marginTop:'20px', borderTop:'1px solid #eee', paddingTop:'20px'}}>
             <input placeholder="新しいカテゴリ名" value={newCategory.name} onChange={e => setNewCategory({...newCategory, name: e.target.value})} style={s.inp} />
-            <button onClick={handleAddCategory} style={{...s.btn, width:'100%'}}>新しいカテゴリを追加</button>
+            <button onClick={handleAddCategory} style={{...s.btn, width:'100%'}}>カテゴリ追加</button>
           </div>
         </section>
       )}
@@ -279,6 +279,17 @@ export default function Admin() {
             ))}
           </tbody>
         </table>
+      )}
+
+      {activeTab === 'config' && (
+        <section style={{ background: '#f8fafc', padding: '24px', borderRadius: '16px', border:'1px solid #e2e8f0' }}>
+          <h3>📢 サイト基本情報</h3>
+          <input value={siteConfig.site_title} onChange={e => setSiteConfig({...siteConfig, site_title: e.target.value})} placeholder="タイトル" style={s.inp} />
+          <input value={siteConfig.site_description} onChange={e => setSiteConfig({...siteConfig, site_description: e.target.value})} placeholder="説明" style={s.inp} />
+          <textarea value={siteConfig.admin_message} onChange={e => setSiteConfig({...siteConfig, admin_message: e.target.value})} placeholder="メッセージ" style={{...s.inp, height:'80px'}} />
+          <textarea value={siteConfig.share_text_base} onChange={e => setSiteConfig({...siteConfig, share_text_base: e.target.value})} placeholder="𝕏投稿文" style={{...s.inp, height:'80px'}} />
+          <button onClick={handleUpdateConfig} style={{...s.btn, background: '#10b981', width:'100%'}}>設定を保存</button>
+        </section>
       )}
     </div>
   )
