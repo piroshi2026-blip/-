@@ -82,10 +82,9 @@ export default function Home() {
 
   return (
     <div style={{ maxWidth: '500px', margin: '0 auto', padding: '10px 10px 80px', fontFamily: 'sans-serif', background: '#f8fafc', minHeight: '100vh' }}>
-      {/* 𝕏投稿モーダル等既存機能維持 */}
       {justVoted && <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.8)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:'20px'}}><div style={{background:'white', padding:'24px', borderRadius:'24px', textAlign:'center', width:'100%', maxWidth:'320px'}}><div style={{fontSize:'40px', marginBottom:'10px'}}>🎯</div><h3 style={{margin:'0 0 10px', fontSize:'20px', fontWeight:'900'}}>ヨソりました！</h3><button onClick={() => { const text = config.share_text_base.replace('{title}', justVoted.title).replace('{option}', justVoted.option); window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(window.location.origin)}`, '_blank') }} style={{background:'#000', color:'#fff', padding:'14px', borderRadius:'12px', width:'100%', fontWeight:'bold', border:'none'}}>𝕏に投稿して自慢する</button><button onClick={() => setJustVoted(null)} style={{background:'none', border:'none', color:'#999', fontSize:'13px', marginTop:'10px'}}>閉じる</button></div></div>}
 
-      {showAuthModal && <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:'20px'}}><div style={{background:'white', padding:'24px', borderRadius:'20px', width:'100%', maxWidth:'380px', textAlign:'center'}}><h2 style={{fontSize:'20px', fontWeight:'900', marginBottom:'15px'}}>ヨソるを開始</h2><button onClick={() => supabase.auth.signInWithOAuth({provider:'google'})} style={{width:'100%', padding:'12px', marginBottom:'10px', borderRadius:'8px', border:'1px solid #ddd', background:'#fff', fontWeight:'bold', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'}}><img src="https://www.google.com/favicon.ico" alt="Google" width="16"/>Googleでつづける</button><div style={{margin:'15px 0', color:'#999', fontSize:'12px'}}>またはメールアドレスで</div><input type="email" placeholder="メール" value={email} onChange={e => setEmail(e.target.value)} style={{width:'100%', padding:'10px', marginBottom:'8px', borderRadius:'8px', border:'1px solid #eee'}} /><input type="password" placeholder="パス" value={password} onChange={e => setPassword(e.target.value)} style={{width:'100%', padding:'10px', marginBottom:'16px', borderRadius:'8px', border:'1px solid #eee'}} /><div style={{display:'flex', gap:'8px'}}><button onClick={() => supabase.auth.signInWithPassword({email, password}).then(()=>setShowAuthModal(false))} style={{flex:1, padding:'12px', background:'#3b82f6', color:'#fff', border:'none', borderRadius:'8px'}}>ログイン</button><button onClick={() => supabase.auth.signUp({email, password}).then(()=>setShowAuthModal(false))} style={{flex:1, padding:'12px', background:'#1f2937', color:'#fff', border:'none', borderRadius:'8px'}}>新規登録</button></div><button onClick={() => supabase.auth.signInAnonymously().then(()=>setShowAuthModal(false))} style={{background:'none', border:'none', color:'#999', fontSize:'12px', marginTop:'15px'}}>ゲスト利用（匿名）</button></div></div>}
+      {showAuthModal && <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:'20px'}}><div style={{background:'white', padding:'24px', borderRadius:'20px', width:'100%', maxWidth:'380px', textAlign:'center'}}><h2 style={{fontSize:'20px', fontWeight:'900', marginBottom:'15px'}}>ヨソるを開始</h2><button onClick={() => supabase.auth.signInWithOAuth({provider:'google'})} style={{width:'100%', padding:'12px', marginBottom:'10px', borderRadius:'8px', border:'1px solid #ddd', background:'#fff', fontWeight:'bold', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'}}><img src="https://www.google.com/favicon.ico" alt="Google icon" width="16"/>Googleでつづける</button><div style={{margin:'15px 0', color:'#999', fontSize:'12px'}}>またはメールアドレスで</div><input type="email" placeholder="メール" value={email} onChange={e => setEmail(e.target.value)} style={{width:'100%', padding:'10px', marginBottom:'8px', borderRadius:'8px', border:'1px solid #eee'}} /><input type="password" placeholder="パス" value={password} onChange={e => setPassword(e.target.value)} style={{width:'100%', padding:'10px', marginBottom:'16px', borderRadius:'8px', border:'1px solid #eee'}} /><div style={{display:'flex', gap:'8px'}}><button onClick={() => supabase.auth.signInWithPassword({email, password}).then(()=>setShowAuthModal(false))} style={{flex:1, padding:'12px', background:'#3b82f6', color:'#fff', border:'none', borderRadius:'8px'}}>ログイン</button><button onClick={() => supabase.auth.signUp({email, password}).then(()=>setShowAuthModal(false))} style={{flex:1, padding:'12px', background:'#1f2937', color:'#fff', border:'none', borderRadius:'8px'}}>新規登録</button></div><button onClick={() => supabase.auth.signInAnonymously().then(()=>setShowAuthModal(false))} style={{background:'none', border:'none', color:'#999', fontSize:'12px', marginTop:'15px'}}>ゲスト利用（匿名）</button></div></div>}
 
       <header>
         <h1 style={{fontSize:'28px', fontWeight:'900', textAlign:'center', background:'linear-gradient(to right, #2563eb, #9333ea)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', margin:'10px 0 5px'}}>{config.site_title}</h1>
@@ -107,7 +106,6 @@ export default function Home() {
               {isPopular && <div style={{background:'#f59e0b', color:'#fff', fontSize:'10px', padding:'4px 8px', borderRadius:'8px', fontWeight:'bold'}}>💎 人気</div>}
               {active && <div style={{background:isUrgent?'#ef4444':'#1f2937', color:'#fff', fontSize:'10px', padding:'4px 8px', borderRadius:'8px', fontWeight:'bold'}}>⏰ あと{days}日</div>}
             </div>
-            {/* 修正：alt属性を追加 */}
             <div style={{height:'150px', position:'relative', background:'#eee'}}>{m.image_url && <img src={m.image_url} alt={m.title} style={{width:'100%', height:'100%', objectFit:'cover'}} />}
               <div style={{position:'absolute', top:10, left:10, background: categoryMeta[m.category]?.color || '#374151', color:'#fff', fontSize:'9px', padding:'4px 10px', borderRadius:'6px', fontWeight:'bold'}}>{m.category}</div>
               <div style={{position:'absolute', bottom:0, left:0, right:0, padding:'15px', background:'linear-gradient(to top, rgba(0,0,0,0.9), transparent)', color:'#fff'}}><h2 style={{fontSize:'16px', margin:0, fontWeight:'800'}}>{m.title}</h2></div>
@@ -122,7 +120,6 @@ export default function Home() {
         })}</div>
       )}
 
-      {/* ランキング */}
       {activeTab === 'ranking' && (
         <div style={{ border: '1px solid #e2e8f0', borderRadius: '16px', overflow: 'hidden', background:'#fff' }}>
           {ranking.map((u, i) => (
@@ -135,7 +132,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* マイページ */}
       {activeTab === 'mypage' && (
         <div>
           {!session ? <div style={{textAlign:'center', padding:'40px'}}><button onClick={()=>setShowAuthModal(true)} style={{padding:'12px 24px', background:'#3b82f6', color:'#fff', border:'none', borderRadius:'8px', fontWeight:'bold'}}>ログインして開始</button></div> : 
@@ -173,7 +169,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* ガイド */}
       {activeTab === 'info' && (
         <div style={{ fontSize: '13px', padding: '10px' }}>
           <section style={{background:'#fff', padding:'20px', borderRadius:'16px', border:'1px solid #e2e8f0', marginBottom:'20px'}}>
@@ -189,7 +184,7 @@ export default function Home() {
               <p><strong>1. 賭博罪の不該当性について</strong><br/>本サービスは刑法185条（賭博罪）に抵触しない娯楽用シミュレーターです。ポイントの現金交換、財物への引換機能は一切提供しません。</p>
               <p><strong>2. 景品表示法の遵守</strong><br/>ランキング報酬やキャンペーンで提供されるデジタル資産（NFT等）は、景品表示法に基づき、法令の定める範囲内で提供されます。</p>
               <p><strong>3. アカウントの管理</strong><br/>複数アカウントによるポイントの不正取得、自動操作、またはポイントのリアルマネー取引（RMT）を固く禁じます。違反時は全スコアを没収します。</p>
-              <p><strong>4. デジタル特典について</strong><br/>付与されるデジタル資産や称号はサービス内での娯楽を目的としたものであり、投資対象や経済的価値を有するものではありません。</p>
+              <p><strong>4. デジタル特典について</strong><br/>付与されるデジタル資産や称号はサービス内での娯楽を目的としたものであり、投資対象や経済적価値を有するものではありません。</p>
             </div>
           </section>
           <div style={{ textAlign: 'center', marginTop: '40px' }}><Link href="/admin" style={{ color: '#eee', textDecoration: 'none', fontSize: '10px' }}>admin</Link></div>

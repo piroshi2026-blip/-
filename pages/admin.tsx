@@ -20,6 +20,7 @@ export default function Admin() {
   const [siteConfig, setSiteConfig] = useState<any>({ 
     id: 1, site_title: '', site_description: '', admin_message: '', show_ranking: true, share_text_base: '' 
   })
+
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editForm, setEditForm] = useState<any>({})
   const [newOptionName, setNewOptionName] = useState('')
@@ -69,9 +70,9 @@ export default function Admin() {
   useEffect(() => { fetchData() }, [fetchData])
 
   async function handleResolve(marketId: number, optionId: number, optionName: string) {
-    if(!confirm(`「${optionName}」の結果で確定させますか？\n的中者に配当が分配されます。`)) return;
+    if(!confirm(`「${optionName}」の結果で確定させますか？`)) return;
     const { error } = await supabase.rpc('resolve_market', { market_id_input: marketId, winning_option_id: optionId });
-    if (error) alert('確定エラー: ' + error.message); else { alert('確定しました'); fetchData(); }
+    if (error) { alert('確定エラー: ' + error.message); } else { alert('確定しました'); fetchData(); }
   }
 
   async function handleDeleteMarket(id: number, title: string) {
@@ -178,7 +179,7 @@ export default function Admin() {
                 <div style={{ marginTop: '10px', padding: '15px', background: '#f9f9f9', borderRadius: '8px' }}>
                   <input value={editForm.title} onChange={e => setEditForm({...editForm, title: e.target.value})} style={s.inp} />
                   <textarea value={editForm.description} onChange={e => setEditForm({...editForm, description: e.target.value})} style={{...s.inp, height:'60px'}} />
-                  <input type="file" onChange={e => uploadImage(e, true)} />
+                  <div style={{marginBottom:'10px'}}><label style={{fontSize:'12px'}}>画像変更</label><br/><input type="file" onChange={e => uploadImage(e, true)} /></div>
                   {editForm.market_options.map((opt: any, idx: number) => (
                     <input key={opt.id} value={opt.name} onChange={e => { const newOpts = [...editForm.market_options]; newOpts[idx].name = e.target.value; setEditForm({ ...editForm, market_options: newOpts }) }} style={s.inp} />
                   ))}
