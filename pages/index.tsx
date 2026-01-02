@@ -59,10 +59,15 @@ export default function Home() {
     }
     init()
     const { data: authListener } = supabase.auth.onAuthStateChange((_, s) => { 
-      setSession(s); if (s) initUserData(s.user.id); else { setProfile(null); setMyBets([]); }
+      setSession(s); if (s) initUserData(s.user.id); else { setSession(null); setProfile(null); setMyBets([]); }
     })
     return () => authListener.subscription.unsubscribe()
   }, [sortBy, fetchMarkets, initUserData])
+
+  const handleEmailAuth = async (type: 'login' | 'signup') => {
+    const { error } = type === 'signup' ? await supabase.auth.signUp({ email, password }) : await supabase.auth.signInWithPassword({ email, password })
+    if (error) alert(error.message); else setShowAuthModal(false)
+  }
 
   const handleVote = async () => {
     if (!session) { setShowAuthModal(true); return; }
@@ -75,66 +80,120 @@ export default function Home() {
   }
 
   return (
-    <div style={{ maxWidth: '500px', margin: '0 auto', padding: '10px 10px 80px', fontFamily: 'sans-serif', background: '#fff' }}>
-      {/* 𝕏シェアモーダル */}
-      {justVoted && <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:'20px'}}>
-        <div style={{background:'white', padding:'24px', borderRadius:'20px', textAlign:'center', width:'100%', maxWidth:'320px'}}>
-          <h3 style={{margin:'0 0 10px'}}>🎯 ヨソりました！</h3>
-          <button onClick={() => { const text = config.share_text_base.replace('{title}', justVoted.title).replace('{option}', justVoted.option); window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(window.location.origin)}`, '_blank') }} style={{background:'#000', color:'#fff', padding:'12px', borderRadius:'8px', width:'100%', fontWeight:'bold', border:'none'}}>𝕏に投稿して自慢する</button>
-          <button onClick={() => setJustVoted(null)} style={{marginTop:'10px', background:'none', border:'none', color:'#999'}}>閉じる</button>
+    <div style={{ maxWidth: '500px', margin: '0 auto', padding: '10px 10px 80px', fontFamily: 'sans-serif', background: '#f8fafc', minHeight: '100vh' }}>
+      {/* 𝕏投稿モーダル */}
+      {justVoted && <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.8)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:'20px'}}>
+        <div style={{background:'white', padding:'24px', borderRadius:'24px', textAlign:'center', width:'100%', maxWidth:'320px', boxShadow:'0 20px 25px -5px rgba(0,0,0,0.1)'}}>
+          <div style={{fontSize:'40px', marginBottom:'10px'}}>🎯</div>
+          <h3 style={{margin:'0 0 10px', fontSize:'20px', fontWeight:'900'}}>ヨソりました！</h3>
+          <p style={{fontSize:'13px', color:'#666', marginBottom:'20px'}}>「{justVoted.title}」の<br/>「{justVoted.option}」にヨソりました！</p>
+          <button onClick={() => { const text = config.share_text_base.replace('{title}', justVoted.title).replace('{option}', justVoted.option); window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(window.location.origin)}`, '_blank') }} style={{background:'#000', color:'#fff', padding:'14px', borderRadius:'12px', width:'100%', fontWeight:'bold', border:'none', marginBottom:'10px', cursor:'pointer'}}>𝕏に投稿して自慢する</button>
+          <button onClick={() => setJustVoted(null)} style={{background:'none', border:'none', color:'#999', fontSize:'13px'}}>閉じる</button>
         </div>
       </div>}
 
-      {showAuthModal && <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:'20px'}}><div style={{background:'white', padding:'24px', borderRadius:'20px', width:'100%', maxWidth:'380px', textAlign:'center'}}>
-        <h2 style={{fontSize:'20px', fontWeight:'900', marginBottom:'15px'}}>ヨソるを開始</h2>
-        <button onClick={() => supabase.auth.signInWithOAuth({provider:'google'})} style={{width:'100%', padding:'12px', marginBottom:'10px', borderRadius:'8px', border:'1px solid #ddd', background:'#fff', fontWeight:'bold', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'}}><img src="https://www.google.com/favicon.ico" width="16"/>Googleでつづける</button>
-        <button onClick={() => supabase.auth.signInAnonymously().then(()=>setShowAuthModal(false))} style={{width:'100%', padding:'12px', borderRadius:'8px', border:'none', background:'#eee', fontWeight:'bold', color:'#666'}}>ゲスト利用（匿名）</button>
-        <button onClick={()=>setShowAuthModal(false)} style={{marginTop:'15px', background:'none', border:'none', color:'#999'}}>閉じる</button>
-      </div></div>}
+      {/* ログイン・登録モーダル */}
+      {showAuthModal && <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:'20px'}}>
+        <div style={{background:'white', padding:'24px', borderRadius:'20px', width:'100%', maxWidth:'380px', textAlign:'center'}}>
+          <h2 style={{fontSize:'20px', fontWeight:'900', marginBottom:'15px'}}>ヨソるを開始</h2>
+          <button onClick={() => supabase.auth.signInWithOAuth({provider:'google'})} style={{width:'100%', padding:'12px', marginBottom:'10px', borderRadius:'8px', border:'1px solid #ddd', background:'#fff', fontWeight:'bold', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'}}><img src="https://www.google.com/favicon.ico" width="16"/>Googleでつづける</button>
+          <div style={{margin:'15px 0', color:'#999', fontSize:'12px'}}>またはメールアドレスで</div>
+          <input type="email" placeholder="メール" value={email} onChange={e => setEmail(e.target.value)} style={{width:'100%', padding:'10px', marginBottom:'8px', borderRadius:'8px', border:'1px solid #eee', boxSizing:'border-box'}} />
+          <input type="password" placeholder="パスワード" value={password} onChange={e => setPassword(e.target.value)} style={{width:'100%', padding:'10px', marginBottom:'16px', borderRadius:'8px', border:'1px solid #eee', boxSizing:'border-box'}} />
+          <div style={{display:'flex', gap:'8px', marginBottom:'15px'}}>
+            <button onClick={() => handleEmailAuth('login')} style={{flex:1, padding:'12px', background:'#3b82f6', color:'#fff', border:'none', borderRadius:'8px', fontWeight:'bold'}}>ログイン</button>
+            <button onClick={() => handleEmailAuth('signup')} style={{flex:1, padding:'12px', background:'#1f2937', color:'#fff', border:'none', borderRadius:'8px', fontWeight:'bold'}}>新規登録</button>
+          </div>
+          <button onClick={() => supabase.auth.signInAnonymously().then(()=>setShowAuthModal(false))} style={{background:'none', border:'none', color:'#999', fontSize:'12px', textDecoration:'underline'}}>ゲスト利用（匿名）</button>
+          <br/><button onClick={()=>setShowAuthModal(false)} style={{marginTop:'15px', background:'none', border:'none', color:'#666'}}>閉じる</button>
+        </div>
+      </div>}
 
       <header>
-        <h1 style={{fontSize:'26px', fontWeight:'900', textAlign:'center', background:'linear-gradient(to right, #2563eb, #9333ea)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent'}}>{config.site_title}</h1>
-        <div style={{ textAlign: 'center', fontSize: '11px', color: '#999', marginBottom: '8px' }}>{config.site_description}</div>
+        <h1 style={{fontSize:'28px', fontWeight:'900', textAlign:'center', background:'linear-gradient(to right, #2563eb, #9333ea)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', margin:'10px 0 5px'}}>{config.site_title}</h1>
         {activeTab === 'home' && (
-          <><div style={{fontSize:'11px', background:'#f0f9ff', padding:'8px', borderRadius:'6px', textAlign:'center', border:'1px solid #bae6fd'}}>{config.admin_message}</div>
-            <div style={{display:'grid', gridTemplateColumns:'repeat(6, 1fr)', gap:'3px', margin:'10px 0'}}>{dbCategories.map(c => <button key={c.name} onClick={() => setActiveCategory(c.name)} style={{padding:'6px 0', fontSize:'9px', fontWeight:'bold', background:activeCategory===c.name?'#1f2937':'#fff', color:activeCategory===c.name?'#fff':'#666', border:'1px solid #eee', borderRadius:'4px'}}>{c.name}</button>)}</div>
-            <div style={{display:'flex', justifyContent:'center', gap:'8px'}}>{['new', 'deadline', 'popular'].map(t => <button key={t} onClick={() => setSortBy(t as any)} style={{padding:'4px 12px', borderRadius:'15px', border:'none', background:sortBy===t?'#3b82f6':'#eee', color:sortBy===t?'#fff':'#666', fontSize:'10px', fontWeight:'bold'}}>{t==='new'?'✨新着':t==='deadline'?'⏰締切':t==='popular'?'🔥人気':''}</button>)}</div></>
+          <><div style={{fontSize:'11px', background:'#fff', padding:'8px', borderRadius:'8px', textAlign:'center', border:'1px solid #e2e8f0', color:'#64748b', marginBottom:'10px'}}>{config.admin_message}</div>
+            <div style={{display:'grid', gridTemplateColumns:'repeat(6, 1fr)', gap:'4px', margin:'10px 0'}}>{dbCategories.map(c => <button key={c.name} onClick={() => setActiveCategory(c.name)} style={{padding:'6px 0', fontSize:'9px', fontWeight:'bold', background:activeCategory===c.name?'#1f2937':'#fff', color:activeCategory===c.name?'#fff':'#64748b', border:'1px solid #e2e8f0', borderRadius:'6px'}}>{c.name}</button>)}</div>
+            <div style={{display:'flex', justifyContent:'center', gap:'8px'}}>{['new', 'deadline', 'popular'].map(t => <button key={t} onClick={() => setSortBy(t as any)} style={{padding:'6px 16px', borderRadius:'20px', border:'none', background:sortBy===t?'#3b82f6':'#e2e8f0', color:sortBy===t?'#fff':'#64748b', fontSize:'11px', fontWeight:'bold'}}>{t==='new'?'✨新着':t==='deadline'?'⏰締切':t==='popular'?'🔥人気':''}</button>)}</div></>
         )}
       </header>
 
       {activeTab === 'home' && (
         <div style={{marginTop:'15px'}}>{markets.filter(m => activeCategory === 'すべて' || m.category === activeCategory).map(m => {
-          const active = !m.is_resolved && new Date(m.end_date) > new Date(); const days = Math.ceil((new Date(m.end_date).getTime() - new Date().getTime()) / 86400000)
+          const active = !m.is_resolved && new Date(m.end_date) > new Date(); 
+          const diff = new Date(m.end_date).getTime() - new Date().getTime();
+          const days = Math.ceil(diff / 86400000);
           const isPopular = m.total_pool > 1000; const isUrgent = active && days <= 2;
-          return (<div key={m.id} style={{borderRadius:'12px', marginBottom:'12px', border: isUrgent ? '2px solid #ef4444' : '1px solid #eee', overflow:'hidden', position:'relative', background:'#fff'}}>
-            {isUrgent && <div style={{position:'absolute', top:5, right:5, background:'#ef4444', color:'#fff', fontSize:'10px', padding:'2px 8px', borderRadius:'10px', zIndex:10, fontWeight:'bold'}}>🔥 締切間近</div>}
-            {isPopular && !isUrgent && <div style={{position:'absolute', top:5, right:5, background:'#f59e0b', color:'#fff', fontSize:'10px', padding:'2px 8px', borderRadius:'10px', zIndex:10, fontWeight:'bold'}}>💎 大注目</div>}
-            <div style={{height:'140px', position:'relative', background:'#eee'}}>{m.image_url && <img src={m.image_url} style={{width:'100%', height:'100%', objectFit:'cover'}} />}
-              <div style={{position:'absolute', top:8, left:8, background: categoryMeta[m.category]?.color || '#374151', color:'#fff', fontSize:'9px', padding:'3px 8px', borderRadius:'4px', fontWeight:'bold'}}>{m.category}</div>
-              <div style={{position:'absolute', bottom:0, left:0, right:0, padding:'10px', background:'linear-gradient(to top, rgba(0,0,0,0.85), transparent)', color:'#fff'}}><h2 style={{fontSize:'15px', margin:0}}>{m.title}</h2><div style={{fontSize:'10px', opacity:0.8}}>⏰ {new Date(m.end_date).toLocaleString()}</div></div>
+          return (<div key={m.id} style={{borderRadius:'16px', marginBottom:'16px', border: isUrgent ? '2px solid #ef4444' : '1px solid #e2e8f0', overflow:'hidden', position:'relative', background:'#fff', boxShadow:'0 4px 6px -1px rgba(0,0,0,0.05)'}}>
+            {/* 復活：人気ワッペン & あと何日 */}
+            <div style={{position:'absolute', top:10, right:10, zIndex:10, display:'flex', gap:'5px'}}>
+              {isPopular && <div style={{background:'#f59e0b', color:'#fff', fontSize:'10px', padding:'4px 8px', borderRadius:'8px', fontWeight:'bold', boxShadow:'0 2px 4px rgba(0,0,0,0.2)'}}>💎 人気</div>}
+              {active && <div style={{background:isUrgent?'#ef4444':'#1f2937', color:'#fff', fontSize:'10px', padding:'4px 8px', borderRadius:'8px', fontWeight:'bold', boxShadow:'0 2px 4px rgba(0,0,0,0.2)'}}>⏰ あと{days}日</div>}
             </div>
-            <div style={{padding:'8px 10px'}}>
-              {/* 復活：判定基準（description） */}
-              <div style={{ fontSize: '10px', color: '#666', background: '#f9fafb', padding: '6px 8px', borderRadius: '6px', marginBottom: '8px', borderLeft: '3px solid #ddd', lineHeight: '1.4' }}>
-                <strong>【判定基準】</strong><br/>{m.description}
-              </div>
 
-              {m.market_options.map((opt: any, i: number) => { const pct = Math.round((opt.pool / (m.total_pool || 1)) * 100); return (<div key={opt.id} style={{marginBottom:'4px'}}><div style={{display:'flex', justifyContent:'space-between', fontSize:'11px'}}><span>{m.result_option_id === opt.id ? '👑 ' : ''}{opt.name}</span><span style={{color:'#3b82f6'}}>{opt.pool===0?0:(m.total_pool/opt.pool).toFixed(1)}倍 <span style={{color:'#999', fontSize:'9px'}}>({pct}%)</span></span></div><div style={{height:'5px', background:'#eee', borderRadius:'3px', overflow:'hidden'}}><div style={{width:`${pct}%`, height:'100%', background:['#3b82f6', '#ef4444', '#10b981'][i%3]}} /></div></div>) })}
-              {active ? (selectedMarketId === m.id ? (<div style={{marginTop:'8px', background:'#f8fafc', padding:'10px', borderRadius:'8px'}}><div style={{display:'flex', gap:'4px', flexWrap:'wrap', marginBottom:'10px'}}>{m.market_options.map((o: any) => (<button key={o.id} onClick={()=>setSelectedOptionId(o.id)} style={{padding:'6px 10px', borderRadius:'15px', border:selectedOptionId===o.id?'2px solid #3b82f6':'1px solid #ddd', fontSize:'11px', background:'#fff', fontWeight:selectedOptionId===o.id?'bold':'normal'}}>{o.name}</button>))}</div>
-                <div style={{display:'flex', alignItems:'center', gap:'10px', marginBottom:'10px'}}><input type="range" min="10" max={profile?.point_balance || 1000} step="10" value={voteAmount} onChange={e => setVoteAmount(Number(e.target.value))} style={{flex:1}} /><input type="number" value={voteAmount} onChange={e => setVoteAmount(Number(e.target.value))} style={{width:'60px', border:'1px solid #ddd', borderRadius:'4px', fontSize:'11px'}} /></div>
-                <button onClick={handleVote} style={{width:'100%', padding:'10px', background:'#1f2937', color:'#fff', borderRadius:'8px', fontWeight:'bold', border:'none'}}>この予想で確定</button></div>) : (<button onClick={()=>setSelectedMarketId(m.id)} style={{width:'100%', padding:'8px', background:'#3b82f6', color:'#fff', borderRadius:'8px', fontWeight:'bold', border:'none', marginTop:'6px'}}>ヨソる</button>)) : <div style={{textAlign:'center', fontSize:'11px', color:'#999', marginTop:'6px'}}>判定中</div>}
-            </div></div>)
+            <div style={{height:'150px', position:'relative', background:'#eee'}}>{m.image_url && <img src={m.image_url} style={{width:'100%', height:'100%', objectFit:'cover'}} />}
+              <div style={{position:'absolute', top:10, left:10, background: categoryMeta[m.category]?.color || '#374151', color:'#fff', fontSize:'9px', padding:'4px 10px', borderRadius:'6px', fontWeight:'bold', boxShadow:'0 2px 4px rgba(0,0,0,0.2)'}}>{m.category}</div>
+              <div style={{position:'absolute', bottom:0, left:0, right:0, padding:'15px', background:'linear-gradient(to top, rgba(0,0,0,0.9), transparent)', color:'#fff'}}><h2 style={{fontSize:'16px', margin:0, fontWeight:'800'}}>{m.title}</h2></div>
+            </div>
+            <div style={{padding:'12px'}}>
+              <div style={{ fontSize: '11px', color: '#64748b', background: '#f1f5f9', padding: '8px 10px', borderRadius: '8px', marginBottom: '12px', borderLeft: '4px solid #cbd5e1', lineHeight: '1.4' }}><strong>判定基準:</strong> {m.description}</div>
+              {m.market_options.map((opt: any, i: number) => { const pct = Math.round((opt.pool / (m.total_pool || 1)) * 100); return (<div key={opt.id} style={{marginBottom:'6px'}}><div style={{display:'flex', justifyContent:'space-between', fontSize:'12px', marginBottom:'2px'}}><span>{m.result_option_id === opt.id ? '👑 ' : ''}{opt.name}</span><span style={{fontWeight:'bold', color:'#2563eb'}}>{opt.pool===0?0:(m.total_pool/opt.pool).toFixed(1)}倍 <span style={{color:'#94a3b8', fontSize:'10px', fontWeight:'normal'}}>({pct}%)</span></span></div><div style={{height:'6px', background:'#e2e8f0', borderRadius:'3px', overflow:'hidden'}}><div style={{width:`${pct}%`, height:'100%', background:['#3b82f6', '#ef4444', '#10b981'][i%3]}} /></div></div>) })}
+              {active ? (selectedMarketId === m.id ? (<div style={{marginTop:'12px', background:'#f8fafc', padding:'12px', borderRadius:'12px', border:'1px solid #e2e8f0'}}><div style={{display:'flex', gap:'6px', flexWrap:'wrap', marginBottom:'12px'}}>{m.market_options.map((o: any) => (<button key={o.id} onClick={()=>setSelectedOptionId(o.id)} style={{padding:'8px 12px', borderRadius:'20px', border:selectedOptionId===o.id?'2px solid #2563eb':'1px solid #cbd5e1', fontSize:'12px', background:'#fff', fontWeight:selectedOptionId===o.id?'bold':'normal', color:selectedOptionId===o.id?'#2563eb':'#475569'}}>{o.name}</button>))}</div>
+                <div style={{display:'flex', alignItems:'center', gap:'10px', marginBottom:'12px'}}><input type="range" min="10" max={profile?.point_balance || 1000} step="10" value={voteAmount} onChange={e => setVoteAmount(Number(e.target.value))} style={{flex:1}} /><input type="number" value={voteAmount} onChange={e => setVoteAmount(Number(e.target.value))} style={{width:'70px', border:'1px solid #cbd5e1', borderRadius:'8px', padding:'5px', fontSize:'13px', textAlign:'center', fontWeight:'bold'}} /> <span style={{fontSize:'12px', fontWeight:'bold', color:'#64748b'}}>pt</span></div>
+                <button onClick={handleVote} style={{width:'100%', padding:'12px', background:'#1f2937', color:'#fff', borderRadius:'12px', fontWeight:'bold', border:'none', boxShadow:'0 4px 6px rgba(0,0,0,0.1)'}}>確定する</button></div>) : (<button onClick={()=>setSelectedMarketId(m.id)} style={{width:'100%', padding:'10px', background:'#3b82f6', color:'#fff', borderRadius:'10px', fontWeight:'bold', border:'none', marginTop:'10px', fontSize:'14px', boxShadow:'0 4px 6px -1px rgba(59,130,246,0.3)'}}>ヨソる</button>)) : <div style={{textAlign:'center', fontSize:'12px', color:'#94a3b8', marginTop:'10px', fontWeight:'bold', padding:'8px', background:'#f1f5f9', borderRadius:'8px'}}>判定中</div>}
+          </div></div>)
         })}</div>
       )}
 
-      {/* ランキング、マイページ、ガイド等の既存機能は完璧に維持 */}
+      {/* 復活：マイページ機能一式 */}
+      {activeTab === 'mypage' && (
+        <div>
+          {!session ? <div style={{textAlign:'center', padding:'60px 20px'}}><div style={{fontSize:'50px', marginBottom:'20px'}}>👤</div><h2 style={{fontSize:'20px', fontWeight:'900', marginBottom:'10px'}}>マイページ</h2><p style={{color:'#64748b', fontSize:'14px', marginBottom:'25px'}}>ログインすると予想履歴の確認や<br/>名前の変更ができます。</p><button onClick={()=>setShowAuthModal(true)} style={{padding:'14px 30px', background:'#3b82f6', color:'#fff', border:'none', borderRadius:'12px', fontWeight:'bold', fontSize:'16px', boxShadow:'0 10px 15px -3px rgba(59,130,246,0.3)'}}>ログイン / 新規登録</button></div> : 
+          <>
+            <div style={{background:'linear-gradient(135deg, #1e3a8a, #3b82f6)', color:'#fff', padding:'30px 20px', borderRadius:'24px', textAlign:'center', boxShadow:'0 10px 20px rgba(30,58,138,0.2)', marginBottom:'25px'}}>
+              {isEditingName ? (<div style={{display:'flex', gap:'8px', justifyContent:'center', alignItems:'center'}}><input value={newUsername} onChange={e=>setNewUsername(e.target.value)} style={{color:'#333', borderRadius:'8px', padding:'8px 12px', border:'none', fontSize:'14px', width:'150px'}} /><button onClick={() => supabase.from('profiles').update({username: newUsername}).eq('id', profile.id).then(() => {setIsEditingName(false); initUserData(profile.id);})} style={{background:'#10b981', color:'#fff', border:'none', padding:'8px 15px', borderRadius:'8px', fontWeight:'bold', fontSize:'13px'}}>保存</button></div>) : (<div><span style={{fontSize:'20px', fontWeight:'900'}}>{profile?.username || '名無しさん'}</span><button onClick={()=>setIsEditingName(true)} style={{fontSize:'11px', marginLeft:'10px', background:'rgba(255,255,255,0.2)', color:'#fff', border:'none', padding:'4px 10px', borderRadius:'6px'}}>名前変更</button></div>)}
+              <div style={{fontSize:'36px', fontWeight:'900', marginTop:'15px', letterSpacing:'-1px'}}>{profile?.point_balance?.toLocaleString()} <span style={{fontSize:'16px', fontWeight:'normal', opacity:0.8}}>pt</span></div>
+              <div style={{fontSize:'11px', opacity:0.7, marginTop:'5px'}}>現在の保有ポイント</div>
+            </div>
+
+            <h3 style={{fontSize:'16px', fontWeight:'800', margin:'0 0 15px', display:'flex', alignItems:'center', gap:'8px'}}>📜 予想履歴（ポイント増減）</h3>
+            <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
+              {myBets.length === 0 ? <div style={{textAlign:'center', padding:'40px', color:'#94a3b8', fontSize:'13px', background:'#fff', borderRadius:'16px', border:'1px dashed #cbd5e1'}}>まだ予想履歴がありません。</div> : myBets.map(b => {
+                const isWin = b.markets.is_resolved && b.markets.result_option_id === b.market_option_id;
+                const isLost = b.markets.is_resolved && b.markets.result_option_id !== b.market_option_id;
+                return (
+                  <div key={b.id} style={{padding:'15px', background:'#fff', border:'1px solid #e2e8f0', borderRadius:'16px', position:'relative', borderLeft: isWin ? '6px solid #10b981' : isLost ? '6px solid #ef4444' : '6px solid #cbd5e1'}}>
+                    <div style={{fontSize:'10px', color:'#94a3b8', marginBottom:'5px'}}>{new Date(b.created_at).toLocaleDateString()}</div>
+                    <div style={{fontSize:'14px', fontWeight:'bold', marginBottom:'8px', color:'#1f2937'}}>{b.markets.title}</div>
+                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end'}}>
+                      <div>
+                        <div style={{fontSize:'12px', color:'#64748b'}}>選んだ答え: <span style={{fontWeight:'bold', color:'#1f2937'}}>{b.market_options.name}</span></div>
+                        <div style={{fontSize:'12px', color:'#64748b'}}>ヨソった額: <span style={{fontWeight:'bold', color:'#1f2937'}}>{b.amount}pt</span></div>
+                      </div>
+                      <div style={{textAlign:'right'}}>
+                        <div style={{fontSize:'13px', fontWeight:'900', color: isWin ? '#10b981' : isLost ? '#ef4444' : '#64748b'}}>
+                          {isWin ? '🎯 的中！' : isLost ? '💀 不的中' : '⏳ 判定待ち'}
+                        </div>
+                        {isWin && <button onClick={() => { const text = `「${b.markets.title}」の予想を的中させました！🎯\n選んだ答え: ${b.market_options.name}`; window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(window.location.origin)}`, '_blank') }} style={{fontSize:'10px', marginTop:'5px', background:'#000', color:'#fff', border:'none', padding:'3px 8px', borderRadius:'4px'}}>𝕏で自慢する</button>}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            <button onClick={()=>supabase.auth.signOut()} style={{width:'100%', marginTop:'30px', color:'#ef4444', background:'#fff', border:'1px solid #ef4444', padding:'12px', borderRadius:'12px', fontWeight:'bold', fontSize:'14px', marginBottom:'20px'}}>ログアウト</button>
+          </>}
+        </div>
+      )}
+
+      {/* ランキング・ガイド（維持） */}
       {activeTab === 'ranking' && (
-        <div style={{ border: '1px solid #eee', borderRadius: '12px', overflow: 'hidden' }}>
+        <div style={{ border: '1px solid #e2e8f0', borderRadius: '16px', overflow: 'hidden', background:'#fff', boxShadow:'0 4px 6px -1px rgba(0,0,0,0.05)' }}>
           {ranking.map((u, i) => (
-            <div key={u.id} style={{ display: 'flex', alignItems: 'center', padding: '15px', borderBottom: '1px solid #eee', background: u.id === profile?.id ? '#fffbeb' : '#fff' }}>
-              <div style={{ width: '40px', fontSize: '18px', textAlign: 'center' }}>{i === 0 ? '👑' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}</div>
-              <div style={{ flex: 1, marginLeft: '10px' }}><strong>{u.username || '名無しさん'}</strong>{u.id === profile?.id && <span style={{fontSize:'10px', marginLeft:'5px', color:'#3b82f6'}}>(あなた)</span>}</div>
-              <div style={{ fontWeight: '900', color: i === 0 ? '#d97706' : '#4b5563' }}>{u.point_balance.toLocaleString()} pt</div>
+            <div key={u.id} style={{ display: 'flex', alignItems: 'center', padding: '16px', borderBottom: '1px solid #f1f5f9', background: u.id === profile?.id ? '#fffbeb' : '#fff' }}>
+              <div style={{ width: '45px', fontSize: '20px', textAlign: 'center', fontWeight:'900' }}>{i === 0 ? '👑' : i === 1 ? '🥈' : i === 2 ? '🥉' : <span style={{fontSize:'14px', color:'#94a3b8'}}>{i + 1}</span>}</div>
+              <div style={{ flex: 1, marginLeft: '10px' }}><div style={{fontWeight: '800', fontSize:'15px', color:'#1f2937'}}>{u.username || '名無しさん'}</div>{u.id === profile?.id && <div style={{fontSize:'10px', color:'#3b82f6', fontWeight:'bold'}}>YOU</div>}</div>
+              <div style={{ textAlign:'right' }}><div style={{ fontWeight: '900', color: i === 0 ? '#d97706' : '#475569', fontSize:'17px' }}>{u.point_balance.toLocaleString()}</div><div style={{fontSize:'10px', color:'#94a3b8'}}>pt</div></div>
             </div>
           ))}
         </div>
@@ -142,23 +201,27 @@ export default function Home() {
 
       {activeTab === 'info' && (
         <div style={{ fontSize: '13px', padding: '10px' }}>
-          <section style={{background:'#f9f9f9', padding:'16px', borderRadius:'12px', border:'1px solid #eee', marginBottom:'20px'}}>
-            <h3 style={{borderBottom:'2px solid #3b82f6', paddingBottom:'5px', marginTop:0}}>📖 ヨソるの遊び方</h3>
-            <p style={{fontSize:'12px', color:'#666'}}>1. 未来を予想してポイントをヨソ（ベット）ります。<br/>2. 的中するとプールされたポイントが分配されます。<br/>3. ポイントは無料シミュレーター用で換金はできません。</p>
+          <section style={{background:'#fff', padding:'20px', borderRadius:'16px', border:'1px solid #e2e8f0', marginBottom:'20px', boxShadow:'0 4px 6px -1px rgba(0,0,0,0.05)'}}>
+            <h3 style={{borderBottom:'3px solid #3b82f6', paddingBottom:'8px', marginTop:0, fontWeight:'900'}}>📖 ヨソるの遊び方</h3>
+            <div style={{lineHeight:'1.8', color:'#475569'}}>
+              <p><strong>1. 未来を予想する</strong><br/>提示された問いに対して、自分の予想する答えにポイントをヨソ（ベット）ります。</p>
+              <p><strong>2. 配当を獲得する</strong><br/>予想が的中すると、外れた人のポイントを含めた総プールから、的中者全員で山分け配当を獲得できます。</p>
+              <p><strong>3. 完全無料のシミュレーター</strong><br/>使用するポイントはログイン時やイベントで配布されるゲーム内通貨です。購入や換金は一切できません。</p>
+            </div>
           </section>
-          <section style={{background:'#f9f9f9', padding:'16px', borderRadius:'12px', border:'1px solid #eee'}}>
-            <h3 style={{borderBottom:'2px solid #3b82f6', paddingBottom:'5px', marginTop:0}}>⚖️ 利用規約</h3>
-            <p style={{fontSize:'12px', color:'#666'}}>本サービスは刑法185条（賭博）に該当しない娯楽用アプリです。取得ポイントは現金や財物へ換金できません。</p>
+          <section style={{background:'#fff', padding:'20px', borderRadius:'16px', border:'1px solid #e2e8f0', boxShadow:'0 4px 6px -1px rgba(0,0,0,0.05)'}}>
+            <h3 style={{borderBottom:'3px solid #3b82f6', paddingBottom:'8px', marginTop:0, fontWeight:'900'}}>⚖️ 利用規約</h3>
+            <p style={{fontSize:'12px', color:'#64748b', lineHeight:'1.6'}}>本サービスは刑法185条（賭博）に該当しない娯楽用アプリです。取得ポイントは現金や財物へ換金できません。複数アカウントでの不正利用はアカウント停止の対象となります。</p>
           </section>
-          <div style={{ textAlign: 'center', marginTop: '40px' }}><Link href="/admin" style={{ color: '#eee', textDecoration: 'none', fontSize: '10px' }}>admin</Link></div>
+          <div style={{ textAlign: 'center', marginTop: '40px' }}><Link href="/admin" style={{ color: '#e2e8f0', textDecoration: 'none', fontSize: '10px' }}>admin</Link></div>
         </div>
       )}
 
-      <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: '#fff', display: 'flex', justifyContent: 'space-around', padding: '10px 0', borderTop: '1px solid #eee', zIndex: 100 }}>
-        <button onClick={() => setActiveTab('home')} style={{ background: 'none', border: 'none', color: activeTab === 'home' ? '#3b82f6' : '#999', fontSize:'11px', fontWeight:'bold' }}>🏠<br />ホーム</button>
-        <button onClick={() => setActiveTab('ranking')} style={{ background: 'none', border: 'none', color: activeTab === 'ranking' ? '#3b82f6' : '#999', fontSize:'11px', fontWeight:'bold' }}>👑<br />ランク</button>
-        <button onClick={() => setActiveTab('mypage')} style={{ background: 'none', border: 'none', color: activeTab === 'mypage' ? '#3b82f6' : '#999', fontSize:'11px', fontWeight:'bold' }}>👤<br />マイペ</button>
-        <button onClick={() => setActiveTab('info')} style={{ background: 'none', border: 'none', color: activeTab === 'info' ? '#3b82f6' : '#999', fontSize:'11px', fontWeight:'bold' }}>📖<br />ガイド</button>
+      <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: '#fff', display: 'flex', justifyContent: 'space-around', padding: '12px 0', borderTop: '1px solid #e2e8f0', zIndex: 100, boxShadow:'0 -4px 6px -1px rgba(0,0,0,0.05)' }}>
+        <button onClick={() => setActiveTab('home')} style={{ background: 'none', border: 'none', color: activeTab === 'home' ? '#3b82f6' : '#94a3b8', fontSize:'11px', fontWeight:'bold' }}>🏠<br />ホーム</button>
+        <button onClick={() => setActiveTab('ranking')} style={{ background: 'none', border: 'none', color: activeTab === 'ranking' ? '#3b82f6' : '#94a3b8', fontSize:'11px', fontWeight:'bold' }}>👑<br />ランク</button>
+        <button onClick={() => setActiveTab('mypage')} style={{ background: 'none', border: 'none', color: activeTab === 'mypage' ? '#3b82f6' : '#94a3b8', fontSize:'11px', fontWeight:'bold' }}>👤<br />マイペ</button>
+        <button onClick={() => setActiveTab('info')} style={{ background: 'none', border: 'none', color: activeTab === 'info' ? '#3b82f6' : '#94a3b8', fontSize:'11px', fontWeight:'bold' }}>📖<br />ガイド</button>
       </nav>
     </div>
   )
