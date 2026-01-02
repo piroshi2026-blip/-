@@ -70,19 +70,13 @@ export default function Home() {
   const handleUpdateName = async () => {
     if (!profile) return
     const { error } = await supabase.from('profiles').update({ username: newUsername }).eq('id', profile.id)
-    if (error) alert('失敗'); else { alert('更新完了'); setIsEditingName(false); initUserData(profile.id); }
+    if (!error) { alert('更新完了'); setIsEditingName(false); initUserData(profile.id); }
   }
 
-  // Googleログイン機能
   const handleGoogleLogin = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: window.location.origin }
-    })
-    if (error) alert(error.message)
+    await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } })
   }
 
-  // メールログイン（並列ボタン用）
   const handleEmailAuth = async (type: 'login' | 'signup') => {
     const { error } = type === 'signup' 
       ? await supabase.auth.signUp({ email, password }) 
@@ -110,56 +104,38 @@ export default function Home() {
   const getOdds = (t: number, p: number) => (p === 0 ? 0 : (t / p).toFixed(1)); const getPercent = (t: number, p: number) => (t === 0 ? 0 : Math.round((p / t) * 100))
 
   const s: any = {
-    container: { maxWidth: '500px', margin: '0 auto', padding: '10px 10px 80px', fontFamily: 'sans-serif', background: '#fff' },
-    title: { fontSize: '26px', fontWeight: '900', textAlign: 'center', margin: '0', background: 'linear-gradient(to right, #2563eb, #9333ea)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' },
-    siteDesc: { fontSize: '11px', color: '#999', textAlign: 'center', marginBottom: '4px' },
-    adminMsg: { fontSize: '11px', background: '#f0f9ff', color: '#0369a1', padding: '6px 10px', borderRadius: '6px', marginBottom: '10px', border: '1px solid #bae6fd', textAlign: 'center' },
+    container: { maxWidth: '500px', margin: '0 auto', padding: '10px 10px 80px', fontFamily: 'sans-serif' },
+    title: { fontSize: '26px', fontWeight: '900', textAlign: 'center', background: 'linear-gradient(to right, #2563eb, #9333ea)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' },
+    adminMsg: { fontSize: '11px', background: '#f0f9ff', color: '#0369a1', padding: '8px', borderRadius: '6px', marginBottom: '10px', textAlign: 'center' },
     catGrid: { display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '3px', marginBottom: '10px' },
-    catBtn: (active: boolean) => ({ padding: '5px 0', borderRadius: '4px', border: '1px solid #eee', background: active ? '#1f2937' : '#fff', color: active ? '#fff' : '#666', fontSize: '9px', fontWeight: 'bold', overflow: 'hidden' }),
-    card: { borderRadius: '12px', marginBottom: '12px', border: '1px solid #eee', overflow: 'hidden', position: 'relative' },
-    imgOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: '10px', background: 'linear-gradient(to top, rgba(0,0,0,0.85), transparent)', color: '#fff' },
-    desc: { fontSize: '10px', color: '#555', background: '#f8f8f8', padding: '4px 8px', borderRadius: '4px', margin: '2px 0', lineHeight: '1.4' },
+    catBtn: (active: boolean) => ({ padding: '5px 0', borderRadius: '4px', border: '1px solid #eee', background: active ? '#1f2937' : '#fff', color: active ? '#fff' : '#666', fontSize: '9px', fontWeight: 'bold' }),
     modal: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' },
     modalContent: { background: 'white', padding: '24px', borderRadius: '20px', width: '100%', maxWidth: '380px', textAlign: 'center' }
   }
 
   return (
     <div style={s.container}>
-      {justVoted && <div style={s.modal as any}><div style={s.modalContent as any}><h3>🎯 ヨソりました！</h3><button onClick={openXShare} style={{ background: '#000', color: '#fff', border: 'none', padding: '12px', borderRadius: '8px', width: '100%', marginTop: '10px', fontWeight: 'bold' }}>𝕏に投稿する</button><button onClick={() => setJustVoted(null)} style={{ background: 'none', border: 'none', color: '#999', marginTop: '10px' }}>閉じる</button></div></div>}
+      {justVoted && <div style={s.modal as any}><div style={s.modalContent as any}><h3>🎯 ヨソりました！</h3><button onClick={openXShare} style={{ background: '#000', color: '#fff', padding: '12px', borderRadius: '8px', width: '100%', fontWeight: 'bold', border: 'none' }}>𝕏に投稿する</button><button onClick={() => setJustVoted(null)} style={{ background: 'none', border: 'none', color: '#999', marginTop: '10px' }}>閉じる</button></div></div>}
 
       {showAuthModal && (
         <div style={s.modal as any}>
           <div style={s.modalContent as any}>
             <h2 style={{ fontSize: '20px', marginBottom: '20px', fontWeight: '900' }}>ヨソるを開始</h2>
-
-            {/* Googleログイン復活 */}
-            <button onClick={handleGoogleLogin} style={{ width: '100%', padding: '12px', marginBottom: '16px', borderRadius: '8px', border: '1px solid #ddd', background: '#fff', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-              <img src="https://www.google.com/favicon.ico" width="16" height="16" /> Googleでつづける
-            </button>
-
-            <div style={{ fontSize: '12px', color: '#999', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div style={{ flex: 1, height: '1px', background: '#eee' }}></div>または<div style={{ flex: 1, height: '1px', background: '#eee' }}></div>
-            </div>
-
-            <input type="email" placeholder="メールアドレス" value={email} onChange={e => setEmail(e.target.value)} style={{ width: '100%', padding: '12px', marginBottom: '8px', borderRadius: '8px', border: '1px solid #eee', boxSizing: 'border-box' }} />
-            <input type="password" placeholder="パスワード" value={password} onChange={e => setPassword(e.target.value)} style={{ width: '100%', padding: '12px', marginBottom: '16px', borderRadius: '8px', border: '1px solid #eee', boxSizing: 'border-box' }} />
-
-            {/* メール登録・ログイン並列配置 */}
+            <button onClick={handleGoogleLogin} style={{ width: '100%', padding: '12px', marginBottom: '16px', borderRadius: '8px', border: '1px solid #ddd', background: '#fff', fontWeight: 'bold' }}>Googleでつづける</button>
+            <input type="email" placeholder="メール" value={email} onChange={e => setEmail(e.target.value)} style={{ width: '100%', padding: '10px', marginBottom: '8px', borderRadius: '8px', border: '1px solid #eee' }} />
+            <input type="password" placeholder="パスワード" value={password} onChange={e => setPassword(e.target.value)} style={{ width: '100%', padding: '10px', marginBottom: '16px', borderRadius: '8px', border: '1px solid #eee' }} />
             <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-              <button onClick={() => handleEmailAuth('login')} style={{ flex: 1, padding: '12px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>ログイン</button>
-              <button onClick={() => handleEmailAuth('signup')} style={{ flex: 1, padding: '12px', background: '#1f2937', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>新規登録</button>
+              <button onClick={() => handleEmailAuth('login')} style={{ flex: 1, padding: '12px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px' }}>ログイン</button>
+              <button onClick={() => handleEmailAuth('signup')} style={{ flex: 1, padding: '12px', background: '#1f2937', color: '#fff', border: 'none', borderRadius: '8px' }}>新規登録</button>
             </div>
-
-            <button onClick={() => { supabase.auth.signInAnonymously(); setShowAuthModal(false); }} style={{ background: 'none', border: 'none', color: '#999', fontSize: '13px', textDecoration: 'underline' }}>ゲストとして利用</button>
-            <br />
-            <button onClick={() => setShowAuthModal(false)} style={{ marginTop: '16px', color: '#666', border: 'none', background: 'none' }}>キャンセル</button>
+            <button onClick={() => { supabase.auth.signInAnonymously(); setShowAuthModal(false); }} style={{ background: 'none', border: 'none', color: '#999', fontSize: '12px' }}>ゲスト利用</button>
           </div>
         </div>
       )}
 
       <header>
         <h1 style={s.title}>{config.site_title}</h1>
-        <div style={s.siteDesc}>{config.site_description}</div>
+        <div style={{ textAlign: 'center', fontSize: '11px', color: '#999', marginBottom: '8px' }}>{config.site_description}</div>
         {activeTab === 'home' && (
           <><div style={s.adminMsg}>{config.admin_message}</div>
             <div style={s.catGrid}>{dbCategories.map(c => <button key={c.name} onClick={() => setActiveCategory(c.name)} style={s.catBtn(activeCategory === c.name)}>{c.name}</button>)}</div>
@@ -170,10 +146,10 @@ export default function Home() {
       {activeTab === 'home' && (
         <div>{markets.filter(m => activeCategory === 'すべて' || m.category === activeCategory).map(m => {
           const active = !m.is_resolved && new Date(m.end_date) > new Date();
-          return (<div key={m.id} style={s.card}><div style={{ height: '140px', position: 'relative', background: '#eee' }}>{m.image_url && <img src={m.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}<div style={s.imgOverlay}><h2 style={{ fontSize: '15px', margin: 0 }}>{m.title}</h2></div></div>
-            <div style={{ padding: '8px 10px' }}><div style={s.desc}>{m.description}</div>
+          return (<div key={m.id} style={{ borderRadius: '12px', marginBottom: '12px', border: '1px solid #eee', overflow: 'hidden', position: 'relative' }}><div style={{ height: '140px', position: 'relative', background: '#eee' }}>{m.image_url && <img src={m.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}<div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '10px', background: 'linear-gradient(to top, rgba(0,0,0,0.85), transparent)', color: '#fff' }}><h2 style={{ fontSize: '15px', margin: 0 }}>{m.title}</h2></div></div>
+            <div style={{ padding: '8px 10px' }}><div style={{ fontSize: '10px', color: '#555', background: '#f8f8f8', padding: '4px', borderRadius: '4px' }}>{m.description}</div>
               {m.market_options.map((opt: any, i: number) => { const pct = getPercent(m.total_pool, opt.pool); return (<div key={opt.id} style={{ marginBottom: '4px' }}><div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}><span>{m.result_option_id === opt.id ? '👑 ' : ''}{opt.name}</span><span style={{ color: '#3b82f6' }}>{getOdds(m.total_pool, opt.pool)}倍 ({pct}%)</span></div><div style={{ height: '5px', background: '#eee', borderRadius: '3px', overflow: 'hidden' }}><div style={{ width: `${pct}%`, height: '100%', background: ['#3b82f6', '#ef4444', '#10b981'][i % 3] }} /></div></div>) })}
-              {active ? (selectedMarketId === m.id ? (<div style={{ marginTop: '8px' }}><div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>{m.market_options.map((o: any) => (<button key={o.id} onClick={() => setSelectedOptionId(o.id)} style={{ padding: '4px 8px', borderRadius: '15px', border: selectedOptionId === o.id ? '2px solid #3b82f6' : '1px solid #ddd', fontSize: '10px' }}>{o.name}</button>))}</div><div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '6px' }}><input type="range" min="10" max={profile?.point_balance || 1000} step="10" value={voteAmount} onChange={e => setVoteAmount(Number(e.target.value))} style={{ flex: 1 }} /><button onClick={handleVote} style={{ background: '#1f2937', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold' }}>確定({voteAmount}pt)</button></div></div>) : (<button onClick={() => setSelectedMarketId(m.id)} style={{ width: '100%', padding: '8px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', marginTop: '6px' }}>ヨソる</button>)) : <div style={{ textAlign: 'center', fontSize: '11px', color: '#999', marginTop: '6px' }}>終了</div>}
+              {active ? (selectedMarketId === m.id ? (<div style={{ marginTop: '8px' }}><div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>{m.market_options.map((o: any) => (<button key={o.id} onClick={() => setSelectedOptionId(o.id)} style={{ padding: '4px 8px', borderRadius: '15px', border: selectedOptionId === o.id ? '2px solid #3b82f6' : '1px solid #ddd', fontSize: '10px', background: '#fff' }}>{o.name}</button>))}</div><div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '6px' }}><input type="range" min="10" max={profile?.point_balance || 1000} step="10" value={voteAmount} onChange={e => setVoteAmount(Number(e.target.value))} style={{ flex: 1 }} /><button onClick={handleVote} style={{ background: '#1f2937', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold' }}>確定({voteAmount}pt)</button></div></div>) : (<button onClick={() => setSelectedMarketId(m.id)} style={{ width: '100%', padding: '8px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', marginTop: '6px' }}>ヨソる</button>)) : <div style={{ textAlign: 'center', fontSize: '11px', color: '#999', marginTop: '6px' }}>終了</div>}
             </div></div>)
         })}</div>
       )}
@@ -182,7 +158,7 @@ export default function Home() {
 
       {activeTab === 'mypage' && (
         <div><div style={{ background: 'linear-gradient(135deg, #1e3a8a, #3b82f6)', color: '#fff', padding: '20px', borderRadius: '12px', textAlign: 'center' }}>
-          {isEditingName ? (<div><input value={newUsername} onChange={e => setNewUsername(e.target.value)} style={{ color: '#333' }} /><button onClick={handleUpdateName}>保存</button></div>) : (<div><span style={{ fontSize: '18px', fontWeight: 'bold' }}>{profile?.username || '名無し'}</span><button onClick={() => setIsEditingName(true)} style={{ fontSize: '10px', marginLeft: '8px' }}>編集</button></div>)}
+          {isEditingName ? (<div><input value={newUsername} onChange={e => setNewUsername(e.target.value)} style={{ color: '#333', padding: '4px' }} /><button onClick={handleUpdateName}>保存</button></div>) : (<div><span style={{ fontSize: '18px', fontWeight: 'bold' }}>{profile?.username || '名無し'}</span><button onClick={() => setIsEditingName(true)} style={{ fontSize: '10px', marginLeft: '8px', background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', padding: '2px 4px', borderRadius: '4px' }}>編集</button></div>)}
           <div style={{ fontSize: '24px', fontWeight: '900' }}>{profile?.point_balance?.toLocaleString()} pt</div></div>
           {myBets.map(b => (<div key={b.id} style={{ padding: '10px', borderBottom: '1px solid #eee', fontSize: '12px' }}><div>{b.markets?.title}</div><div style={{ fontWeight: 'bold' }}>{b.market_options?.name} / {b.amount}pt</div></div>))}
           <button onClick={() => supabase.auth.signOut()} style={{ width: '100%', marginTop: '20px', color: '#ef4444', background: 'none', border: '1px solid #ef4444', padding: '10px', borderRadius: '8px' }}>ログアウト</button></div>
@@ -190,15 +166,13 @@ export default function Home() {
 
       {activeTab === 'info' && (
         <div style={{ fontSize: '12px', lineHeight: '1.6', padding: '10px' }}>
-          <section><h3>ヨソるの遊び方</h3><p>未来の問いを予想し、ポイントをヨソるシミュレーションゲームです。</p></section>
           <section style={{ background: '#f9f9f9', padding: '15px', borderRadius: '10px', border: '1px solid #eee' }}>
             <h3 style={{ borderBottom: '2px solid #3b82f6', paddingBottom: '5px' }}>⚖️ 法的ガイドライン及び利用規約</h3>
-            <p><strong>1. ポイントの性質</strong><br />取得されるポイントはゲーム内通貨であり、金銭への換金機能は提供しません。本サービスは刑法第185条の賭博には該当しません。</p>
-            <p><strong>2. 景品・キャンペーンについて</strong><br />ランキング上位者等へ賞品や**デジタル特典（NFT等を含む）**の提供を行う場合は、景品表示法が定める「懸賞」の限度額（最高10万円等）および総額制限の範囲内で行うものとします。</p>
-            <p><strong>3. 禁止事項</strong><br />複数垢、不正取得、およびポイントや**付与されたデジタル資産**のリアルマネー取引（RMT）を固く禁じます。違反時はアカウントを凍結します。</p>
-            <p><strong>4. 免責事項</strong><br />判定は客観的事実に基づきますが、最終決定は運営によります。システム不具合等による損失について、運営は一切の責任を負いません。</p>
+            <p><strong>1. ポイントの性質</strong><br />取得されるポイントはゲーム内通貨であり、金銭への換金機能は提供しません。本サービスは刑法第185条の賭備には該当しません。</p>
+            <p><strong>2. 景品・キャンペーンについて</strong><br />ランキング上位者等へ賞品や**デジタル特典（NFT等を含む）**の提供を行う場合は、景品表示法が定める「懸賞」の限度額および総額制限の範囲内で行うものとします。</p>
+            <p><strong>3. 禁止事項</strong><br />複数垢、不正取得、およびポイントや**付与されたデジタル資産**のリアルマネー取引（RMT）を固く禁じます。</p>
           </section>
-          <div style={{ textAlign: 'center', marginTop: '30px' }}><Link href="/admin" style={{ color: '#ccc' }}>admin</Link></div>
+          <div style={{ textAlign: 'center', marginTop: '30px' }}><Link href="/admin" style={{ color: '#eee' }}>admin</Link></div>
         </div>
       )}
 
