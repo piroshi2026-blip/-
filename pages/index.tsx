@@ -36,13 +36,19 @@ export default function Home() {
     else if (sortBy === 'deadline') query = query.order('end_date', { ascending: true })
     else if (sortBy === 'popular') query = query.order('total_pool', { ascending: false })
     const { data } = await query
-    if (data) setMarkets(data.map((m: any) => ({ ...m, market_options: m.market_options.sort((a: any, b: any) => a.id - b.id) })))
+    if (data) {
+      // 確定済みのものを後ろに回すソート処理を追加
+      const sortedData = data.sort((a, b) => {
+        if (a.is_resolved === b.is_resolved) return 0;
+        return a.is_resolved ? 1 : -1;
+      });
+      setMarkets(sortedData.map((m: any) => ({ ...m, market_options: m.market_options.sort((a: any, b: any) => a.id - b.id) })))
+    }
   }, [sortBy])
 
   const initUserData = useCallback(async (userId: string) => {
     const { data: p } = await supabase.from('profiles').select('*').eq('id', userId).single()
     if (p) { setProfile(p); setNewUsername(p.username || ''); }
-    // 修正：配当計算のためにマーケットの総プールと全選択肢のプールも取得
     const { data: b } = await supabase.from('bets').select('*, markets(title, is_resolved, result_option_id, total_pool, market_options(id, pool)), market_options(name)').eq('user_id', userId).order('created_at', { ascending: false })
     if (b) setMyBets(b)
   }, [])
@@ -102,23 +108,23 @@ export default function Home() {
           const active = !m.is_resolved && new Date(m.end_date) > new Date(); 
           const days = Math.ceil((new Date(m.end_date).getTime() - new Date().getTime()) / 86400000);
           const isPopular = m.total_pool > 1000; const isUrgent = active && days <= 2;
-          return (<div key={m.id} style={{borderRadius:'16px', marginBottom:'16px', border: isUrgent ? '2px solid #ef4444' : '1px solid #e2e8f0', overflow:'hidden', position:'relative', background:'#fff', boxShadow:'0 4px 6px -1px rgba(0,0,0,0.05)'}}>
+          return (<div key={m.id} style={{borderRadius:'16px', marginBottom:'16px', border: isUrgent ? '2px solid #ef4444' : '1px solid #e2e8f0', overflow:'hidden', position:'relative', background:'#fff', boxShadow:'0 4px 6px -1px rgba(0,0,0,0.05)', opacity: m.is_resolved ? 0.8 : 1}}>
             <div style={{position:'absolute', top:10, right:10, zIndex:10, display:'flex', gap:'5px'}}>
-              {isPopular && <div style={{background:'#f59e0b', color:'#fff', fontSize:'10px', padding:'4px 8px', borderRadius:'8px', fontWeight:'bold'}}>💎 人気</div>}
+              {m.is_resolved && <div style={{background:'#10b981', color:'#fff', fontSize:'10px', padding:'4px 8px', borderRadius:'8px', fontWeight:'bold'}}>✅ 確定済み</div>}
+              {isPopular && !m.is_resolved && <div style={{background:'#f59e0b', color:'#fff', fontSize:'10px', padding:'4px 8px', borderRadius:'8px', fontWeight:'bold'}}>💎 人気</div>}
               {active && <div style={{background:isUrgent?'#ef4444':'#1f2937', color:'#fff', fontSize:'10px', padding:'4px 8px', borderRadius:'8px', fontWeight:'bold'}}>⏰ あと{days}日</div>}
             </div>
-            <div style={{height:'150px', position:'relative', background:'#eee'}}>{m.image_url && <img src={m.image_url} alt={m.title} style={{width:'100%', height:'100%', objectFit:'cover'}} />}
+            <div style={{height:'150px', position:'relative', background:'#eee'}}>{m.image_url && <img src={m.image_url} alt={m.title} style={{width:'100%', height:'100%', objectFit:'cover', filter: m.is_resolved ? 'grayscale(40%)' : 'none'}} />}
               <div style={{position:'absolute', top:10, left:10, background: categoryMeta[m.category]?.color || '#374151', color:'#fff', fontSize:'9px', padding:'4px 10px', borderRadius:'6px', fontWeight:'bold'}}>{m.category}</div>
               <div style={{position:'absolute', bottom:0, left:0, right:0, padding:'15px', background:'linear-gradient(to top, rgba(0,0,0,0.9), transparent)', color:'#fff'}}><h2 style={{fontSize:'16px', margin:0, fontWeight:'800'}}>{m.title}</h2></div>
             </div>
             <div style={{padding:'12px'}}>
-              {/* 復活：締切日時表示 */}
-              <div style={{fontSize:'10px', color:'#94a3b8', marginBottom:'6px'}}>⏰ 締切: {new Date(m.end_date).toLocaleString()}</div>
+              <div style={{fontSize:'10px', color:'#94a3b8', marginBottom:'6px'}}>⏰ {m.is_resolved ? '終了日時' : '締切'}: {new Date(m.end_date).toLocaleString()}</div>
               <div style={{ fontSize: '11px', color: '#64748b', background: '#f1f5f9', padding: '8px 10px', borderRadius: '8px', marginBottom: '12px', borderLeft: '4px solid #cbd5e1', lineHeight: '1.4' }}><strong>判定基準:</strong> {m.description}</div>
-              {m.market_options.map((opt: any, i: number) => { const pct = Math.round((opt.pool / (m.total_pool || 1)) * 100); return (<div key={opt.id} style={{marginBottom:'6px'}}><div style={{display:'flex', justifyContent:'space-between', fontSize:'12px', marginBottom:'2px'}}><span>{m.result_option_id === opt.id ? '👑 ' : ''}{opt.name}</span><span style={{fontWeight:'bold', color:'#2563eb'}}>{opt.pool===0?0:(m.total_pool/opt.pool).toFixed(1)}倍 <span style={{color:'#94a3b8', fontSize:'10px'}}>({pct}%)</span></span></div><div style={{height:'6px', background:'#e2e8f0', borderRadius:'3px', overflow:'hidden'}}><div style={{width:`${pct}%`, height:'100%', background:['#3b82f6', '#ef4444', '#10b981'][i%3]}} /></div></div>) })}
+              {m.market_options.map((opt: any, i: number) => { const pct = Math.round((opt.pool / (m.total_pool || 1)) * 100); return (<div key={opt.id} style={{marginBottom:'6px'}}><div style={{display:'flex', justifyContent:'space-between', fontSize:'12px', marginBottom:'2px'}}><span>{m.result_option_id === opt.id ? '👑 ' : ''}{opt.name}</span><span style={{fontWeight:'bold', color: m.result_option_id === opt.id ? '#10b981' : '#2563eb'}}>{opt.pool===0?0:(m.total_pool/opt.pool).toFixed(1)}倍 <span style={{color:'#94a3b8', fontSize:'10px'}}>({pct}%)</span></span></div><div style={{height:'6px', background:'#e2e8f0', borderRadius:'3px', overflow:'hidden'}}><div style={{width:`${pct}%`, height:'100%', background: m.result_option_id === opt.id ? '#10b981' : ['#3b82f6', '#ef4444', '#10b981'][i%3]}} /></div></div>) })}
               {active ? (selectedMarketId === m.id ? (<div style={{marginTop:'12px', background:'#f8fafc', padding:'12px', borderRadius:'12px', border:'1px solid #e2e8f0'}}><div style={{display:'flex', gap:'6px', flexWrap:'wrap', marginBottom:'12px'}}>{m.market_options.map((o: any) => (<button key={o.id} onClick={()=>setSelectedOptionId(o.id)} style={{padding:'8px 12px', borderRadius:'20px', border:selectedOptionId===o.id?'2px solid #2563eb':'1px solid #cbd5e1', fontSize:'12px', background:'#fff', color:selectedOptionId===o.id?'#2563eb':'#475569'}}>{o.name}</button>))}</div>
                 <div style={{display:'flex', alignItems:'center', gap:'10px', marginBottom:'12px'}}><input type="range" min="10" max={profile?.point_balance || 1000} step="10" value={voteAmount} onChange={e => setVoteAmount(Number(e.target.value))} style={{flex:1}} /><input type="number" value={voteAmount} onChange={e => setVoteAmount(Number(e.target.value))} style={{width:'70px', border:'1px solid #cbd5e1', borderRadius:'8px', padding:'5px', fontSize:'13px', textAlign:'center'}} /> <span style={{fontSize:'12px'}}>pt</span></div>
-                <button onClick={handleVote} style={{width:'100%', padding:'12px', background:'#1f2937', color:'#fff', borderRadius:'12px', fontWeight:'bold', border:'none'}}>確定する</button></div>) : (<button onClick={()=>setSelectedMarketId(m.id)} style={{width:'100%', padding:'10px', background:'#3b82f6', color:'#fff', borderRadius:'10px', fontWeight:'bold', border:'none', marginTop:'10px'}}>ヨソる</button>)) : <div style={{textAlign:'center', fontSize:'12px', color:'#94a3b8', marginTop:'10px', padding:'8px', background:'#f1f5f9', borderRadius:'8px'}}>判定中</div>}
+                <button onClick={handleVote} style={{width:'100%', padding:'12px', background:'#1f2937', color:'#fff', borderRadius:'12px', fontWeight:'bold', border:'none'}}>確定する</button></div>) : (<button onClick={()=>setSelectedMarketId(m.id)} style={{width:'100%', padding:'10px', background:'#3b82f6', color:'#fff', borderRadius:'10px', fontWeight:'bold', border:'none', marginTop:'10px'}}>ヨソる</button>)) : <div style={{textAlign:'center', fontSize:'12px', color: m.is_resolved ? '#10b981' : '#94a3b8', marginTop:'10px', padding:'8px', background: m.is_resolved ? '#ecfdf5' : '#f1f5f9', borderRadius:'8px', fontWeight: m.is_resolved ? 'bold' : 'normal'}}>{m.is_resolved ? `正解：${m.market_options.find((o:any) => o.id === m.result_option_id)?.name || '未設定'}` : '判定中'}</div>}
           </div></div>)
         })}</div>
       )}
@@ -157,10 +163,8 @@ export default function Home() {
 
             <h3 style={{fontSize:'16px', fontWeight:'800', margin:'0 0 15px'}}>📜 ヨソり履歴</h3>
             {myBets.map(b => {
-              // 修正：的中判定に使用するカラムを option_id に変更
               const isWin = b.markets.is_resolved && b.markets.result_option_id === b.option_id;
               const pool = b.markets.total_pool || 0;
-              // 修正：配当計算に使用するカラムを option_id に変更
               const winOption = b.markets.market_options?.find((o:any) => o.id === b.option_id);
               const winOptionPool = winOption?.pool || 0;
               const odds = winOptionPool > 0 ? (pool / winOptionPool).toFixed(1) : "0";
@@ -180,7 +184,6 @@ export default function Home() {
                       <div style={{fontSize:'12px', fontWeight:'bold', color: b.markets.is_resolved ? (isWin ? '#10b981' : '#ef4444') : '#666'}}>
                         {b.markets.is_resolved ? (isWin ? '🎯 的中！' : '不的中') : '判定中'}
                       </div>
-                      {/* 復活・追加：𝕏投稿ボタン */}
                       {isWin && (
                         <button 
                           onClick={() => {
