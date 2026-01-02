@@ -9,11 +9,12 @@ const supabase = createClient(
 
 export default function Admin() {
   // --- 管理者パスワード設定 ---
-  const ADMIN_PASSWORD = 'yosoru_admin' // ← ここを好きなパスワードに変更してください
+  const ADMIN_PASSWORD = 'yosoru_admin' 
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [passInput, setPassInput] = useState('')
 
   const [activeTab, setActiveTab] = useState<'markets' | 'categories' | 'users' | 'config'>('markets')
+  const [marketSortBy, setMarketSortBy] = useState<'deadline' | 'category' | 'popular'>('deadline')
   const [markets, setMarkets] = useState<any[]>([])
   const [categories, setCategories] = useState<any[]>([])
   const [users, setUsers] = useState<any[]>([])
@@ -22,7 +23,6 @@ export default function Admin() {
     id: 1, site_title: '', site_description: '', admin_message: '', show_ranking: true, share_text_base: '' 
   })
 
-  const [marketSortBy, setMarketSortBy] = useState<'deadline' | 'category' | 'popular'>('deadline')
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editForm, setEditForm] = useState<any>({})
   const [newOptionName, setNewOptionName] = useState('')
@@ -30,7 +30,7 @@ export default function Admin() {
   const [newMarket, setNewMarket] = useState({ title: '', category: '', end_date: '', description: '', image_url: '', options: '' })
   const [newCategory, setNewCategory] = useState({ name: '', icon: '', display_order: 0 })
 
-  // ブラウザ保存を利用してリロード時の利便性を確保（任意）
+  // 認証チェック
   useEffect(() => {
     const authStatus = localStorage.getItem('yosoru_admin_auth')
     if (authStatus === 'true') setIsAuthenticated(true)
@@ -40,9 +40,7 @@ export default function Admin() {
     if (passInput === ADMIN_PASSWORD) {
       setIsAuthenticated(true)
       localStorage.setItem('yosoru_admin_auth', 'true')
-    } else {
-      alert('パスワードが違います')
-    }
+    } else { alert('パスワードが違います') }
   }
 
   const handleLogout = () => {
@@ -52,19 +50,21 @@ export default function Admin() {
   }
 
   const fetchData = useCallback(async () => {
-    if (!isAuthenticated) return // 認証前はデータを取らない
+    if (!isAuthenticated) return
     setIsLoading(true)
-    let marketQuery = supabase.from('markets').select('*, market_options(*)')
-    if (marketSortBy === 'deadline') marketQuery = marketQuery.order('end_date', { ascending: true })
-    else if (marketSortBy === 'category') marketQuery = marketQuery.order('category', { ascending: true })
-    else if (marketSortBy === 'popular') marketQuery = marketQuery.order('total_pool', { ascending: false })
+
+    let mQuery = supabase.from('markets').select('*, market_options(*)')
+    if (marketSortBy === 'deadline') mQuery = mQuery.order('end_date', { ascending: true })
+    else if (marketSortBy === 'category') mQuery = mQuery.order('category', { ascending: true })
+    else if (marketSortBy === 'popular') mQuery = mQuery.order('total_pool', { ascending: false })
 
     const [m, c, u, cfg] = await Promise.all([
-      marketQuery,
+      mQuery,
       supabase.from('categories').select('*').order('display_order', { ascending: true }),
       supabase.from('profiles').select('*').order('point_balance', { ascending: false }),
       supabase.from('site_config').select('*').single()
     ])
+
     if (m.data) setMarkets(m.data)
     if (c.data) setCategories(c.data)
     if (u.data) setUsers(u.data)
@@ -74,111 +74,172 @@ export default function Admin() {
 
   useEffect(() => { fetchData() }, [fetchData])
 
-  // --- 以降、既存の全機能を維持 ---
-  async function handleUpdateConfig() { await supabase.from('site_config').update(siteConfig).eq('id', siteConfig.id); alert('保存完了'); }
-  async function handleUserUpdate(id: string, updates: any) { await supabase.from('profiles').update(updates).eq('id', id); fetchData(); }
+  // --- サイト設定・メッセージ編集 ---
+  async function handleUpdateConfig() {
+    await supabase.from('site_config').update(siteConfig).eq('id', siteConfig.id)
+    alert('設定を保存しました')
+  }
+
+  // --- カテゴリー管理（追加・編集・順序変更） ---
+  async function handleUpdateCategory(id: number, updates: any) {
+    await supabase.from('categories').update(updates).eq('id', id)
+    fetchData()
+  }
+
+  async function handleAddCategory() {
+    if (!newCategory.name) return
+    await supabase.from('categories').insert([newCategory])
+    setNewCategory({ name: '', icon: '', display_order: 0 })
+    fetchData()
+  }
+
+  // --- 画像アップロード ---
   async function uploadImage(e: any, isEdit: boolean) {
-    setUploading(true); const file = e.target.files[0]; const fileName = `${Math.random()}.${file.name.split('.').pop()}`;
-    const { error } = await supabase.storage.from('market-images').upload(fileName, file);
+    setUploading(true)
+    const file = e.target.files[0]
+    const fileName = `${Math.random()}.${file.name.split('.').pop()}`
+    const { error } = await supabase.storage.from('market-images').upload(fileName, file)
     if (!error) {
-      const { data: { publicUrl } } = supabase.storage.from('market-images').getPublicUrl(fileName);
-      if (isEdit) setEditForm({ ...editForm, image_url: publicUrl }); else setNewMarket({ ...newMarket, image_url: publicUrl });
+      const { data: { publicUrl } } = supabase.storage.from('market-images').getPublicUrl(fileName)
+      if (isEdit) setEditForm({ ...editForm, image_url: publicUrl })
+      else setNewMarket({ ...newMarket, image_url: publicUrl })
+      alert('画像をアップロードしました')
     }
-    setUploading(false);
+    setUploading(false)
   }
+
+  // --- 問いの作成・編集・配当確定 ---
+  async function handleCreateMarket() {
+    const optArray = newMarket.options.split(',').map(s => s.trim())
+    const { error } = await supabase.rpc('create_market_with_options', {
+      title_input: newMarket.title, category_input: newMarket.category,
+      end_date_input: new Date(newMarket.end_date).toISOString(), description_input: newMarket.description,
+      image_url_input: newMarket.image_url, options_input: optArray
+    })
+    if (!error) { alert('作成完了'); fetchData(); }
+  }
+
   async function handleUpdateMarket() {
-    await supabase.from('markets').update({ title: editForm.title, description: editForm.description, category: editForm.category, end_date: new Date(editForm.end_date).toISOString(), image_url: editForm.image_url }).eq('id', editingId)
-    for (const opt of editForm.market_options) { await supabase.from('market_options').update({ name: opt.name }).eq('id', opt.id) }
-    if (newOptionName.trim()) { await supabase.from('market_options').insert([{ market_id: editingId, name: newOptionName.trim(), pool: 0 }]); setNewOptionName(''); }
-    setEditingId(null); fetchData(); alert('更新完了');
-  }
-  async function handleResolve(marketId: number, optionId: number) {
-    if(!confirm('配当を確定しますか？')) return;
-    const { error } = await supabase.rpc('resolve_market', { market_id_input: marketId, winning_option_id: optionId });
-    if (!error) { alert('配当確定成功'); fetchData(); }
+    await supabase.from('markets').update({ 
+      title: editForm.title, description: editForm.description, category: editForm.category, 
+      end_date: new Date(editForm.end_date).toISOString(), image_url: editForm.image_url 
+    }).eq('id', editingId)
+    for (const opt of editForm.market_options) {
+      await supabase.from('market_options').update({ name: opt.name }).eq('id', opt.id)
+    }
+    if (newOptionName.trim()) {
+      await supabase.from('market_options').insert([{ market_id: editingId, name: newOptionName.trim(), pool: 0 }])
+      setNewOptionName('')
+    }
+    setEditingId(null); fetchData(); alert('更新完了')
   }
 
   const s: any = {
-    inp: { padding: '8px', border: '1px solid #ddd', borderRadius: '6px', width: '100%', boxSizing: 'border-box', marginBottom: '8px' },
-    btn: { background: '#1f2937', color: 'white', padding: '10px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' },
-    tab: (active: boolean) => ({ flex: 1, padding: '12px', background: active ? '#1f2937' : '#eee', color: active ? 'white' : '#666', border: 'none', cursor: 'pointer', fontWeight: 'bold' }),
-    sortBtn: (active: boolean) => ({ padding: '6px 12px', borderRadius: '20px', border: active ? 'none' : '1px solid #ddd', background: active ? '#3b82f6' : '#fff', color: active ? '#fff' : '#666', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' })
+    inp: { padding: '10px', border: '1px solid #ddd', borderRadius: '8px', width: '100%', boxSizing: 'border-box', marginBottom: '10px', fontSize:'14px' },
+    btn: { background: '#1f2937', color: 'white', padding: '12px 20px', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' },
+    tab: (active: boolean) => ({ flex: 1, padding: '14px', background: active ? '#1f2937' : '#eee', color: active ? 'white' : '#666', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize:'13px' })
   }
 
-  // --- 未認証時のログイン画面 ---
   if (!isAuthenticated) {
     return (
-      <div style={{ maxWidth: '400px', margin: '100px auto', padding: '20px', textAlign: 'center', fontFamily: 'sans-serif' }}>
-        <h2>管理者認証</h2>
-        <input type="password" placeholder="パスワードを入力" value={passInput} onChange={e => setPassInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleLogin()} style={s.inp} />
+      <div style={{ maxWidth: '400px', margin: '100px auto', padding: '30px', textAlign: 'center', fontFamily: 'sans-serif', background:'#fff', borderRadius:'20px', boxShadow:'0 10px 25px rgba(0,0,0,0.1)' }}>
+        <h2 style={{fontWeight:'900', marginBottom:'20px'}}>Admin Login</h2>
+        <input type="password" placeholder="パスワード" value={passInput} onChange={e => setPassInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleLogin()} style={s.inp} />
         <button onClick={handleLogin} style={{ ...s.btn, width: '100%', background: '#3b82f6' }}>ログイン</button>
-        <div style={{ marginTop: '20px' }}><Link href="/" style={{ color: '#999', fontSize: '12px' }}>← ホームへ戻る</Link></div>
       </div>
     )
   }
 
-  if (isLoading) return <div style={{padding:'20px'}}>読み込み中...</div>
-
   return (
     <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '20px', fontFamily: 'sans-serif' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h1>🛠 管理パネル</h1>
+        <h1 style={{fontWeight:'900'}}>🛠 管理パネル</h1>
         <div style={{ display: 'flex', gap: '10px' }}>
-          <Link href="/"><button style={{...s.btn, background: '#3b82f6'}}>🏠 戻る</button></Link>
-          <button onClick={handleLogout} style={{...s.btn, background: '#ef4444'}}>🚪 ログアウト</button>
+          <Link href="/"><button style={{...s.btn, background: '#3b82f6', padding:'8px 15px'}}>🏠 アプリへ</button></Link>
+          <button onClick={handleLogout} style={{...s.btn, background: '#ef4444', padding:'8px 15px'}}>🚪 ログアウト</button>
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: '2px', marginBottom: '20px' }}>
+      <div style={{ display: 'flex', gap: '2px', marginBottom: '20px', borderRadius:'10px', overflow:'hidden' }}>
         <button onClick={() => setActiveTab('markets')} style={s.tab(activeTab === 'markets')}>問い管理</button>
         <button onClick={() => setActiveTab('categories')} style={s.tab(activeTab === 'categories')}>カテゴリ</button>
         <button onClick={() => setActiveTab('users')} style={s.tab(activeTab === 'users')}>ユーザー</button>
         <button onClick={() => setActiveTab('config')} style={s.tab(activeTab === 'config')}>サイト設定</button>
       </div>
 
+      {activeTab === 'config' && (
+        <section style={{ background: '#f8fafc', padding: '24px', borderRadius: '16px', border:'1px solid #e2e8f0' }}>
+          <h3 style={{marginTop:0, fontWeight:'900'}}>📢 サイト基本情報・メッセージ編集</h3>
+          <div style={{display:'grid', gap:'15px'}}>
+            <div><label style={{fontSize:'12px', fontWeight:'bold'}}>サイトタイトル</label><input value={siteConfig.site_title} onChange={e => setSiteConfig({...siteConfig, site_title: e.target.value})} style={s.inp} /></div>
+            <div><label style={{fontSize:'12px', fontWeight:'bold'}}>タイトル下の説明文</label><input value={siteConfig.site_description} onChange={e => setSiteConfig({...siteConfig, site_description: e.target.value})} style={s.inp} /></div>
+            <div><label style={{fontSize:'12px', fontWeight:'bold'}}>通信欄メッセージ (ホーム上部)</label><textarea value={siteConfig.admin_message} onChange={e => setSiteConfig({...siteConfig, admin_message: e.target.value})} style={{...s.inp, height:'80px'}} /></div>
+            <div><label style={{fontSize:'12px', fontWeight:'bold'}}>𝕏投稿テンプレート</label><textarea value={siteConfig.share_text_base} onChange={e => setSiteConfig({...siteConfig, share_text_base: e.target.value})} style={{...s.inp, height:'80px'}} /></div>
+            <button onClick={handleUpdateConfig} style={{...s.btn, background: '#10b981', width:'100%', fontSize:'16px'}}>設定を保存する</button>
+          </div>
+        </section>
+      )}
+
       {activeTab === 'markets' && (
         <>
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '15px', alignItems: 'center' }}>
-            <span style={{ fontSize: '12px', color: '#666', fontWeight: 'bold' }}>並び替え:</span>
-            <button onClick={() => setMarketSortBy('deadline')} style={s.sortBtn(marketSortBy === 'deadline')}>⏰ 締切順</button>
-            <button onClick={() => setMarketSortBy('category')} style={s.sortBtn(marketSortBy === 'category')}>📁 カテゴリ順</button>
-            <button onClick={() => setMarketSortBy('popular')} style={s.sortBtn(marketSortBy === 'popular')}>🔥 人気順</button>
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', alignItems: 'center' }}>
+            <span style={{fontSize:'13px', fontWeight:'bold'}}>並び替え:</span>
+            {['deadline', 'category', 'popular'].map(t => <button key={t} onClick={() => setMarketSortBy(t as any)} style={{padding:'6px 12px', borderRadius:'20px', border:marketSortBy===t?'none':'1px solid #ddd', background:marketSortBy===t?'#3b82f6':'#fff', color:marketSortBy===t?'#fff':'#666', fontSize:'12px', fontWeight:'bold'}}>{t==='deadline'?'⏰締切順':t==='category'?'📁カテゴリ順':'🔥人気順'}</button>)}
           </div>
 
-          <section style={{ background: '#f4f4f4', padding: '15px', borderRadius: '10px', marginBottom: '20px' }}>
-            <h3>🆕 新規問い作成</h3>
+          <section style={{ background: '#f4f4f4', padding: '20px', borderRadius: '12px', marginBottom: '30px' }}>
+            <h3 style={{marginTop:0}}>🆕 新規問い作成</h3>
             <input placeholder="タイトル" value={newMarket.title} onChange={e => setNewMarket({...newMarket, title: e.target.value})} style={s.inp} />
+            <textarea placeholder="判定基準の詳細" value={newMarket.description} onChange={e => setNewMarket({...newMarket, description: e.target.value})} style={{...s.inp, height:'60px'}} />
             <div style={{ display: 'flex', gap: '10px' }}>
               <select value={newMarket.category} onChange={e => setNewMarket({...newMarket, category: e.target.value})} style={s.inp}>
-                <option value="">カテゴリ選択</option>{categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                <option value="">カテゴリを選択</option>{categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
               </select>
               <input type="datetime-local" onChange={e => setNewMarket({...newMarket, end_date: e.target.value})} style={s.inp} />
             </div>
-            <input type="file" onChange={e => uploadImage(e, false)} />
+            <div style={{marginBottom:'15px'}}><label style={{fontSize:'12px', display:'block'}}>画像アップロード</label><input type="file" onChange={e => uploadImage(e, false)} /></div>
             <input placeholder="選択肢 (カンマ区切り)" value={newMarket.options} onChange={e => setNewMarket({...newMarket, options: e.target.value})} style={s.inp} />
-            <button onClick={() => { const optArray = newMarket.options.split(',').map(ss => ss.trim()); supabase.rpc('create_market_with_options', { title_input: newMarket.title, category_input: newMarket.category, end_date_input: new Date(newMarket.end_date).toISOString(), description_input: newMarket.description, image_url_input: newMarket.image_url, options_input: optArray }).then(()=>fetchData()) }} style={{ ...s.btn, width: '100%', background: '#3b82f6' }}>問いを公開</button>
+            <button onClick={handleCreateMarket} style={{ ...s.btn, width: '100%', background: '#3b82f6' }}>問いを公開する</button>
           </section>
 
           {markets.map(m => (
-            <div key={m.id} style={{ border: '1px solid #eee', padding: '15px', marginBottom: '10px', borderRadius: '10px', background:'#fff' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div><strong>{m.title}</strong><div style={{fontSize:'11px', color:'#666'}}>{m.category} | ⏰ {new Date(m.end_date).toLocaleString()} | 🔥 {m.total_pool}pt</div></div>
-                <button onClick={() => { setEditingId(m.id); setEditForm({...m, end_date: new Date(m.end_date).toISOString().slice(0,16)}); }} style={{...s.btn, background:'#3b82f6', padding:'5px 12px'}}>編集</button>
+            <div key={m.id} style={{ border: '1px solid #eee', padding: '20px', marginBottom: '15px', borderRadius: '12px', background:'#fff' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <strong style={{fontSize:'18px'}}>{m.title}</strong>
+                  <div style={{fontSize:'12px', color:'#666', marginTop:'5px'}}>{m.category} | ⏰ 締切: {new Date(m.end_date).toLocaleString()} | 🔥 {m.total_pool}pt</div>
+                </div>
+                <button onClick={() => { setEditingId(m.id); setEditForm({...m, end_date: new Date(m.end_date).toISOString().slice(0,16)}); }} style={{...s.btn, background:'#3b82f6', padding:'8px 15px'}}>編集</button>
               </div>
+
               {editingId === m.id && (
-                <div style={{ marginTop: '10px', padding: '10px', border: '1px solid #ddd', borderRadius: '8px' }}>
+                <div style={{ marginTop: '20px', padding: '20px', background: '#f9fafb', borderRadius: '12px', border:'1px solid #e2e8f0' }}>
                   <input value={editForm.title} onChange={e => setEditForm({...editForm, title: e.target.value})} style={s.inp} />
-                  {editForm.market_options.map((opt: any, idx: number) => (
-                    <input key={opt.id} value={opt.name} onChange={e => { const newOpts = [...editForm.market_options]; newOpts[idx].name = e.target.value; setEditForm({ ...editForm, market_options: newOpts }) }} style={s.inp} />
-                  ))}
-                  <input placeholder="+ 選択肢を追加" value={newOptionName} onChange={e => setNewOptionName(e.target.value)} style={{ ...s.inp, border: '1px solid #3b82f6' }} />
-                  <button onClick={handleUpdateMarket} style={{...s.btn, width:'100%', background:'#10b981'}}>保存</button>
+                  <textarea value={editForm.description} onChange={e => setEditForm({...editForm, description: e.target.value})} style={{...s.inp, height:'60px'}} />
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <select value={editForm.category} onChange={e => setEditForm({...editForm, category: e.target.value})} style={s.inp}>
+                      {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                    </select>
+                    <input type="datetime-local" value={editForm.end_date} onChange={e => setEditForm({...editForm, end_date: e.target.value})} style={s.inp} />
+                  </div>
+                  <div style={{marginBottom:'15px'}}><label style={{fontSize:'12px'}}>画像変更</label><br/><input type="file" onChange={e => uploadImage(e, true)} /></div>
+
+                  <div style={{background:'#fff', padding:'15px', borderRadius:'8px', border:'1px solid #ddd'}}>
+                    <div style={{fontSize:'13px', fontWeight:'bold', marginBottom:'10px'}}>選択肢の編集・追加</div>
+                    {editForm.market_options.map((opt: any, idx: number) => (
+                      <input key={opt.id} value={opt.name} onChange={e => { const newOpts = [...editForm.market_options]; newOpts[idx].name = e.target.value; setEditForm({ ...editForm, market_options: newOpts }) }} style={s.inp} />
+                    ))}
+                    <input placeholder="+ 新しい選択肢を追加" value={newOptionName} onChange={e => setNewOptionName(e.target.value)} style={{ ...s.inp, border: '1px solid #3b82f6', marginBottom:0 }} />
+                  </div>
+                  <button onClick={handleUpdateMarket} style={{...s.btn, width:'100%', background:'#10b981', marginTop:'15px'}}>変更を保存</button>
                 </div>
               )}
+
               {!m.is_resolved && (
-                <div style={{marginTop:'10px', borderTop:'1px dashed #eee', paddingTop:'10px'}}>
+                <div style={{marginTop:'15px', borderTop:'1px dashed #ddd', paddingTop:'15px'}}>
+                  <div style={{fontSize:'12px', color:'#ef4444', fontWeight:'bold', marginBottom:'8px'}}>配当確定（決定ボタン）</div>
                   {m.market_options.map((opt: any) => (
-                    <button key={opt.id} onClick={() => handleResolve(m.id, opt.id)} style={{fontSize:'10px', marginRight:'5px', padding:'4px 8px', borderRadius:'4px', border:'1px solid #ef4444', color:'#ef4444', background:'#fff'}}>「{opt.name}」で確定</button>
+                    <button key={opt.id} onClick={() => supabase.rpc('resolve_market', { market_id_input: m.id, winning_option_id: opt.id }).then(()=>fetchData())} style={{fontSize:'11px', marginRight:'8px', padding:'6px 12px', borderRadius:'6px', border:'1px solid #ef4444', color:'#ef4444', background:'#fff', fontWeight:'bold'}}>「{opt.name}」で確定</button>
                   ))}
                 </div>
               )}
@@ -187,26 +248,33 @@ export default function Admin() {
         </>
       )}
 
-      {/* 設定、ユーザー、カテゴリ管理の既存UIは省略せずコード内に完全に含まれています */}
-      {activeTab === 'config' && (
-        <section style={{ background: '#f9f9f9', padding: '20px', borderRadius: '12px' }}>
-          <h3>📢 サイト設定</h3>
-          <input value={siteConfig.site_title} onChange={e => setSiteConfig({...siteConfig, site_title: e.target.value})} placeholder="タイトル" style={s.inp} />
-          <textarea value={siteConfig.share_text_base} onChange={e => setSiteConfig({...siteConfig, share_text_base: e.target.value})} placeholder="𝕏投稿文" style={{...s.inp, height:'60px'}} />
-          <button onClick={handleUpdateConfig} style={{...s.btn, background: '#10b981', width:'100%'}}>保存</button>
+      {activeTab === 'categories' && (
+        <section style={{ background: '#fff', padding: '20px', borderRadius: '12px', border:'1px solid #eee' }}>
+          <h3 style={{marginTop:0}}>📁 カテゴリの編集・追加・順序変更</h3>
+          {categories.map(c => (
+            <div key={c.id} style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+              <input type="number" defaultValue={c.display_order} onBlur={e => handleUpdateCategory(c.id, { display_order: Number(e.target.value) })} style={{ width: '60px', padding:'8px', border:'1px solid #ddd', borderRadius:'6px' }} />
+              <input defaultValue={c.name} onBlur={e => handleUpdateCategory(c.id, { name: e.target.value })} style={{...s.inp, marginBottom:0}} />
+              <button onClick={() => supabase.from('categories').delete().eq('id', c.id).then(()=>fetchData())} style={{background:'none', border:'none', color:'#ef4444', cursor:'pointer', padding:'0 10px'}}>✕</button>
+            </div>
+          ))}
+          <div style={{marginTop:'20px', borderTop:'1px solid #eee', paddingTop:'20px'}}>
+            <input placeholder="新しいカテゴリ名" value={newCategory.name} onChange={e => setNewCategory({...newCategory, name: e.target.value})} style={s.inp} />
+            <button onClick={handleAddCategory} style={{...s.btn, width:'100%'}}>新しいカテゴリを追加</button>
+          </div>
         </section>
       )}
 
       {activeTab === 'users' && (
-        <table style={{ width: '100%', fontSize: '13px' }}>
-          <thead><tr style={{ background: '#eee' }}><th>ユーザー</th><th>ポイント</th><th>ランキング</th><th>操作</th></tr></thead>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+          <thead><tr style={{ background: '#eee', textAlign:'left' }}><th style={{padding:'12px'}}>ユーザー</th><th>ポイント</th><th>ランキング</th><th>操作</th></tr></thead>
           <tbody>
             {users.map(u => (
               <tr key={u.id} style={{ borderBottom: '1px solid #eee' }}>
-                <td>{u.username || '匿名'}</td>
-                <td><input type="number" defaultValue={u.point_balance} onBlur={e => supabase.from('profiles').update({ point_balance: Number(e.target.value) }).eq('id', u.id).then(()=>fetchData())} style={{ width: '80px' }} /></td>
-                <td><button onClick={() => supabase.from('profiles').update({ is_hidden_from_ranking: !u.is_hidden_from_ranking }).eq('id', u.id).then(()=>fetchData())}>{u.is_hidden_from_ranking ? '隠し' : '表示'}</button></td>
-                <td><button onClick={() => { if(confirm('削除？')) supabase.from('profiles').delete().eq('id', u.id).then(()=>fetchData()) }} style={{ color: 'red' }}>削除</button></td>
+                <td style={{padding:'12px'}}>{u.username || '匿名'}</td>
+                <td><input type="number" defaultValue={u.point_balance} onBlur={e => supabase.from('profiles').update({ point_balance: Number(e.target.value) }).eq('id', u.id).then(()=>fetchData())} style={{ width: '90px', padding:'5px' }} /></td>
+                <td><button onClick={() => supabase.from('profiles').update({ is_hidden_from_ranking: !u.is_hidden_from_ranking }).eq('id', u.id).then(()=>fetchData())} style={{padding:'4px 8px', borderRadius:'4px', border:'none', background:u.is_hidden_from_ranking?'#94a3b8':'#10b981', color:'#fff', fontSize:'11px'}}>{u.is_hidden_from_ranking ? '隠し中' : '表示中'}</button></td>
+                <td><button onClick={() => { if(confirm('削除しますか？')) supabase.from('profiles').delete().eq('id', u.id).then(()=>fetchData()) }} style={{ color: '#ef4444', border:'none', background:'none', cursor:'pointer' }}>削除</button></td>
               </tr>
             ))}
           </tbody>
