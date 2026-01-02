@@ -23,7 +23,7 @@ export default function Home() {
   const [newUsername, setNewUsername] = useState(''); const [isEditingName, setIsEditingName] = useState(false)
   const [activeCategory, setActiveCategory] = useState('すべて')
 
-  // 修正：初期の並び替えを 'deadline' (締切順) に変更
+  // 初期表示を締切順に設定
   const [sortBy, setSortBy] = useState<'new' | 'deadline' | 'popular'>('deadline')
 
   const [voteAmount, setVoteAmount] = useState(100)
@@ -40,7 +40,7 @@ export default function Home() {
     else if (sortBy === 'popular') query = query.order('total_pool', { ascending: false })
     const { data } = await query
     if (data) {
-      // 確定済みのものを後ろに回すソート処理（維持）
+      // 確定済みを後ろに回すソート
       const sortedData = data.sort((a, b) => {
         if (a.is_resolved === b.is_resolved) return 0;
         return a.is_resolved ? 1 : -1;
@@ -129,13 +129,11 @@ export default function Home() {
                 {active ? (selectedMarketId === m.id ? (<div style={{marginTop:'12px', background:'#f8fafc', padding:'12px', borderRadius:'12px', border:'1px solid #e2e8f0'}}><div style={{display:'flex', gap:'6px', flexWrap:'wrap', marginBottom:'12px'}}>{m.market_options.map((o: any) => (<button key={o.id} onClick={()=>setSelectedOptionId(o.id)} style={{padding:'8px 12px', borderRadius:'20px', border:selectedOptionId===o.id?'2px solid #2563eb':'1px solid #cbd5e1', fontSize:'12px', background:'#fff', color:selectedOptionId===o.id?'#2563eb':'#475569'}}>{o.name}</button>))}</div>
                   <div style={{display:'flex', alignItems:'center', gap:'10px', marginBottom:'12px'}}><input type="range" min="10" max={profile?.point_balance || 1000} step="10" value={voteAmount} onChange={e => setVoteAmount(Number(e.target.value))} style={{flex:1}} /><input type="number" value={voteAmount} onChange={e => setVoteAmount(Number(e.target.value))} style={{width:'70px', border:'1px solid #cbd5e1', borderRadius:'8px', padding:'5px', fontSize:'13px', textAlign:'center'}} /> <span style={{fontSize:'12px'}}>pt</span></div>
                   <button onClick={handleVote} style={{width:'100%', padding:'12px', background:'#1f2937', color:'#fff', borderRadius:'12px', fontWeight:'bold', border:'none'}}>確定する</button></div>) : (<button onClick={()=>setSelectedMarketId(m.id)} style={{width:'100%', padding:'10px', background:'#3b82f6', color:'#fff', borderRadius:'10px', fontWeight:'bold', border:'none', marginTop:'10px'}}>ヨソる</button>)) : <div style={{textAlign:'center', fontSize:'12px', color: m.is_resolved ? '#10b981' : '#94a3b8', marginTop:'10px', padding:'8px', background: m.is_resolved ? '#ecfdf5' : '#f1f5f9', borderRadius:'8px', fontWeight: m.is_resolved ? 'bold' : 'normal'}}>{m.is_resolved ? `正解：${m.market_options.find((o:any) => o.id === m.result_option_id)?.name || '未設定'}` : '判定中'}</div>}
+              </div>
             </div>
           )
         })}</div>
       )}
-
-      {/* ランキング・マイページ・ガイド部分は変更なし */}
-      {/* ... (省略された部分は以前のコードをそのまま維持) */}
 
       {activeTab === 'ranking' && (
         <div style={{ border: '1px solid #e2e8f0', borderRadius: '16px', overflow: 'hidden', background:'#fff' }}>
@@ -215,7 +213,6 @@ export default function Home() {
 
       {activeTab === 'info' && (
         <div style={{ fontSize: '13px', padding: '10px' }}>
-          {/* ...利用規約部分も変更なし */}
           <section style={{background:'#fff', padding:'20px', borderRadius:'16px', border:'1px solid #e2e8f0', marginBottom:'20px'}}>
             <h3 style={{borderBottom:'3px solid #3b82f6', paddingBottom:'8px', marginTop:0, fontWeight:'900'}}>📖 ヨソるの遊び方</h3>
             <p>1. 未来に起こる出来事を予想し、自分の信じる答えにポイントをヨソ（ベット）ります。</p>
