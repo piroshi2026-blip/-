@@ -42,7 +42,8 @@ export default function Home() {
   const initUserData = useCallback(async (userId: string) => {
     const { data: p } = await supabase.from('profiles').select('*').eq('id', userId).single()
     if (p) { setProfile(p); setNewUsername(p.username || ''); }
-    const { data: b } = await supabase.from('bets').select('*, markets(title, is_resolved, result_option_id), market_options(name)').eq('user_id', userId).order('created_at', { ascending: false })
+    // 修正：配当計算のためにマーケットの総プールと全選択肢のプールも取得
+    const { data: b } = await supabase.from('bets').select('*, markets(title, is_resolved, result_option_id, total_pool, market_options(id, pool)), market_options(name)').eq('user_id', userId).order('created_at', { ascending: false })
     if (b) setMyBets(b)
   }, [])
 
@@ -111,6 +112,8 @@ export default function Home() {
               <div style={{position:'absolute', bottom:0, left:0, right:0, padding:'15px', background:'linear-gradient(to top, rgba(0,0,0,0.9), transparent)', color:'#fff'}}><h2 style={{fontSize:'16px', margin:0, fontWeight:'800'}}>{m.title}</h2></div>
             </div>
             <div style={{padding:'12px'}}>
+              {/* 復活：締切日時表示 */}
+              <div style={{fontSize:'10px', color:'#94a3b8', marginBottom:'6px'}}>⏰ 締切: {new Date(m.end_date).toLocaleString()}</div>
               <div style={{ fontSize: '11px', color: '#64748b', background: '#f1f5f9', padding: '8px 10px', borderRadius: '8px', marginBottom: '12px', borderLeft: '4px solid #cbd5e1', lineHeight: '1.4' }}><strong>判定基準:</strong> {m.description}</div>
               {m.market_options.map((opt: any, i: number) => { const pct = Math.round((opt.pool / (m.total_pool || 1)) * 100); return (<div key={opt.id} style={{marginBottom:'6px'}}><div style={{display:'flex', justifyContent:'space-between', fontSize:'12px', marginBottom:'2px'}}><span>{m.result_option_id === opt.id ? '👑 ' : ''}{opt.name}</span><span style={{fontWeight:'bold', color:'#2563eb'}}>{opt.pool===0?0:(m.total_pool/opt.pool).toFixed(1)}倍 <span style={{color:'#94a3b8', fontSize:'10px'}}>({pct}%)</span></span></div><div style={{height:'6px', background:'#e2e8f0', borderRadius:'3px', overflow:'hidden'}}><div style={{width:`${pct}%`, height:'100%', background:['#3b82f6', '#ef4444', '#10b981'][i%3]}} /></div></div>) })}
               {active ? (selectedMarketId === m.id ? (<div style={{marginTop:'12px', background:'#f8fafc', padding:'12px', borderRadius:'12px', border:'1px solid #e2e8f0'}}><div style={{display:'flex', gap:'6px', flexWrap:'wrap', marginBottom:'12px'}}>{m.market_options.map((o: any) => (<button key={o.id} onClick={()=>setSelectedOptionId(o.id)} style={{padding:'8px 12px', borderRadius:'20px', border:selectedOptionId===o.id?'2px solid #2563eb':'1px solid #cbd5e1', fontSize:'12px', background:'#fff', color:selectedOptionId===o.id?'#2563eb':'#475569'}}>{o.name}</button>))}</div>
@@ -153,17 +156,46 @@ export default function Home() {
             </div>
 
             <h3 style={{fontSize:'16px', fontWeight:'800', margin:'0 0 15px'}}>📜 ヨソり履歴</h3>
-            {myBets.map(b => (
-              <div key={b.id} style={{padding:'15px', background:'#fff', border:'1px solid #e2e8f0', borderRadius:'16px', marginBottom:'10px', borderLeft: b.markets.is_resolved && b.markets.result_option_id === b.market_option_id ? '6px solid #10b981' : b.markets.is_resolved ? '6px solid #ef4444' : '6px solid #cbd5e1'}}>
-                <div style={{fontSize:'11px', color:'#64748b'}}>{b.markets.title}</div>
-                <div style={{display:'flex', justifyContent:'space-between', fontWeight:'bold', marginTop:'5px'}}>
-                  <span>{b.market_options.name} / {b.amount}pt</span>
-                  <span style={{color: b.markets.is_resolved ? (b.markets.result_option_id === b.market_option_id ? '#10b981' : '#ef4444') : '#666'}}>
-                    {b.markets.is_resolved ? (b.markets.result_option_id === b.market_option_id ? '🎯 的中！' : '終了') : '判定中'}
-                  </span>
+            {myBets.map(b => {
+              // 追加：詳細な配当計算ロジック
+              const isWin = b.markets.is_resolved && b.markets.result_option_id === b.market_option_id;
+              const pool = b.markets.total_pool || 0;
+              const winOption = b.markets.market_options?.find((o:any) => o.id === b.market_option_id);
+              const winOptionPool = winOption?.pool || 0;
+              const odds = winOptionPool > 0 ? (pool / winOptionPool).toFixed(1) : "0";
+              const payout = isWin ? Math.floor(b.amount * Number(odds)) : 0;
+
+              return (
+                <div key={b.id} style={{padding:'15px', background:'#fff', border:'1px solid #e2e8f0', borderRadius:'16px', marginBottom:'10px', borderLeft: b.markets.is_resolved && b.markets.result_option_id === b.market_option_id ? '6px solid #10b981' : b.markets.is_resolved ? '6px solid #ef4444' : '6px solid #cbd5e1'}}>
+                  <div style={{fontSize:'11px', color:'#64748b'}}>{b.markets.title}</div>
+                  <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginTop:'5px'}}>
+                    <div>
+                      <div style={{fontSize:'13px', fontWeight:'bold'}}>{b.market_options.name} / {b.amount}pt</div>
+                      {isWin && (
+                        <div style={{fontSize:'11px', color:'#10b981', fontWeight:'bold'}}>獲得: +{payout.toLocaleString()}pt ({odds}倍)</div>
+                      )}
+                    </div>
+                    <div style={{textAlign:'right'}}>
+                      <div style={{fontSize:'12px', fontWeight:'bold', color: b.markets.is_resolved ? (isWin ? '#10b981' : '#ef4444') : '#666'}}>
+                        {b.markets.is_resolved ? (isWin ? '🎯 的中！' : '不的中') : '判定中'}
+                      </div>
+                      {/* 復活・追加：𝕏投稿ボタン */}
+                      {isWin && (
+                        <button 
+                          onClick={() => {
+                            const text = `【的中！】「${b.markets.title}」の予想を当てました！🎯\n🔥 ${odds}倍の配当で ${payout}pt 獲得！\n#ヨソる #予測市場`;
+                            window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(window.location.origin)}`, '_blank');
+                          }}
+                          style={{fontSize:'10px', background:'#000', color:'#fff', border:'none', padding:'4px 8px', borderRadius:'6px', marginTop:'5px', cursor:'pointer', fontWeight:'bold'}}
+                        >
+                          𝕏 的中報告
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
             <button onClick={()=>supabase.auth.signOut()} style={{width:'100%', marginTop:'20px', color:'#ef4444', background:'#fff', border:'1px solid #ef4444', padding:'12px', borderRadius:'12px', fontWeight:'bold'}}>ログアウト</button>
           </>}
         </div>
