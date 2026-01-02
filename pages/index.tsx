@@ -28,8 +28,6 @@ export default function Home() {
   const [selectedOptionId, setSelectedOptionId] = useState<number | null>(null)
   const [justVoted, setJustVoted] = useState<any>(null)
 
-  const categoryMeta: any = { 'こども': { color: '#f43f5e' }, '経済・投資': { color: '#3b82f6' }, 'エンタメ': { color: '#a855f7' }, 'スポーツ': { color: '#22c55e' }, '旅・生活': { color: '#f59e0b' }, 'ゲーム': { color: '#10b981' }, '恋愛': { color: '#ec4899' }, '芸術・デザイン': { color: '#8b5cf6' }, '自然・科学': { color: '#06b6d4' }, '政治・思想': { color: '#6366f1' }, 'その他': { color: '#6b7280' } }
-
   const fetchMarkets = useCallback(async () => {
     let query = supabase.from('markets').select('*, market_options(*)')
     if (sortBy === 'new') query = query.order('created_at', { ascending: false })
@@ -64,6 +62,13 @@ export default function Home() {
     return () => authListener.subscription.unsubscribe()
   }, [sortBy, fetchMarkets, initUserData])
 
+  const handleEmailAuth = async (type: 'login' | 'signup') => {
+    const { error } = type === 'signup' 
+      ? await supabase.auth.signUp({ email, password }) 
+      : await supabase.auth.signInWithPassword({ email, password })
+    if (error) alert(error.message); else setShowAuthModal(false)
+  }
+
   const handleVote = async () => {
     if (!session) { setShowAuthModal(true); return; }
     if (!selectedOptionId) return alert('先に「答え」の選択肢をひとつ選んでください！')
@@ -85,12 +90,22 @@ export default function Home() {
         </div>
       </div>}
 
-      {showAuthModal && <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:'20px'}}><div style={{background:'white', padding:'24px', borderRadius:'20px', width:'100%', maxWidth:'380px', textAlign:'center'}}>
-        <h2 style={{fontSize:'20px', fontWeight:'900', marginBottom:'15px'}}>ヨソるを開始</h2>
-        <button onClick={() => supabase.auth.signInWithOAuth({provider:'google'})} style={{width:'100%', padding:'12px', marginBottom:'10px', borderRadius:'8px', border:'1px solid #ddd', background:'#fff', fontWeight:'bold', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'}}><img src="https://www.google.com/favicon.ico" width="16"/>Googleでつづける</button>
-        <button onClick={() => supabase.auth.signInAnonymously().then(()=>setShowAuthModal(false))} style={{width:'100%', padding:'12px', borderRadius:'8px', border:'none', background:'#eee', fontWeight:'bold', color:'#666'}}>ゲスト利用（匿名）</button>
-        <button onClick={()=>setShowAuthModal(false)} style={{marginTop:'15px', background:'none', border:'none', color:'#999'}}>閉じる</button>
-      </div></div>}
+      {/* ログイン・登録モーダル */}
+      {showAuthModal && <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:'20px'}}>
+        <div style={{background:'white', padding:'24px', borderRadius:'20px', width:'100%', maxWidth:'380px', textAlign:'center'}}>
+          <h2 style={{fontSize:'20px', fontWeight:'900', marginBottom:'15px'}}>ヨソるを開始</h2>
+          <button onClick={() => supabase.auth.signInWithOAuth({provider:'google'})} style={{width:'100%', padding:'12px', marginBottom:'10px', borderRadius:'8px', border:'1px solid #ddd', background:'#fff', fontWeight:'bold', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'}}><img src="https://www.google.com/favicon.ico" width="16"/>Googleでつづける</button>
+          <div style={{margin:'15px 0', color:'#999', fontSize:'12px'}}>またはメールアドレスで</div>
+          <input type="email" placeholder="メール" value={email} onChange={e => setEmail(e.target.value)} style={{width:'100%', padding:'10px', marginBottom:'8px', borderRadius:'8px', border:'1px solid #eee', boxSizing:'border-box'}} />
+          <input type="password" placeholder="パス" value={password} onChange={e => setPassword(e.target.value)} style={{width:'100%', padding:'10px', marginBottom:'16px', borderRadius:'8px', border:'1px solid #eee', boxSizing:'border-box'}} />
+          <div style={{display:'flex', gap:'8px', marginBottom:'15px'}}>
+            <button onClick={() => handleEmailAuth('login')} style={{flex:1, padding:'12px', background:'#3b82f6', color:'#fff', border:'none', borderRadius:'8px', fontWeight:'bold'}}>ログイン</button>
+            <button onClick={() => handleEmailAuth('signup')} style={{flex:1, padding:'12px', background:'#1f2937', color:'#fff', border:'none', borderRadius:'8px', fontWeight:'bold'}}>新規登録</button>
+          </div>
+          <button onClick={() => supabase.auth.signInAnonymously().then(()=>setShowAuthModal(false))} style={{background:'none', border:'none', color:'#999', fontSize:'13px', textDecoration:'underline'}}>ゲスト利用（匿名）</button>
+          <br/><button onClick={()=>setShowAuthModal(false)} style={{marginTop:'15px', background:'none', border:'none', color:'#666'}}>閉じる</button>
+        </div>
+      </div>}
 
       <header>
         <h1 style={{fontSize:'26px', fontWeight:'900', textAlign:'center', background:'linear-gradient(to right, #2563eb, #9333ea)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent'}}>{config.site_title}</h1>
@@ -106,28 +121,23 @@ export default function Home() {
         <div style={{marginTop:'15px'}}>{markets.filter(m => activeCategory === 'すべて' || m.category === activeCategory).map(m => {
           const active = !m.is_resolved && new Date(m.end_date) > new Date(); const days = Math.ceil((new Date(m.end_date).getTime() - new Date().getTime()) / 86400000)
           const isPopular = m.total_pool > 1000; const isUrgent = active && days <= 2;
-          return (<div key={m.id} style={{borderRadius:'12px', marginBottom:'12px', border: isUrgent ? '2px solid #ef4444' : '1px solid #eee', overflow:'hidden', position:'relative', background:'#fff'}}>
+          return (<div key={m.id} style={{borderRadius:'12px', marginBottom:'12px', border: isUrgent ? '2px solid #ef4444' : '1px solid #eee', overflow:'hidden', position:'relative'}}>
             {isUrgent && <div style={{position:'absolute', top:5, right:5, background:'#ef4444', color:'#fff', fontSize:'10px', padding:'2px 8px', borderRadius:'10px', zIndex:10, fontWeight:'bold'}}>🔥 締切間近</div>}
             {isPopular && !isUrgent && <div style={{position:'absolute', top:5, right:5, background:'#f59e0b', color:'#fff', fontSize:'10px', padding:'2px 8px', borderRadius:'10px', zIndex:10, fontWeight:'bold'}}>💎 大注目</div>}
             <div style={{height:'140px', position:'relative', background:'#eee'}}>{m.image_url && <img src={m.image_url} style={{width:'100%', height:'100%', objectFit:'cover'}} />}
-              <div style={{position:'absolute', top:8, left:8, background: categoryMeta[m.category]?.color || '#374151', color:'#fff', fontSize:'9px', padding:'3px 8px', borderRadius:'4px', fontWeight:'bold'}}>{m.category}</div>
+              {/* 復活：カテゴリ表示 */}
+              <div style={{position:'absolute', top:8, left:8, background:'rgba(31,41,55,0.8)', color:'#fff', fontSize:'9px', padding:'3px 8px', borderRadius:'4px', fontWeight:'bold'}}>{m.category}</div>
               <div style={{position:'absolute', bottom:0, left:0, right:0, padding:'10px', background:'linear-gradient(to top, rgba(0,0,0,0.85), transparent)', color:'#fff'}}><h2 style={{fontSize:'15px', margin:0}}>{m.title}</h2><div style={{fontSize:'10px', opacity:0.8}}>⏰ {new Date(m.end_date).toLocaleString()}</div></div>
             </div>
-            <div style={{padding:'8px 10px'}}>
-              {/* 復活：判定基準（description） */}
-              <div style={{ fontSize: '10px', color: '#666', background: '#f9fafb', padding: '6px 8px', borderRadius: '6px', marginBottom: '8px', borderLeft: '3px solid #ddd', lineHeight: '1.4' }}>
-                <strong>【判定基準】</strong><br/>{m.description}
-              </div>
-
-              {m.market_options.map((opt: any, i: number) => { const pct = Math.round((opt.pool / (m.total_pool || 1)) * 100); return (<div key={opt.id} style={{marginBottom:'4px'}}><div style={{display:'flex', justifyContent:'space-between', fontSize:'11px'}}><span>{m.result_option_id === opt.id ? '👑 ' : ''}{opt.name}</span><span style={{color:'#3b82f6'}}>{opt.pool===0?0:(m.total_pool/opt.pool).toFixed(1)}倍 <span style={{color:'#999', fontSize:'9px'}}>({pct}%)</span></span></div><div style={{height:'5px', background:'#eee', borderRadius:'3px', overflow:'hidden'}}><div style={{width:`${pct}%`, height:'100%', background:['#3b82f6', '#ef4444', '#10b981'][i%3]}} /></div></div>) })}
-              {active ? (selectedMarketId === m.id ? (<div style={{marginTop:'8px', background:'#f8fafc', padding:'10px', borderRadius:'8px'}}><div style={{display:'flex', gap:'4px', flexWrap:'wrap', marginBottom:'10px'}}>{m.market_options.map((o: any) => (<button key={o.id} onClick={()=>setSelectedOptionId(o.id)} style={{padding:'6px 10px', borderRadius:'15px', border:selectedOptionId===o.id?'2px solid #3b82f6':'1px solid #ddd', fontSize:'11px', background:'#fff', fontWeight:selectedOptionId===o.id?'bold':'normal'}}>{o.name}</button>))}</div>
+            <div style={{padding:'8px 10px'}}>{m.market_options.map((opt: any, i: number) => { const pct = Math.round((opt.pool / (m.total_pool || 1)) * 100); return (<div key={opt.id} style={{marginBottom:'4px'}}><div style={{display:'flex', justifyContent:'space-between', fontSize:'11px'}}><span>{m.result_option_id === opt.id ? '👑 ' : ''}{opt.name}</span><span style={{color:'#3b82f6'}}>{opt.pool===0?0:(m.total_pool/opt.pool).toFixed(1)}倍 <span style={{color:'#999', fontSize:'9px'}}>({pct}%)</span></span></div><div style={{height:'5px', background:'#eee', borderRadius:'3px', overflow:'hidden'}}><div style={{width:`${pct}%`, height:'100%', background:['#3b82f6', '#ef4444', '#10b981'][i%3]}} /></div></div>) })}
+            {active ? (selectedMarketId === m.id ? (<div style={{marginTop:'8px', background:'#f8fafc', padding:'10px', borderRadius:'8px'}}><div style={{display:'flex', gap:'4px', flexWrap:'wrap', marginBottom:'10px'}}>{m.market_options.map((o: any) => (<button key={o.id} onClick={()=>setSelectedOptionId(o.id)} style={{padding:'6px 10px', borderRadius:'15px', border:selectedOptionId===o.id?'2px solid #3b82f6':'1px solid #ddd', fontSize:'11px', background:'#fff'}}>{o.name}</button>))}</div>
                 <div style={{display:'flex', alignItems:'center', gap:'10px', marginBottom:'10px'}}><input type="range" min="10" max={profile?.point_balance || 1000} step="10" value={voteAmount} onChange={e => setVoteAmount(Number(e.target.value))} style={{flex:1}} /><input type="number" value={voteAmount} onChange={e => setVoteAmount(Number(e.target.value))} style={{width:'60px', border:'1px solid #ddd', borderRadius:'4px', fontSize:'11px'}} /></div>
-                <button onClick={handleVote} style={{width:'100%', padding:'10px', background:'#1f2937', color:'#fff', borderRadius:'8px', fontWeight:'bold', border:'none'}}>この予想で確定</button></div>) : (<button onClick={()=>setSelectedMarketId(m.id)} style={{width:'100%', padding:'8px', background:'#3b82f6', color:'#fff', borderRadius:'8px', fontWeight:'bold', border:'none', marginTop:'6px'}}>ヨソる</button>)) : <div style={{textAlign:'center', fontSize:'11px', color:'#999', marginTop:'6px'}}>判定中</div>}
-            </div></div>)
+                <button onClick={handleVote} style={{width:'100%', padding:'10px', background:'#1f2937', color:'#fff', borderRadius:'8px', fontWeight:'bold', border:'none'}}>この予想で確定</button></div>) : (<button onClick={()=>setSelectedMarketId(m.id)} style={{width:'100%', padding:'8px', background:'#3b82f6', color:'#fff', borderRadius:'8px', fontWeight:'bold', border:'none', marginTop:'6px'}}>ヨソる</button>)) : <div style={{textAlign:'center', fontSize:'11px', color:'#999', marginTop:'6px'}}>終了</div>}
+          </div></div>)
         })}</div>
       )}
 
-      {/* ランキング、マイページ、ガイド等の既存機能は完璧に維持 */}
+      {/* ランキング、マイページ、ガイド */}
       {activeTab === 'ranking' && (
         <div style={{ border: '1px solid #eee', borderRadius: '12px', overflow: 'hidden' }}>
           {ranking.map((u, i) => (
@@ -140,21 +150,51 @@ export default function Home() {
         </div>
       )}
 
+      {activeTab === 'mypage' && (
+        <div>
+          {!session ? <div style={{textAlign:'center', padding:'40px'}}><button onClick={()=>setShowAuthModal(true)} style={{padding:'12px 24px', background:'#3b82f6', color:'#fff', border:'none', borderRadius:'8px', fontWeight:'bold'}}>ログインして開始</button></div> : 
+          <>
+            <div style={{background:'linear-gradient(135deg, #1e3a8a, #3b82f6)', color:'#fff', padding:'24px', borderRadius:'16px', textAlign:'center'}}>
+              {isEditingName ? (<div style={{display:'flex', gap:'5px', justifyContent:'center'}}><input value={newUsername} onChange={e=>setNewUsername(e.target.value)} style={{color:'#333', borderRadius:'4px', padding:'4px'}} /><button onClick={() => supabase.from('profiles').update({username: newUsername}).eq('id', profile.id).then(() => {setIsEditingName(false); initUserData(profile.id);})} style={{background:'#fff', color:'#3b82f6', border:'none', padding:'4px 8px', borderRadius:'4px', fontWeight:'bold'}}>保存</button></div>) : (<div><span style={{fontSize:'18px', fontWeight:'bold'}}>{profile?.username || '名無しさん'}</span><button onClick={()=>setIsEditingName(true)} style={{fontSize:'10px', marginLeft:'8px', background:'rgba(255,255,255,0.2)', color:'#fff', border:'none', padding:'2px 6px', borderRadius:'4px'}}>編集</button></div>)}
+              <div style={{fontSize:'32px', fontWeight:'900', marginTop:'10px'}}>{profile?.point_balance?.toLocaleString()} pt</div>
+            </div>
+            <h3 style={{fontSize:'14px', margin:'20px 0 10px'}}>📜 ヨソり履歴</h3>
+            {myBets.map(b => (
+              <div key={b.id} style={{padding:'12px', border:'1px solid #eee', borderRadius:'10px', marginBottom:'8px', fontSize:'13px', borderLeft: b.markets.is_resolved && b.markets.result_option_id === b.market_option_id ? '4px solid #10b981' : '1px solid #eee'}}>
+                <div style={{color:'#666', fontSize:'11px'}}>{b.markets.title}</div>
+                <div style={{display:'flex', justifyContent:'space-between', fontWeight:'bold', marginTop:'4px'}}>
+                  <span>{b.market_options.name} / {b.amount}pt</span>
+                  <span style={{color: b.markets.is_resolved ? (b.markets.result_option_id === b.market_option_id ? '#10b981' : '#ef4444') : '#666'}}>
+                    {b.markets.is_resolved ? (b.markets.result_option_id === b.market_option_id ? '🎯 的中！' : '終了') : '判定中'}
+                  </span>
+                </div>
+              </div>
+            ))}
+            <button onClick={()=>supabase.auth.signOut()} style={{width:'100%', marginTop:'20px', color:'#ef4444', background:'none', border:'1px solid #ef4444', padding:'10px', borderRadius:'8px', fontWeight:'bold'}}>ログアウト</button>
+          </>}
+        </div>
+      )}
+
+      {/* 復活：詳細なガイド（使い方・規約） */}
       {activeTab === 'info' && (
-        <div style={{ fontSize: '13px', padding: '10px' }}>
+        <div style={{ fontSize: '13px', lineHeight: '1.7', padding: '10px' }}>
           <section style={{background:'#f9f9f9', padding:'16px', borderRadius:'12px', border:'1px solid #eee', marginBottom:'20px'}}>
-            <h3 style={{borderBottom:'2px solid #3b82f6', paddingBottom:'5px', marginTop:0}}>📖 ヨソるの遊び方</h3>
-            <p style={{fontSize:'12px', color:'#666'}}>1. 未来を予想してポイントをヨソ（ベット）ります。<br/>2. 的中するとプールされたポイントが分配されます。<br/>3. ポイントは無料シミュレーター用で換金はできません。</p>
+            <h3 style={{borderBottom:'2px solid #3b82f6', paddingBottom:'5px', color:'#1f2937', marginTop:0}}>📖 ヨソるの遊び方</h3>
+            <p><strong>1. 未来を予想する</strong><br/>問いを選んで、自分の予想にポイントを投じます。</p>
+            <p><strong>2. 配当を獲得する</strong><br/>的中すると、プールされたポイントが的中者全員に分配されます。</p>
+            <p><strong>3. 安心の無料シミュレーター</strong><br/>ポイントはゲーム内通貨です。購入や換金は一切できません。</p>
           </section>
-          <section style={{background:'#f9f9f9', padding:'16px', borderRadius:'12px', border:'1px solid #eee'}}>
-            <h3 style={{borderBottom:'2px solid #3b82f6', paddingBottom:'5px', marginTop:0}}>⚖️ 利用規約</h3>
-            <p style={{fontSize:'12px', color:'#666'}}>本サービスは刑法185条（賭博）に該当しない娯楽用アプリです。取得ポイントは現金や財物へ換金できません。</p>
+          <section style={{ background: '#f9f9f9', padding: '16px', borderRadius: '12px', border: '1px solid #eee' }}>
+            <h3 style={{ borderBottom: '2px solid #3b82f6', paddingBottom: '5px', color:'#1f2937', marginTop:0 }}>⚖️ 利用規約・法的ガイドライン</h3>
+            <p><strong>・賭博罪の回避</strong><br />取得ポイントは現金や財物への換金機能を提供しません。刑法185条（賭博）に該当しない娯楽用アプリです。</p>
+            <p><strong>・景品表示法の遵守</strong><br />ランキング等で提供されるデジタル資産は、法令の定める懸賞限度額を遵守します。</p>
+            <p><strong>・禁止行為</strong><br />複数アカウントによる不正取得、ポイントのリアルマネー取引（RMT）を固く禁じます。</p>
           </section>
           <div style={{ textAlign: 'center', marginTop: '40px' }}><Link href="/admin" style={{ color: '#eee', textDecoration: 'none', fontSize: '10px' }}>admin</Link></div>
         </div>
       )}
 
-      <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: '#fff', display: 'flex', justifyContent: 'space-around', padding: '10px 0', borderTop: '1px solid #eee', zIndex: 100 }}>
+      <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: '#fff', display: 'flex', justifyContent: 'space-around', padding: '12px 0', borderTop: '1px solid #eee', zIndex: 100 }}>
         <button onClick={() => setActiveTab('home')} style={{ background: 'none', border: 'none', color: activeTab === 'home' ? '#3b82f6' : '#999', fontSize:'11px', fontWeight:'bold' }}>🏠<br />ホーム</button>
         <button onClick={() => setActiveTab('ranking')} style={{ background: 'none', border: 'none', color: activeTab === 'ranking' ? '#3b82f6' : '#999', fontSize:'11px', fontWeight:'bold' }}>👑<br />ランク</button>
         <button onClick={() => setActiveTab('mypage')} style={{ background: 'none', border: 'none', color: activeTab === 'mypage' ? '#3b82f6' : '#999', fontSize:'11px', fontWeight:'bold' }}>👤<br />マイペ</button>
