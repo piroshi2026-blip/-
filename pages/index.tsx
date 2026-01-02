@@ -85,7 +85,7 @@ export default function Home() {
       {/* 𝕏投稿モーダル等既存機能維持 */}
       {justVoted && <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.8)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:'20px'}}><div style={{background:'white', padding:'24px', borderRadius:'24px', textAlign:'center', width:'100%', maxWidth:'320px'}}><div style={{fontSize:'40px', marginBottom:'10px'}}>🎯</div><h3 style={{margin:'0 0 10px', fontSize:'20px', fontWeight:'900'}}>ヨソりました！</h3><button onClick={() => { const text = config.share_text_base.replace('{title}', justVoted.title).replace('{option}', justVoted.option); window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(window.location.origin)}`, '_blank') }} style={{background:'#000', color:'#fff', padding:'14px', borderRadius:'12px', width:'100%', fontWeight:'bold', border:'none'}}>𝕏に投稿して自慢する</button><button onClick={() => setJustVoted(null)} style={{background:'none', border:'none', color:'#999', fontSize:'13px', marginTop:'10px'}}>閉じる</button></div></div>}
 
-      {showAuthModal && <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:'20px'}}><div style={{background:'white', padding:'24px', borderRadius:'20px', width:'100%', maxWidth:'380px', textAlign:'center'}}><h2 style={{fontSize:'20px', fontWeight:'900', marginBottom:'15px'}}>ヨソるを開始</h2><button onClick={() => supabase.auth.signInWithOAuth({provider:'google'})} style={{width:'100%', padding:'12px', marginBottom:'10px', borderRadius:'8px', border:'1px solid #ddd', background:'#fff', fontWeight:'bold', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'}}><img src="https://www.google.com/favicon.ico" width="16"/>Googleでつづける</button><div style={{margin:'15px 0', color:'#999', fontSize:'12px'}}>またはメールアドレスで</div><input type="email" placeholder="メール" value={email} onChange={e => setEmail(e.target.value)} style={{width:'100%', padding:'10px', marginBottom:'8px', borderRadius:'8px', border:'1px solid #eee'}} /><input type="password" placeholder="パス" value={password} onChange={e => setPassword(e.target.value)} style={{width:'100%', padding:'10px', marginBottom:'16px', borderRadius:'8px', border:'1px solid #eee'}} /><div style={{display:'flex', gap:'8px'}}><button onClick={() => supabase.auth.signInWithPassword({email, password}).then(()=>setShowAuthModal(false))} style={{flex:1, padding:'12px', background:'#3b82f6', color:'#fff', border:'none', borderRadius:'8px'}}>ログイン</button><button onClick={() => supabase.auth.signUp({email, password}).then(()=>setShowAuthModal(false))} style={{flex:1, padding:'12px', background:'#1f2937', color:'#fff', border:'none', borderRadius:'8px'}}>新規登録</button></div><button onClick={() => supabase.auth.signInAnonymously().then(()=>setShowAuthModal(false))} style={{background:'none', border:'none', color:'#999', fontSize:'12px', marginTop:'15px'}}>ゲスト利用（匿名）</button></div></div>}
+      {showAuthModal && <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:'20px'}}><div style={{background:'white', padding:'24px', borderRadius:'20px', width:'100%', maxWidth:'380px', textAlign:'center'}}><h2 style={{fontSize:'20px', fontWeight:'900', marginBottom:'15px'}}>ヨソるを開始</h2><button onClick={() => supabase.auth.signInWithOAuth({provider:'google'})} style={{width:'100%', padding:'12px', marginBottom:'10px', borderRadius:'8px', border:'1px solid #ddd', background:'#fff', fontWeight:'bold', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'}}><img src="https://www.google.com/favicon.ico" alt="Google" width="16"/>Googleでつづける</button><div style={{margin:'15px 0', color:'#999', fontSize:'12px'}}>またはメールアドレスで</div><input type="email" placeholder="メール" value={email} onChange={e => setEmail(e.target.value)} style={{width:'100%', padding:'10px', marginBottom:'8px', borderRadius:'8px', border:'1px solid #eee'}} /><input type="password" placeholder="パス" value={password} onChange={e => setPassword(e.target.value)} style={{width:'100%', padding:'10px', marginBottom:'16px', borderRadius:'8px', border:'1px solid #eee'}} /><div style={{display:'flex', gap:'8px'}}><button onClick={() => supabase.auth.signInWithPassword({email, password}).then(()=>setShowAuthModal(false))} style={{flex:1, padding:'12px', background:'#3b82f6', color:'#fff', border:'none', borderRadius:'8px'}}>ログイン</button><button onClick={() => supabase.auth.signUp({email, password}).then(()=>setShowAuthModal(false))} style={{flex:1, padding:'12px', background:'#1f2937', color:'#fff', border:'none', borderRadius:'8px'}}>新規登録</button></div><button onClick={() => supabase.auth.signInAnonymously().then(()=>setShowAuthModal(false))} style={{background:'none', border:'none', color:'#999', fontSize:'12px', marginTop:'15px'}}>ゲスト利用（匿名）</button></div></div>}
 
       <header>
         <h1 style={{fontSize:'28px', fontWeight:'900', textAlign:'center', background:'linear-gradient(to right, #2563eb, #9333ea)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', margin:'10px 0 5px'}}>{config.site_title}</h1>
@@ -107,7 +107,8 @@ export default function Home() {
               {isPopular && <div style={{background:'#f59e0b', color:'#fff', fontSize:'10px', padding:'4px 8px', borderRadius:'8px', fontWeight:'bold'}}>💎 人気</div>}
               {active && <div style={{background:isUrgent?'#ef4444':'#1f2937', color:'#fff', fontSize:'10px', padding:'4px 8px', borderRadius:'8px', fontWeight:'bold'}}>⏰ あと{days}日</div>}
             </div>
-            <div style={{height:'150px', position:'relative', background:'#eee'}}>{m.image_url && <img src={m.image_url} style={{width:'100%', height:'100%', objectFit:'cover'}} />}
+            {/* 修正：alt属性を追加 */}
+            <div style={{height:'150px', position:'relative', background:'#eee'}}>{m.image_url && <img src={m.image_url} alt={m.title} style={{width:'100%', height:'100%', objectFit:'cover'}} />}
               <div style={{position:'absolute', top:10, left:10, background: categoryMeta[m.category]?.color || '#374151', color:'#fff', fontSize:'9px', padding:'4px 10px', borderRadius:'6px', fontWeight:'bold'}}>{m.category}</div>
               <div style={{position:'absolute', bottom:0, left:0, right:0, padding:'15px', background:'linear-gradient(to top, rgba(0,0,0,0.9), transparent)', color:'#fff'}}><h2 style={{fontSize:'16px', margin:0, fontWeight:'800'}}>{m.title}</h2></div>
             </div>
@@ -121,7 +122,7 @@ export default function Home() {
         })}</div>
       )}
 
-      {/* ランキング・維持 */}
+      {/* ランキング */}
       {activeTab === 'ranking' && (
         <div style={{ border: '1px solid #e2e8f0', borderRadius: '16px', overflow: 'hidden', background:'#fff' }}>
           {ranking.map((u, i) => (
@@ -134,13 +135,12 @@ export default function Home() {
         </div>
       )}
 
-      {/* 復活：マイページ一式（名前編集・ポイント表示・履歴） */}
+      {/* マイページ */}
       {activeTab === 'mypage' && (
         <div>
           {!session ? <div style={{textAlign:'center', padding:'40px'}}><button onClick={()=>setShowAuthModal(true)} style={{padding:'12px 24px', background:'#3b82f6', color:'#fff', border:'none', borderRadius:'8px', fontWeight:'bold'}}>ログインして開始</button></div> : 
           <>
             <div style={{background:'linear-gradient(135deg, #1e3a8a, #3b82f6)', color:'#fff', padding:'30px 20px', borderRadius:'24px', textAlign:'center', boxShadow:'0 10px 20px rgba(30,58,138,0.2)', marginBottom:'25px'}}>
-              {/* 名前編集復活 */}
               {isEditingName ? (
                 <div style={{display:'flex', gap:'8px', justifyContent:'center', alignItems:'center'}}>
                   <input value={newUsername} onChange={e=>setNewUsername(e.target.value)} style={{color:'#333', borderRadius:'8px', padding:'8px 12px', border:'none', width:'150px'}} />
@@ -152,7 +152,6 @@ export default function Home() {
                   <button onClick={()=>setIsEditingName(true)} style={{fontSize:'11px', marginLeft:'10px', background:'rgba(255,255,255,0.2)', color:'#fff', border:'none', padding:'4px 10px', borderRadius:'6px'}}>名前変更</button>
                 </div>
               )}
-              {/* ポイント表示復活 */}
               <div style={{fontSize:'36px', fontWeight:'900', marginTop:'15px'}}>{profile?.point_balance?.toLocaleString()} <span style={{fontSize:'16px', opacity:0.8}}>pt</span></div>
               <div style={{fontSize:'11px', opacity:0.7, marginTop:'5px'}}>保有スコア</div>
             </div>
@@ -174,7 +173,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* 増量：利用規約・ガイド */}
+      {/* ガイド */}
       {activeTab === 'info' && (
         <div style={{ fontSize: '13px', padding: '10px' }}>
           <section style={{background:'#fff', padding:'20px', borderRadius:'16px', border:'1px solid #e2e8f0', marginBottom:'20px'}}>
