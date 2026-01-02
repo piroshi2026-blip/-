@@ -4,7 +4,7 @@ import Link from 'next/link'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+ process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
   { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } }
 )
 
@@ -157,16 +157,17 @@ export default function Home() {
 
             <h3 style={{fontSize:'16px', fontWeight:'800', margin:'0 0 15px'}}>📜 ヨソり履歴</h3>
             {myBets.map(b => {
-              // 追加：詳細な配当計算ロジック
-              const isWin = b.markets.is_resolved && b.markets.result_option_id === b.market_option_id;
+              // 修正：的中判定に使用するカラムを option_id に変更
+              const isWin = b.markets.is_resolved && b.markets.result_option_id === b.option_id;
               const pool = b.markets.total_pool || 0;
-              const winOption = b.markets.market_options?.find((o:any) => o.id === b.market_option_id);
+              // 修正：配当計算に使用するカラムを option_id に変更
+              const winOption = b.markets.market_options?.find((o:any) => o.id === b.option_id);
               const winOptionPool = winOption?.pool || 0;
               const odds = winOptionPool > 0 ? (pool / winOptionPool).toFixed(1) : "0";
               const payout = isWin ? Math.floor(b.amount * Number(odds)) : 0;
 
               return (
-                <div key={b.id} style={{padding:'15px', background:'#fff', border:'1px solid #e2e8f0', borderRadius:'16px', marginBottom:'10px', borderLeft: b.markets.is_resolved && b.markets.result_option_id === b.market_option_id ? '6px solid #10b981' : b.markets.is_resolved ? '6px solid #ef4444' : '6px solid #cbd5e1'}}>
+                <div key={b.id} style={{padding:'15px', background:'#fff', border:'1px solid #e2e8f0', borderRadius:'16px', marginBottom:'10px', borderLeft: b.markets.is_resolved && isWin ? '6px solid #10b981' : b.markets.is_resolved ? '6px solid #ef4444' : '6px solid #cbd5e1'}}>
                   <div style={{fontSize:'11px', color:'#64748b'}}>{b.markets.title}</div>
                   <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginTop:'5px'}}>
                     <div>
