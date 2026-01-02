@@ -104,9 +104,21 @@ export default function Admin() {
   }
 
   async function handleUpdateMarket() {
-    await supabase.from('markets').update({ title: editForm.title, description: editForm.description, category: editForm.category, end_date: new Date(editForm.end_date).toISOString(), image_url: editForm.image_url }).eq('id', editingId);
-    for (const opt of editForm.market_options) { await supabase.from('market_options').update({ name: opt.name }).eq('id', opt.id) }
-    if (newOptionName.trim()) { await supabase.from('market_options').insert([{ market_id: editingId, name: newOptionName.trim(), pool: 0 }]); setNewOptionName(''); }
+    await supabase.from('markets').update({ 
+      title: editForm.title, 
+      description: editForm.description, 
+      category: editForm.category, 
+      end_date: new Date(editForm.end_date).toISOString(), 
+      image_url: editForm.image_url 
+    }).eq('id', editingId);
+
+    for (const opt of editForm.market_options) { 
+      await supabase.from('market_options').update({ name: opt.name }).eq('id', opt.id) 
+    }
+    if (newOptionName.trim()) { 
+      await supabase.from('market_options').insert([{ market_id: editingId, name: newOptionName.trim(), pool: 0 }]); 
+      setNewOptionName(''); 
+    }
     setEditingId(null); fetchData(); alert('更新完了');
   }
 
@@ -176,15 +188,25 @@ export default function Admin() {
                 </div>
               </div>
               {editingId === m.id && (
-                <div style={{ marginTop: '10px', padding: '15px', background: '#f9f9f9', borderRadius: '8px' }}>
+                <div style={{ marginTop: '10px', padding: '15px', background: '#f9f9f9', borderRadius: '8px', border:'1px solid #ddd' }}>
+                  <label style={{fontSize:'11px', color:'#666'}}>タイトル修正</label>
                   <input value={editForm.title} onChange={e => setEditForm({...editForm, title: e.target.value})} style={s.inp} />
+
+                  <label style={{fontSize:'11px', color:'#666'}}>判定基準修正</label>
                   <textarea value={editForm.description} onChange={e => setEditForm({...editForm, description: e.target.value})} style={{...s.inp, height:'60px'}} />
+
+                  <label style={{fontSize:'11px', color:'#666'}}>締切日時修正</label>
+                  <input type="datetime-local" value={editForm.end_date} onChange={e => setEditForm({...editForm, end_date: e.target.value})} style={s.inp} />
+
                   <div style={{marginBottom:'10px'}}><label style={{fontSize:'12px'}}>画像変更</label><br/><input type="file" onChange={e => uploadImage(e, true)} /></div>
+
+                  <label style={{fontSize:'11px', color:'#666'}}>選択肢名の修正</label>
                   {editForm.market_options.map((opt: any, idx: number) => (
                     <input key={opt.id} value={opt.name} onChange={e => { const newOpts = [...editForm.market_options]; newOpts[idx].name = e.target.value; setEditForm({ ...editForm, market_options: newOpts }) }} style={s.inp} />
                   ))}
                   <input placeholder="+ 選択肢追加" value={newOptionName} onChange={e => setNewOptionName(e.target.value)} style={{ ...s.inp, border: '1px solid #3b82f6' }} />
-                  <button onClick={handleUpdateMarket} style={{...s.btn, width:'100%', background:'#10b981'}}>保存</button>
+
+                  <button onClick={handleUpdateMarket} style={{...s.btn, width:'100%', background:'#10b981'}}>更新内容を保存</button>
                 </div>
               )}
               {!m.is_resolved && (
@@ -231,11 +253,24 @@ export default function Admin() {
 
       {activeTab === 'config' && (
         <section style={{ background: '#f8fafc', padding: '24px', borderRadius: '16px' }}>
-          <input value={siteConfig.site_title} onChange={e => setSiteConfig({...siteConfig, site_title: e.target.value})} placeholder="タイトル" style={s.inp} />
-          <input value={siteConfig.site_description} onChange={e => setSiteConfig({...siteConfig, site_description: e.target.value})} placeholder="説明" style={s.inp} />
-          <textarea value={siteConfig.admin_message} onChange={e => setSiteConfig({...siteConfig, admin_message: e.target.value})} placeholder="メッセージ" style={{...s.inp, height:'60px'}} />
-          <textarea value={siteConfig.share_text_base} onChange={e => setSiteConfig({...siteConfig, share_text_base: e.target.value})} placeholder="𝕏投稿文" style={{...s.inp, height:'60px'}} />
-          <button onClick={handleUpdateConfig} style={{...s.btn, background: '#10b981', width:'100%'}}>保存</button>
+          <h3>📢 サイト設定・𝕏投稿テンプレート</h3>
+          <div style={{marginBottom:'15px'}}>
+            <label style={{fontSize:'12px', color:'#666'}}>サイト名</label>
+            <input value={siteConfig.site_title} onChange={e => setSiteConfig({...siteConfig, site_title: e.target.value})} placeholder="タイトル" style={s.inp} />
+          </div>
+          <div style={{marginBottom:'15px'}}>
+            <label style={{fontSize:'12px', color:'#666'}}>サイト説明</label>
+            <input value={siteConfig.site_description} onChange={e => setSiteConfig({...siteConfig, site_description: e.target.value})} placeholder="説明" style={s.inp} />
+          </div>
+          <div style={{marginBottom:'15px'}}>
+            <label style={{fontSize:'12px', color:'#666'}}>管理メッセージ</label>
+            <textarea value={siteConfig.admin_message} onChange={e => setSiteConfig({...siteConfig, admin_message: e.target.value})} placeholder="メッセージ" style={{...s.inp, height:'60px'}} />
+          </div>
+          <div style={{marginBottom:'15px'}}>
+            <label style={{fontSize:'12px', color:'#666'}}>𝕏投稿テンプレート（{'{title}'}, {'{option}'}が置換されます）</label>
+            <textarea value={siteConfig.share_text_base} onChange={e => setSiteConfig({...siteConfig, share_text_base: e.target.value})} placeholder="𝕏投稿文" style={{...s.inp, height:'80px'}} />
+          </div>
+          <button onClick={handleUpdateConfig} style={{...s.btn, background: '#10b981', width:'100%'}}>サイト設定を保存</button>
         </section>
       )}
     </div>
