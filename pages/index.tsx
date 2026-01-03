@@ -226,7 +226,7 @@ export default function Home() {
               <p><strong>1. 賭博罪の不該当性について</strong><br/>本サービスは刑法185条（賭博罪）に抵触しない娯楽用シミュレーターです。ポイントの現金交換、財物への引換機能は一切提供しません。</p>
               <p><strong>2. 景品表示法の遵守</strong><br/>ランキング報酬やキャンペーンで提供されるデジタル資産（NFT等）は、景品表示法に基づき、法令の定める範囲内で提供されます。</p>
               <p><strong>3. アカウントの管理</strong><br/>複数アカウントによるポイントの不正取得、自動操作、またはポイントのリアルマネー取引（RMT）を固く禁じます。違反時は全スコアを没収します。</p>
-              <p><strong>4. デジタル特典について</strong><br/>付与されるデジタル資産や称号はサービス内での娯楽を目的としたものであり、投資対象や経済적価値を有するものではありません。</p>
+              <p><strong>4. デジタル特典について</strong><br/>付与されるデジタル資産や称号はサービス内での娯楽を目的としたものであり、投資対象や経済的価値を有するものではありません。</p>
             </div>
           </section>
           <div style={{ textAlign: 'center', marginTop: '40px' }}><Link href="/admin" style={{ color: '#eee', textDecoration: 'none', fontSize: '10px' }}>admin</Link></div>
