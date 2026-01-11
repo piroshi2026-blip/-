@@ -75,6 +75,7 @@ export default function Admin() {
     if (error) { alert('確定エラー: ' + error.message); } else { alert('確定しました'); fetchData(); }
   }
 
+  // 削除時にエラーが出ないよう、関連データの削除を追加しておきました
   async function handleDeleteMarket(id: number, title: string) {
     if (!confirm(`「${title}」を完全に削除しますか？`)) return
     await supabase.from('bets').delete().eq('market_id', id)
@@ -107,7 +108,7 @@ export default function Admin() {
     await supabase.from('markets').update({ 
       title: editForm.title, 
       description: editForm.description, 
-      category: editForm.category, 
+      category: editForm.category, // ここでカテゴリーも更新されます
       end_date: new Date(editForm.end_date).toISOString(), 
       image_url: editForm.image_url 
     }).eq('id', editingId);
@@ -195,6 +196,13 @@ export default function Admin() {
                   <label style={{fontSize:'11px', color:'#666'}}>判定基準修正</label>
                   <textarea value={editForm.description} onChange={e => setEditForm({...editForm, description: e.target.value})} style={{...s.inp, height:'60px'}} />
 
+                  {/* ▼▼▼ 追加箇所：ここから ▼▼▼ */}
+                  <label style={{fontSize:'11px', color:'#666'}}>カテゴリ修正</label>
+                  <select value={editForm.category} onChange={e => setEditForm({...editForm, category: e.target.value})} style={s.inp}>
+                    {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                  </select>
+                  {/* ▲▲▲ 追加箇所：ここまで ▲▲▲ */}
+
                   <label style={{fontSize:'11px', color:'#666'}}>締切日時修正</label>
                   <input type="datetime-local" value={editForm.end_date} onChange={e => setEditForm({...editForm, end_date: e.target.value})} style={s.inp} />
 
@@ -207,6 +215,7 @@ export default function Admin() {
                   <input placeholder="+ 選択肢追加" value={newOptionName} onChange={e => setNewOptionName(e.target.value)} style={{ ...s.inp, border: '1px solid #3b82f6' }} />
 
                   <button onClick={handleUpdateMarket} style={{...s.btn, width:'100%', background:'#10b981'}}>更新内容を保存</button>
+                  <button onClick={() => setEditingId(null)} style={{...s.btn, width:'100%', background:'#9ca3af', marginTop:'10px'}}>キャンセル</button>
                 </div>
               )}
               {!m.is_resolved && (
