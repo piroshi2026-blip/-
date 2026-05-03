@@ -1,0 +1,33 @@
+{
+  "name": "minna",
+  "crons": [
+    {
+      "path": "/api/cron/pdca-plan",
+      "schedule": "0 23 * * *"
+    },
+    {
+      "path": "/api/cron/pdca-slot/0",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/pdca-slot/1",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/pdca-slot/2",
+      "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/pdca-slot/3",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/pdca-slot/4",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/pdca-analyze",
+      "schedule": "0 14 * * *"
+    }
+  ]
+}

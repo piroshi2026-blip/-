@@ -1,19 +1,15 @@
-import { useState, useEffect, useCallback } from 'react'
-import { createClient } from '@supabase/supabase-js'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-)
+import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
 
 export default function Admin() {
   const ADMIN_PASSWORD = 'yosoru_admin' 
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [passInput, setPassInput] = useState('')
   const [activeTab, setActiveTab] = useState<'markets' | 'categories' | 'users' | 'config'>('markets')
-  const [marketSortBy, setMarketSortBy] = useState<'deadline' | 'category' | 'popular'>('deadline')
   const [markets, setMarkets] = useState<any[]>([])
+  /** '' = すべて表示 */
+  const [marketCategoryFilter, setMarketCategoryFilter] = useState<string>('')
   const [categories, setCategories] = useState<any[]>([])
   const [users, setUsers] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -47,12 +43,9 @@ export default function Admin() {
   }
 
   const fetchData = useCallback(async () => {
-    if (!isAuthenticated) return
+    if (!isSupabaseConfigured || !isAuthenticated) return
     setIsLoading(true)
-    let mQuery = supabase.from('markets').select('*, market_options(*)')
-    if (marketSortBy === 'deadline') mQuery = mQuery.order('end_date', { ascending: true })
-    else if (marketSortBy === 'category') mQuery = mQuery.order('category', { ascending: true })
-    else if (marketSortBy === 'popular') mQuery = mQuery.order('total_pool', { ascending: false })
+    const mQuery = supabase.from('markets').select('*, market_options(*)')
 
     const [m, c, u, cfg] = await Promise.all([
       mQuery,
@@ -65,9 +58,20 @@ export default function Admin() {
     if (u.data) setUsers(u.data)
     if (cfg.data) setSiteConfig(cfg.data)
     setIsLoading(false)
-  }, [marketSortBy, isAuthenticated])
+  }, [isAuthenticated])
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  const displayedMarkets = useMemo(() => {
+    let list = markets
+    if (marketCategoryFilter) {
+      list = list.filter((m: any) => m.category === marketCategoryFilter)
+    }
+    return [...list].sort((a: any, b: any) => {
+      if (Boolean(a.is_resolved) !== Boolean(b.is_resolved)) return a.is_resolved ? 1 : -1
+      return new Date(a.end_date).getTime() - new Date(b.end_date).getTime()
+    })
+  }, [markets, marketCategoryFilter])
 
   async function handleResolve(marketId: number, optionId: number, optionName: string) {
     if(!confirm(`「${optionName}」の結果で確定させますか？`)) return;
@@ -130,6 +134,19 @@ export default function Admin() {
     sortBtn: (active: boolean) => ({ padding: '6px 12px', borderRadius: '20px', border: active ? 'none' : '1px solid #ddd', background: active ? '#3b82f6' : '#fff', color: active ? '#fff' : '#666', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' })
   }
 
+  if (!isSupabaseConfigured) {
+    return (
+      <div style={{ maxWidth: '500px', margin: '80px auto', padding: '40px 24px', fontFamily: 'sans-serif', background: '#f8fafc', borderRadius: '16px' }}>
+        <h1 style={{ fontSize: '20px', fontWeight: 900, marginBottom: '16px' }}>Supabase の設定が必要です</h1>
+        <p style={{ color: '#475569', lineHeight: 1.6, marginBottom: '12px' }}>
+          プロジェクトルートに <code style={{ background: '#e2e8f0', padding: '2px 6px', borderRadius: '4px' }}>.env.local</code> を作成し、<code style={{ background: '#e2e8f0', padding: '2px 6px', borderRadius: '4px' }}>NEXT_PUBLIC_SUPABASE_URL</code> と{' '}
+          <code style={{ background: '#e2e8f0', padding: '2px 6px', borderRadius: '4px' }}>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> を設定してください。設定後は開発サーバーを再起動してください。
+        </p>
+        <Link href="/" style={{ color: '#3b82f6', fontSize: '14px' }}>← アプリに戻る</Link>
+      </div>
+    )
+  }
+
   if (!isAuthenticated) {
     return (
       <div style={{ maxWidth: '400px', margin: '100px auto', padding: '30px', textAlign: 'center', background:'#fff', borderRadius:'20px', boxShadow:'0 10px 25px rgba(0,0,0,0.1)' }}>
@@ -159,9 +176,30 @@ export default function Admin() {
 
       {activeTab === 'markets' && (
         <>
-          <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', alignItems: 'center' }}>
-            <span style={{fontSize:'13px', fontWeight:'bold'}}>並び替え:</span>
-            {['deadline', 'category', 'popular'].map(t => <button key={t} onClick={() => setMarketSortBy(t as any)} style={s.sortBtn(marketSortBy === t)}>{t==='deadline'?'⏰締切順':t==='category'?'📁カテゴリ順':'🔥人気順'}</button>)}
+          <div style={{ marginBottom: '20px' }}>
+            <span style={{ fontSize: '13px', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>カテゴリで表示</span>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+              <button
+                type="button"
+                onClick={() => setMarketCategoryFilter('')}
+                style={s.sortBtn(marketCategoryFilter === '')}
+              >
+                すべて
+              </button>
+              {categories.map((c: any) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setMarketCategoryFilter(c.name)}
+                  style={s.sortBtn(marketCategoryFilter === c.name)}
+                >
+                  {c.name}
+                </button>
+              ))}
+            </div>
+            <p style={{ fontSize: '11px', color: '#64748b', margin: '8px 0 0' }}>
+              締切が近い順 · 確定済みは一覧の後ろに表示されます
+            </p>
           </div>
 
           <section style={{ background: '#f4f4f4', padding: '20px', borderRadius: '12px', marginBottom: '30px' }}>
@@ -179,7 +217,7 @@ export default function Admin() {
             <button onClick={handleCreateMarket} style={{ ...s.btn, width: '100%', background: '#3b82f6' }}>公開</button>
           </section>
 
-          {markets.map(m => (
+          {displayedMarkets.map(m => (
             <div key={m.id} style={{ border: '1px solid #eee', padding: '20px', marginBottom: '15px', borderRadius: '12px', background:'#fff' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div><strong>{m.title}</strong><div style={{fontSize:'12px', color:'#666'}}>{m.category} | {new Date(m.end_date).toLocaleString()}</div></div>

@@ -1,0 +1,24 @@
+# 本番のスケジュールは vercel.json の crons を推奨（JST 9–17時の5枠＋計画＋分析）。
+# 自前で GitHub から叩く場合は、各 URL を CRON_SECRET 付きで呼び出してください。
+# 例: curl -H "Authorization: Bearer $CRON_SECRET" "https://…/api/cron/pdca-plan"
+name: PDCA (manual / optional)
+
+on:
+  workflow_dispatch:
+    inputs:
+      path:
+        description: '例: /api/cron/pdca-plan または /api/cron/pdca-slot/0'
+        required: true
+        default: '/api/cron/pdca-plan'
+
+jobs:
+  hit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger one endpoint
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          BASE: ${{ secrets.SITE_CRON_BASE }}
+        run: |
+          test -n "$CRON_SECRET" && test -n "$BASE"
+          curl -sS -f -H "Authorization: Bearer $CRON_SECRET" "$BASE${{ inputs.path }}"

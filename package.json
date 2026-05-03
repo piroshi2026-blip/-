@@ -6,14 +6,21 @@
     "dev": "next dev --port 3000 --hostname 0.0.0.0",
     "build": "next build",
     "start": "next start --port 3000 --hostname 0.0.0.0",
-    "lint": "next lint"
+    "lint": "next lint",
+    "pdca": "tsx scripts/run-pdca.ts",
+    "pdca:plan": "tsx scripts/pdca-plan.ts",
+    "pdca:slot": "tsx scripts/pdca-slot.ts",
+    "generate:cron-secret": "node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\""
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.89.0",
+    "dotenv": "^17.4.2",
     "next": "^15.2.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "tailwindcss": "^4.0.15"
+    "rss-parser": "^3.13.0",
+    "tailwindcss": "^4.0.15",
+    "twitter-api-v2": "^1.29.0"
   },
   "devDependencies": {
     "@types/node": "^22.13.11",
@@ -21,6 +28,7 @@
     "@types/react-dom": "^19.0.4",
     "eslint": "^9.23.0",
     "eslint-config-next": "^15.2.3",
+    "tsx": "^4.21.0",
     "typescript": "^5.8.2"
   }
 }

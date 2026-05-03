@@ -1,12 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
-  { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } }
-)
+import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<'home' | 'ranking' | 'mypage' | 'info'>('home')
@@ -57,6 +51,7 @@ export default function Home() {
   }, [])
 
   useEffect(() => {
+    if (!isSupabaseConfigured) return
     const init = async () => {
       const [cfgRes, catRes] = await Promise.all([supabase.from('site_config').select('*').single(), supabase.from('categories').select('*').order('display_order', { ascending: true })])
       if (cfgRes.data) setConfig(cfgRes.data)
@@ -88,6 +83,24 @@ export default function Home() {
       const m = markets.find(m => m.id === selectedMarketId); const o = m?.market_options.find((o: any) => o.id === selectedOptionId)
       setJustVoted({ title: m?.title, option: o?.name }); setSelectedMarketId(null); setSelectedOptionId(null); fetchMarkets(); initUserData(session.user.id)
     } else alert(error.message)
+  }
+
+  if (!isSupabaseConfigured) {
+    return (
+      <div style={{ maxWidth: '500px', margin: '0 auto', padding: '40px 20px', fontFamily: 'sans-serif', minHeight: '100vh', background: '#f8fafc' }}>
+        <h1 style={{ fontSize: '20px', fontWeight: 900, marginBottom: '16px' }}>Supabase の設定が必要です</h1>
+        <p style={{ color: '#475569', lineHeight: 1.6, marginBottom: '12px' }}>
+          プロジェクトルートに <code style={{ background: '#e2e8f0', padding: '2px 6px', borderRadius: '4px' }}>.env.local</code> を作成し、次の値を設定してください。
+        </p>
+        <pre style={{ background: '#1e293b', color: '#e2e8f0', padding: '16px', borderRadius: '12px', fontSize: '12px', overflow: 'auto' }}>
+{`NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key`}
+        </pre>
+        <p style={{ color: '#64748b', fontSize: '13px', marginTop: '16px' }}>
+          Supabase ダッシュボードの Project Settings → API から取得できます。設定後は開発サーバーを再起動してください。
+        </p>
+      </div>
+    )
   }
 
   return (
