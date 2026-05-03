@@ -1,4 +1,4 @@
-import { fetchTrendHeadlines, fetchOhtaniDodgersHeadlines, MLB_TOPIC_RE } from './fetchTrends'
+import { fetchTrendHeadlines, fetchOhtaniDodgersHeadlines, MLB_TOPIC_RE, buildDailyMlbFallbackItem } from './fetchTrends'
 import { draftMarketFromTrend } from './draftMarket'
 import { postPromotionTweet } from './postX'
 import {
@@ -33,7 +33,8 @@ export async function createQuickMarket(): Promise<QuickMarketResult> {
 
   // MLB を先頭に混ぜつつ、上位8件からランダムに1件選ぶ（毎回異なる問いに）
   const pool = [...mlbResult.items.slice(0, 3), ...genResult.items].slice(0, 8)
-  if (!pool.length) throw new Error('ニュースが取得できませんでした')
+  // RSS が全滅した場合もフォールバック問いで続行（止めない）
+  if (!pool.length) pool.push(buildDailyMlbFallbackItem())
 
   const item = pool[Math.floor(Math.random() * pool.length)]
   const isMlb = MLB_TOPIC_RE.test(item.title)

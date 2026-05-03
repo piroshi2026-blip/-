@@ -80,18 +80,24 @@ export async function executePdcaSlot(
         .eq('plan_date', plan_date)
 
       if (!cntErr && (count ?? 0) === 0) {
-        await planDailySlots(plan_date)
-        const { data: row } = await sb
-          .from('pdca_daily_slots')
-          .select('flavor, trend_json')
-          .eq('plan_date', plan_date)
-          .eq('slot_index', slotIndex)
-          .maybeSingle()
-        if (row?.trend_json) {
-          planned = {
-            slot_index: slotIndex,
-            flavor: row.flavor as SlotFlavor,
-            trend_json: row.trend_json as TrendItem,
+        const planResult = await planDailySlots(plan_date)
+        // DB保存が失敗してもインメモリの計画を優先して使う
+        const inMemory = planResult.slots.find((s) => s.slot_index === slotIndex)
+        if (inMemory) {
+          planned = inMemory
+        } else {
+          const { data: row } = await sb
+            .from('pdca_daily_slots')
+            .select('flavor, trend_json')
+            .eq('plan_date', plan_date)
+            .eq('slot_index', slotIndex)
+            .maybeSingle()
+          if (row?.trend_json) {
+            planned = {
+              slot_index: slotIndex,
+              flavor: row.flavor as SlotFlavor,
+              trend_json: row.trend_json as TrendItem,
+            }
           }
         }
       } else {
