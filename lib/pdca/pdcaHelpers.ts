@@ -85,15 +85,23 @@ export async function insertMarket(draft: DraftMarket): Promise<{ error: string 
   return { error: error ? error.message : null }
 }
 
-export function buildTweetLine(kind: 'mlb' | 'general', title: string): string {
-  const t = title.slice(0, 72) + (title.length > 72 ? '…' : '')
-  if (kind === 'mlb') return `⚾MLB（日本人選手等）「${t}」`
-  return `📰話題の問い「${t}」`
-}
-
-export function buildTweetBody(line: string, baseUrl: string): string {
-  if (baseUrl) return `【ヨソる】${line}\n${baseUrl}`.slice(0, 280)
-  return `【ヨソる】${line}`.slice(0, 280)
+export function buildTweetBody(kind: 'mlb' | 'general', title: string, baseUrl: string): string {
+  const shortTitle = title.length > 55 ? `${title.slice(0, 52)}…` : title
+  const emoji = kind === 'mlb' ? '⚾' : '📰'
+  const hashtags =
+    kind === 'mlb'
+      ? '#ヨソる #予測市場 #大谷翔平 #MLB #野球 #予想'
+      : '#ヨソる #予測市場 #予想 #ニュース #話題'
+  const cta = baseUrl ? `▶️ 今すぐ投票 → ${baseUrl}` : '▶️ ヨソるで今すぐ投票！'
+  return [
+    '🔮 あなたはどう予想する？',
+    '',
+    `${emoji}「${shortTitle}」`,
+    '',
+    cta,
+    '',
+    hashtags,
+  ].join('\n').slice(0, 280)
 }
 
 export async function logPdcaPayload(kind: string, payload: Record<string, unknown>, ok: boolean) {

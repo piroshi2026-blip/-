@@ -1,5 +1,4 @@
 import {
-  buildTweetBody,
   getPublicBaseUrl,
   insertMarket,
   isTooSimilar,
@@ -148,7 +147,8 @@ export async function runPdcaPipeline(): Promise<PdcaResult> {
 
     if (combined) {
       try {
-        const { id } = await postPromotionTweet(buildTweetBody(combined, baseUrl))
+        const body = baseUrl ? `【ヨソる】${combined}\n${baseUrl}`.slice(0, 280) : `【ヨソる】${combined}`.slice(0, 280)
+        const { id } = await postPromotionTweet(body)
         result.check.tweetIds.push(id)
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)

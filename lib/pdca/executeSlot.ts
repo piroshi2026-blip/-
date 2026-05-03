@@ -6,7 +6,6 @@ import type { PlannedSlot, SlotFlavor } from './planDailySlots'
 import { planDailySlots, upsertSingleMissingSlot } from './planDailySlots'
 import {
   buildTweetBody,
-  buildTweetLine,
   getPublicBaseUrl,
   insertMarket,
   jstDateString,
@@ -143,9 +142,11 @@ export async function executePdcaSlot(
 
     const marketId = await resolveNewMarketId(sb, draft.title)
 
-    const line = buildTweetLine(planned.flavor === 'mlb' ? 'mlb' : 'general', draft.title)
-    const slotLabel = `${slotIndex + 1}/5枠`
-    const body = buildTweetBody(`${slotLabel} ${line}`, baseUrl)
+    const body = buildTweetBody(
+      planned.flavor === 'mlb' ? 'mlb' : 'general',
+      draft.title,
+      baseUrl
+    )
 
     let tweetId: string | null = null
     let tweetError: string | null = null

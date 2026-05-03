@@ -23,7 +23,18 @@ export async function postPromotionTweet(text: string): Promise<{ id: string }> 
   })
 
   const tweet = text.length > 275 ? `${text.slice(0, 272)}…` : text
-  const { data } = await client.v2.tweet(tweet)
-  if (!data?.id) throw new Error('X API がツイートIDを返しませんでした')
-  return { id: data.id }
+  try {
+    const { data } = await client.v2.tweet(tweet)
+    if (!data?.id) throw new Error('X API がツイートIDを返しませんでした')
+    return { id: data.id }
+  } catch (e: unknown) {
+    const code = (e as { code?: number; status?: number })?.code ?? (e as { status?: number })?.status
+    const msg = e instanceof Error ? e.message : String(e)
+    if (code === 402 || msg.includes('402')) {
+      throw new Error(
+        '[X 402] クレジット不足です。developer.twitter.com → Products → クレジット残高を確認・チャージしてください。'
+      )
+    }
+    throw e
+  }
 }

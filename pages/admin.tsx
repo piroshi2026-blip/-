@@ -6,7 +6,7 @@ export default function Admin() {
   const ADMIN_PASSWORD = 'yosoru_admin' 
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [passInput, setPassInput] = useState('')
-  const [activeTab, setActiveTab] = useState<'markets' | 'categories' | 'users' | 'config'>('markets')
+  const [activeTab, setActiveTab] = useState<'markets' | 'categories' | 'users' | 'config' | 'pdca'>('markets')
   const [markets, setMarkets] = useState<any[]>([])
   /** '' = すべて表示 */
   const [marketCategoryFilter, setMarketCategoryFilter] = useState<string>('')
@@ -23,6 +23,11 @@ export default function Admin() {
   const [uploading, setUploading] = useState(false)
   const [newMarket, setNewMarket] = useState({ title: '', category: '', end_date: '', description: '', image_url: '', options: '' })
   const [newCategory, setNewCategory] = useState({ name: '', icon: '', display_order: 0 })
+
+  const [pdcaSlot, setPdcaSlot] = useState(0)
+  const [pdcaPassword, setPdcaPassword] = useState('')
+  const [pdcaRunning, setPdcaRunning] = useState(false)
+  const [pdcaResult, setPdcaResult] = useState<unknown>(null)
 
   useEffect(() => {
     const authStatus = localStorage.getItem('yosoru_admin_auth')
@@ -86,6 +91,23 @@ export default function Admin() {
     await supabase.from('market_options').delete().eq('market_id', id)
     const { error } = await supabase.from('markets').delete().eq('id', id)
     if (error) alert('削除失敗: ' + error.message); else fetchData();
+  }
+
+  async function handleRunPdca() {
+    setPdcaRunning(true)
+    setPdcaResult(null)
+    try {
+      const res = await fetch('/api/admin/run-pdca', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminPassword: pdcaPassword, slot: pdcaSlot }),
+      })
+      const data = await res.json()
+      setPdcaResult(data)
+    } catch (e) {
+      setPdcaResult({ error: e instanceof Error ? e.message : String(e) })
+    }
+    setPdcaRunning(false)
   }
 
   async function handleUpdateConfig() { await supabase.from('site_config').update(siteConfig).eq('id', siteConfig.id); alert('保存完了'); }
@@ -172,6 +194,7 @@ export default function Admin() {
         <button onClick={() => setActiveTab('categories')} style={s.tab(activeTab === 'categories')}>カテゴリ</button>
         <button onClick={() => setActiveTab('users')} style={s.tab(activeTab === 'users')}>ユーザー</button>
         <button onClick={() => setActiveTab('config')} style={s.tab(activeTab === 'config')}>サイト設定</button>
+        <button onClick={() => setActiveTab('pdca')} style={s.tab(activeTab === 'pdca')}>🤖 PDCA</button>
       </div>
 
       {activeTab === 'markets' && (
@@ -296,6 +319,60 @@ export default function Admin() {
             ))}
           </tbody>
         </table>
+      )}
+
+      {activeTab === 'pdca' && (
+        <section style={{ background: '#f8fafc', padding: '24px', borderRadius: '16px' }}>
+          <h3 style={{ marginTop: 0 }}>🤖 PDCA 手動実行</h3>
+          <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '20px', lineHeight: 1.6 }}>
+            問い作成 → Supabase 公開 → X 投稿 を手動でまとめて実行します。<br />
+            通常は Vercel Cron が JST 9・11・13・15・17 時に自動実行します。<br />
+            <strong>すでに実行済みのスロット</strong>は skip されます。
+          </p>
+          <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: '140px' }}>
+              <label style={{ fontSize: '12px', color: '#666', display: 'block', marginBottom: '4px' }}>スロット番号</label>
+              <select value={pdcaSlot} onChange={e => setPdcaSlot(Number(e.target.value))} style={s.inp}>
+                {[0, 1, 2, 3, 4].map(n => (
+                  <option key={n} value={n}>スロット {n}（JST {['9:00', '11:00', '13:00', '15:00', '17:00'][n]}）</option>
+                ))}
+              </select>
+            </div>
+            <div style={{ flex: 1, minWidth: '180px' }}>
+              <label style={{ fontSize: '12px', color: '#666', display: 'block', marginBottom: '4px' }}>管理パスワード</label>
+              <input
+                type="password"
+                value={pdcaPassword}
+                onChange={e => setPdcaPassword(e.target.value)}
+                placeholder="yosoru_admin"
+                style={s.inp}
+              />
+            </div>
+          </div>
+          <button
+            onClick={handleRunPdca}
+            disabled={pdcaRunning}
+            style={{ ...s.btn, background: pdcaRunning ? '#9ca3af' : '#7c3aed', width: '100%', marginBottom: '16px' }}
+          >
+            {pdcaRunning ? '⏳ 実行中（X 投稿まで30秒程度かかります）…' : `▶ スロット ${pdcaSlot} を今すぐ実行`}
+          </button>
+          {pdcaResult != null && (
+            <div>
+              <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '6px' }}>実行結果：</div>
+              <pre style={{
+                background: '#1e293b', color: '#e2e8f0', padding: '16px',
+                borderRadius: '8px', fontSize: '12px', overflow: 'auto',
+                maxHeight: '320px', whiteSpace: 'pre-wrap', wordBreak: 'break-all'
+              }}>
+                {JSON.stringify(pdcaResult, null, 2)}
+              </pre>
+            </div>
+          )}
+          <div style={{ marginTop: '20px', padding: '12px', background: '#fef9c3', borderRadius: '8px', fontSize: '12px', color: '#854d0e' }}>
+            <strong>X 投稿が 402 エラーになる場合：</strong><br />
+            developer.twitter.com → Products でクレジット残高を確認・チャージしてください。
+          </div>
+        </section>
       )}
 
       {activeTab === 'config' && (
