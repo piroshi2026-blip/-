@@ -110,6 +110,23 @@ export default function Admin() {
     setPdcaRunning(false)
   }
 
+  async function handleRunQuick() {
+    setPdcaRunning(true)
+    setPdcaResult(null)
+    try {
+      const res = await fetch('/api/admin/run-pdca', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminPassword: pdcaPassword, mode: 'quick' }),
+      })
+      const data = await res.json()
+      setPdcaResult(data)
+    } catch (e) {
+      setPdcaResult({ error: e instanceof Error ? e.message : String(e) })
+    }
+    setPdcaRunning(false)
+  }
+
   async function handleUpdateConfig() { await supabase.from('site_config').update(siteConfig).eq('id', siteConfig.id); alert('保存完了'); }
   async function handleUpdateCategory(id: number, updates: any) { await supabase.from('categories').update(updates).eq('id', id); fetchData(); }
   async function handleAddCategory() { if (!newCategory.name) return; await supabase.from('categories').insert([newCategory]); setNewCategory({ name: '', icon: '', display_order: 0 }); fetchData(); }
@@ -349,13 +366,22 @@ export default function Admin() {
               />
             </div>
           </div>
-          <button
-            onClick={handleRunPdca}
-            disabled={pdcaRunning}
-            style={{ ...s.btn, background: pdcaRunning ? '#9ca3af' : '#7c3aed', width: '100%', marginBottom: '16px' }}
-          >
-            {pdcaRunning ? '⏳ 実行中（X 投稿まで30秒程度かかります）…' : `▶ スロット ${pdcaSlot} を今すぐ実行`}
-          </button>
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
+            <button
+              onClick={handleRunQuick}
+              disabled={pdcaRunning}
+              style={{ ...s.btn, background: pdcaRunning ? '#9ca3af' : '#059669', flex: 1 }}
+            >
+              {pdcaRunning ? '⏳ 実行中…' : '⚡ Quick（スロット不問・今すぐ1問生成）'}
+            </button>
+            <button
+              onClick={handleRunPdca}
+              disabled={pdcaRunning}
+              style={{ ...s.btn, background: pdcaRunning ? '#9ca3af' : '#7c3aed', flex: 1 }}
+            >
+              {pdcaRunning ? '⏳ 実行中…' : `▶ スロット ${pdcaSlot} を実行`}
+            </button>
+          </div>
           {pdcaResult != null && (
             <div>
               <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '6px' }}>実行結果：</div>

@@ -28,6 +28,10 @@
     {
       "path": "/api/cron/pdca-analyze",
       "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/cron/pdca-quick",
+      "schedule": "*/10 * * * *"
     }
   ]
 }
