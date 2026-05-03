@@ -182,9 +182,9 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key`}
 
             <h3 style={{fontSize:'16px', fontWeight:'800', margin:'0 0 15px'}}>📜 ヨソり履歴</h3>
             {myBets.map(b => {
-              const isWin = b.markets.is_resolved && b.markets.result_option_id === b.option_id;
+              const isWin = b.markets.is_resolved && b.markets.result_option_id === b.market_option_id;
               const pool = b.markets.total_pool || 0;
-              const winOption = b.markets.market_options?.find((o:any) => o.id === b.option_id);
+              const winOption = b.markets.market_options?.find((o:any) => o.id === b.market_option_id);
               const winOptionPool = winOption?.pool || 0;
               const odds = winOptionPool > 0 ? (pool / winOptionPool).toFixed(1) : "0";
               const payout = isWin ? Math.floor(b.amount * Number(odds)) : 0;
