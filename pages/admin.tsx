@@ -6,7 +6,7 @@ export default function Admin() {
   const ADMIN_PASSWORD = 'yosoru_admin' 
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [passInput, setPassInput] = useState('')
-  const [activeTab, setActiveTab] = useState<'markets' | 'categories' | 'users' | 'config' | 'pdca'>('markets')
+  const [activeTab, setActiveTab] = useState<'markets' | 'categories' | 'users' | 'config' | 'pdca' | 'gacha'>('markets')
   const [markets, setMarkets] = useState<any[]>([])
   /** '' = すべて表示 */
   const [marketCategoryFilter, setMarketCategoryFilter] = useState<string>('')
@@ -28,6 +28,20 @@ export default function Admin() {
   const [pdcaPassword, setPdcaPassword] = useState('')
   const [pdcaRunning, setPdcaRunning] = useState(false)
   const [pdcaResult, setPdcaResult] = useState<unknown>(null)
+
+  type GachaCard = {
+    draft: { title: string; description: string; category: string; options: string[]; endDays: number }
+    headline: string
+    kind: 'mlb' | 'general'
+    imageUrl: string | null
+    error?: string
+  }
+  type EditCard = { title: string; options: string[]; endDays: number }
+  const [gachaCards, setGachaCards] = useState<GachaCard[]>([])
+  const [gachaEdits, setGachaEdits] = useState<EditCard[]>([])
+  const [gachaLoading, setGachaLoading] = useState(false)
+  const [gachaPosting, setGachaPosting] = useState<number | null>(null)
+  const [gachaPostResults, setGachaPostResults] = useState<Record<number, unknown>>({})
 
   useEffect(() => {
     const authStatus = localStorage.getItem('yosoru_admin_auth')
@@ -144,6 +158,51 @@ export default function Admin() {
     setPdcaRunning(false)
   }
 
+  async function handleGacha() {
+    setGachaLoading(true)
+    setGachaCards([])
+    setGachaEdits([])
+    setGachaPostResults({})
+    try {
+      const res = await fetch('/api/admin/generate-drafts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminPassword: pdcaPassword, count: 5 }),
+      })
+      const data = await res.json()
+      const cards: any[] = data.candidates || []
+      setGachaCards(cards)
+      setGachaEdits(cards.map((c: any) => ({
+        title: c.draft?.title ?? '',
+        options: c.draft?.options ?? ['', '', ''],
+        endDays: c.draft?.endDays ?? 7,
+      })))
+    } catch (e) {
+      setGachaCards([{ draft: { title: '', description: '', category: '', options: [], endDays: 7 }, headline: '', kind: 'general', imageUrl: null, error: e instanceof Error ? e.message : String(e) }])
+    }
+    setGachaLoading(false)
+  }
+
+  async function handlePostGacha(idx: number) {
+    const card = gachaCards[idx]
+    const edit = gachaEdits[idx]
+    if (!card || !edit) return
+    setGachaPosting(idx)
+    try {
+      const draft = { ...card.draft, title: edit.title, options: edit.options, endDays: edit.endDays }
+      const res = await fetch('/api/admin/post-draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminPassword: pdcaPassword, draft, headline: card.headline, kind: card.kind, imageUrl: card.imageUrl }),
+      })
+      const data = await res.json()
+      setGachaPostResults(prev => ({ ...prev, [idx]: data }))
+    } catch (e) {
+      setGachaPostResults(prev => ({ ...prev, [idx]: { error: e instanceof Error ? e.message : String(e) } }))
+    }
+    setGachaPosting(null)
+  }
+
   async function handleUpdateConfig() { await supabase.from('site_config').update(siteConfig).eq('id', siteConfig.id); alert('保存完了'); }
   async function handleUpdateCategory(id: number, updates: any) { await supabase.from('categories').update(updates).eq('id', id); fetchData(); }
   async function handleAddCategory() { if (!newCategory.name) return; await supabase.from('categories').insert([newCategory]); setNewCategory({ name: '', icon: '', display_order: 0 }); fetchData(); }
@@ -225,6 +284,7 @@ export default function Admin() {
 
       <div style={{ display: 'flex', gap: '2px', marginBottom: '20px', borderRadius:'10px', overflow:'hidden' }}>
         <button onClick={() => setActiveTab('markets')} style={s.tab(activeTab === 'markets')}>問い管理</button>
+        <button onClick={() => setActiveTab('gacha')} style={{...s.tab(activeTab === 'gacha'), background: activeTab === 'gacha' ? '#f59e0b' : '#fef3c7', color: activeTab === 'gacha' ? '#fff' : '#92400e'}}>🎰 ガチャ投稿</button>
         <button onClick={() => setActiveTab('categories')} style={s.tab(activeTab === 'categories')}>カテゴリ</button>
         <button onClick={() => setActiveTab('users')} style={s.tab(activeTab === 'users')}>ユーザー</button>
         <button onClick={() => setActiveTab('config')} style={s.tab(activeTab === 'config')}>サイト設定</button>
@@ -353,6 +413,114 @@ export default function Admin() {
             ))}
           </tbody>
         </table>
+      )}
+
+      {activeTab === 'gacha' && (
+        <section style={{ background: '#fffbeb', padding: '24px', borderRadius: '16px' }}>
+          <h3 style={{ marginTop: 0, fontSize: '20px' }}>🎰 ガチャ投稿</h3>
+          <p style={{ fontSize: '13px', color: '#78350f', marginBottom: '16px', lineHeight: 1.7 }}>
+            ボタンを押すと最新ニュース・Xトレンドから<strong>5問の候補</strong>を生成します。<br />
+            気に入った問いを選び、必要なら編集してからX投稿できます。
+          </p>
+          <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <div style={{ flex: 1, minWidth: '200px' }}>
+              <label style={{ fontSize: '12px', color: '#666', display: 'block', marginBottom: '4px' }}>管理パスワード</label>
+              <input type="password" value={pdcaPassword} onChange={e => setPdcaPassword(e.target.value)} placeholder="yosoru_admin" style={s.inp} />
+            </div>
+            <button
+              onClick={handleGacha}
+              disabled={gachaLoading}
+              style={{ ...s.btn, background: gachaLoading ? '#9ca3af' : '#f59e0b', fontSize: '16px', padding: '12px 28px', minWidth: '160px' }}
+            >
+              {gachaLoading ? '⏳ 生成中…' : '🎰 5問ガチャ！'}
+            </button>
+          </div>
+
+          {gachaCards.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {gachaCards.map((card, idx) => {
+                const edit = gachaEdits[idx]
+                const postResult = gachaPostResults[idx]
+                const isPosting = gachaPosting === idx
+                const posted = postResult && !(postResult as any).error
+                if (card.error) {
+                  return (
+                    <div key={idx} style={{ background: '#fee2e2', padding: '16px', borderRadius: '12px', color: '#991b1b', fontSize: '13px' }}>
+                      ❌ 生成エラー: {card.error}
+                    </div>
+                  )
+                }
+                if (!edit) return null
+                return (
+                  <div key={idx} style={{ background: '#fff', border: posted ? '2px solid #10b981' : '1px solid #fcd34d', borderRadius: '14px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px', gap: '8px' }}>
+                      <span style={{ fontSize: '11px', color: '#9ca3af', flex: 1 }}>📰 {card.headline}</span>
+                      <span style={{ fontSize: '11px', background: '#e0f2fe', color: '#0369a1', borderRadius: '20px', padding: '2px 10px', whiteSpace: 'nowrap' }}>{card.draft?.category}</span>
+                    </div>
+
+                    <div style={{ marginBottom: '10px' }}>
+                      <label style={{ fontSize: '11px', color: '#666', display: 'block', marginBottom: '4px' }}>タイトル（編集可）</label>
+                      <textarea
+                        value={edit.title}
+                        onChange={e => setGachaEdits(prev => prev.map((ed, i) => i === idx ? { ...ed, title: e.target.value } : ed))}
+                        rows={2}
+                        style={{ ...s.inp, resize: 'vertical', marginBottom: 0, fontWeight: 'bold', fontSize: '15px' }}
+                      />
+                    </div>
+
+                    <div style={{ marginBottom: '12px' }}>
+                      <label style={{ fontSize: '11px', color: '#666', display: 'block', marginBottom: '6px' }}>選択肢（編集可）</label>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        {edit.options.map((opt, oi) => (
+                          <input
+                            key={oi}
+                            value={opt}
+                            onChange={e => setGachaEdits(prev => prev.map((ed, i) => {
+                              if (i !== idx) return ed
+                              const newOpts = [...ed.options]
+                              newOpts[oi] = e.target.value
+                              return { ...ed, options: newOpts }
+                            }))}
+                            placeholder={`選択肢 ${oi + 1}`}
+                            style={{ ...s.inp, flex: 1, minWidth: '100px', marginBottom: 0, fontSize: '13px' }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <label style={{ fontSize: '11px', color: '#666' }}>締切</label>
+                        <select
+                          value={edit.endDays}
+                          onChange={e => setGachaEdits(prev => prev.map((ed, i) => i === idx ? { ...ed, endDays: Number(e.target.value) } : ed))}
+                          style={{ padding: '6px 8px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '13px' }}
+                        >
+                          {[3, 5, 7, 10, 14].map(d => <option key={d} value={d}>{d}日後</option>)}
+                        </select>
+                      </div>
+
+                      {posted ? (
+                        <div style={{ color: '#10b981', fontSize: '13px', fontWeight: 'bold' }}>
+                          ✅ 投稿済み（market ID: {(postResult as any).marketId}）
+                          {(postResult as any).tweetError && <span style={{ color: '#f59e0b', marginLeft: '8px' }}>X投稿エラー: {(postResult as any).tweetError}</span>}
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => handlePostGacha(idx)}
+                          disabled={isPosting || gachaPosting !== null}
+                          style={{ ...s.btn, background: isPosting ? '#9ca3af' : '#0284c7', padding: '10px 20px' }}
+                        >
+                          {isPosting ? '⏳ 投稿中…' : '📤 この問いを投稿'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </section>
       )}
 
       {activeTab === 'pdca' && (
