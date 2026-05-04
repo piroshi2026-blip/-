@@ -36,6 +36,13 @@ function parseMlbFeedList(envVal: string | undefined): string[] {
   return [...new Set([...MLB_EXTRA_FEEDS, ...DEFAULT_FEEDS, ...extra])]
 }
 
+/**
+ * 予測市場として成立しにくい見出しを除外するフィルター。
+ * 気象警報・訃報・既確定の事故報道はオッズの張り合いにならない。
+ */
+const BAD_TOPIC_RE =
+  /警報|暴風雪?|大雨警報|台風.*上陸|大雪警報|地震速報|津波|噴火|土砂崩れ|洪水|氾濫|震度[5-7強弱]|死亡確認|遺体|訃報|逮捕された|緊急逮捕|火災.*死傷|交通事故.*死|墜落|転落死|溺死|心肺停止/
+
 export async function fetchTrendHeadlines(maxItems = 12): Promise<{ items: TrendItem[]; feedsUsed: string[] }> {
   const feeds = parseFeedList(process.env.RSS_FEED_URLS)
   const items: TrendItem[] = []
@@ -48,6 +55,7 @@ export async function fetchTrendHeadlines(maxItems = 12): Promise<{ items: Trend
       for (const entry of feed.items || []) {
         const title = entry.title?.trim()
         if (!title || title.length < 8) continue
+        if (BAD_TOPIC_RE.test(title)) continue
         items.push({ title: title.slice(0, 200), link: entry.link, source: url })
         if (items.length >= maxItems * 2) break
       }

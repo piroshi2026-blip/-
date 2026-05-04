@@ -11,27 +11,23 @@
     },
     {
       "path": "/api/cron/pdca-slot/1",
-      "schedule": "0 2 * * *"
+      "schedule": "0 3 * * *"
     },
     {
       "path": "/api/cron/pdca-slot/2",
-      "schedule": "0 4 * * *"
-    },
-    {
-      "path": "/api/cron/pdca-slot/3",
       "schedule": "0 6 * * *"
     },
     {
-      "path": "/api/cron/pdca-slot/4",
-      "schedule": "0 8 * * *"
+      "path": "/api/cron/pdca-slot/3",
+      "schedule": "0 10 * * *"
     },
     {
-      "path": "/api/cron/pdca-analyze",
+      "path": "/api/cron/pdca-slot/4",
       "schedule": "0 14 * * *"
     },
     {
-      "path": "/api/cron/pdca-quick",
-      "schedule": "*/10 * * * *"
+      "path": "/api/cron/pdca-analyze",
+      "schedule": "0 15 * * *"
     }
   ]
 }

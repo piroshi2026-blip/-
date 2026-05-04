@@ -70,7 +70,10 @@ export async function resolveNewMarketId(
   return last?.id != null ? Number(last.id) : null
 }
 
-export async function insertMarket(draft: DraftMarket): Promise<{ error: string | null }> {
+export async function insertMarket(
+  draft: DraftMarket,
+  imageUrl?: string | null
+): Promise<{ error: string | null }> {
   const sb = getServiceSupabase()
   const end = new Date()
   end.setDate(end.getDate() + draft.endDays)
@@ -79,7 +82,7 @@ export async function insertMarket(draft: DraftMarket): Promise<{ error: string 
     category_input: draft.category,
     end_date_input: end.toISOString(),
     description_input: draft.description,
-    image_url_input: '',
+    image_url_input: imageUrl ?? '',
     options_input: draft.options,
   })
   return { error: error ? error.message : null }

@@ -121,27 +121,97 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key`}
 
       {activeTab === 'home' && (
         <div style={{marginTop:'15px'}}>{markets.filter(m => activeCategory === 'すべて' || m.category === activeCategory).map(m => {
-          const active = !m.is_resolved && new Date(m.end_date) > new Date(); 
-          const days = Math.ceil((new Date(m.end_date).getTime() - new Date().getTime()) / 86400000);
-          const isPopular = m.total_pool > 1000; const isUrgent = active && days <= 2;
+          const active = !m.is_resolved && new Date(m.end_date) > new Date()
+          const days = Math.ceil((new Date(m.end_date).getTime() - new Date().getTime()) / 86400000)
+          const isPopular = m.total_pool > 1000
+          const isUrgent = active && days <= 2
+          const catColor = categoryMeta[m.category]?.color || '#374151'
+          const topOpt = m.market_options.reduce((a: any, b: any) => (b.pool > a.pool ? b : a), m.market_options[0])
+          const topPct = topOpt ? Math.round((topOpt.pool / (m.total_pool || 1)) * 100) : 0
+          const optColors = ['#3b82f6', '#ef4444', '#10b981']
           return (
-            <div key={m.id} style={{borderRadius:'16px', marginBottom:'16px', border: isUrgent ? '2px solid #ef4444' : '1px solid #e2e8f0', overflow:'hidden', position:'relative', background:'#fff', boxShadow:'0 4px 6px -1px rgba(0,0,0,0.05)', opacity: m.is_resolved ? 0.8 : 1}}>
-              <div style={{position:'absolute', top:10, right:10, zIndex:10, display:'flex', gap:'5px'}}>
-                {m.is_resolved && <div style={{background:'#10b981', color:'#fff', fontSize:'10px', padding:'4px 8px', borderRadius:'8px', fontWeight:'bold'}}>✅ 確定済み</div>}
-                {isPopular && !m.is_resolved && <div style={{background:'#f59e0b', color:'#fff', fontSize:'10px', padding:'4px 8px', borderRadius:'8px', fontWeight:'bold'}}>💎 人気</div>}
-                {active && <div style={{background:isUrgent?'#ef4444':'#1f2937', color:'#fff', fontSize:'10px', padding:'4px 8px', borderRadius:'8px', fontWeight:'bold'}}>⏰ あと{days}日</div>}
+            <div key={m.id} style={{borderRadius:'20px', marginBottom:'14px', border: isUrgent ? '2px solid #ef4444' : '1px solid #e2e8f0', overflow:'hidden', background:'#fff', boxShadow:'0 2px 8px rgba(0,0,0,0.06)', opacity: m.is_resolved ? 0.75 : 1}}>
+
+              {/* ヘッダー: 画像あり→画像、なし→カテゴリカラーのグラデーション */}
+              <div style={{position:'relative', height: m.image_url ? '140px' : '90px', background: m.image_url ? '#eee' : `linear-gradient(135deg, ${catColor}dd, ${catColor}88)`}}>
+                {m.image_url && <img src={m.image_url} alt={m.title} style={{width:'100%', height:'100%', objectFit:'cover', filter: m.is_resolved ? 'grayscale(40%)' : 'none'}} />}
+                <div style={{position:'absolute', inset:0, background:'linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 55%)'}} />
+
+                {/* バッジ行 */}
+                <div style={{position:'absolute', top:10, left:10, right:10, display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
+                  <div style={{background:'rgba(0,0,0,0.45)', backdropFilter:'blur(4px)', color:'#fff', fontSize:'10px', padding:'3px 9px', borderRadius:'20px', fontWeight:'bold'}}>{m.category}</div>
+                  <div style={{display:'flex', gap:'5px'}}>
+                    {m.is_resolved && <div style={{background:'#10b981', color:'#fff', fontSize:'10px', padding:'3px 8px', borderRadius:'20px', fontWeight:'bold'}}>確定済み</div>}
+                    {isPopular && !m.is_resolved && <div style={{background:'#f59e0b', color:'#fff', fontSize:'10px', padding:'3px 8px', borderRadius:'20px', fontWeight:'bold'}}>人気</div>}
+                    {active && <div style={{background:isUrgent?'#ef4444':'rgba(0,0,0,0.55)', backdropFilter:'blur(4px)', color:'#fff', fontSize:'10px', padding:'3px 8px', borderRadius:'20px', fontWeight:'bold'}}>{days <= 0 ? '本日締切' : `あと${days}日`}</div>}
+                  </div>
+                </div>
+
+                {/* タイトル */}
+                <div style={{position:'absolute', bottom:10, left:12, right:12}}>
+                  <h2 style={{fontSize:'15px', margin:0, fontWeight:'800', color:'#fff', lineHeight:1.35, textShadow:'0 1px 4px rgba(0,0,0,0.5)'}}>{m.title}</h2>
+                </div>
               </div>
-              <div style={{height:'150px', position:'relative', background:'#eee'}}>{m.image_url && <img src={m.image_url} alt={m.title} style={{width:'100%', height:'100%', objectFit:'cover', filter: m.is_resolved ? 'grayscale(40%)' : 'none'}} />}
-                <div style={{position:'absolute', top:10, left:10, background: categoryMeta[m.category]?.color || '#374151', color:'#fff', fontSize:'9px', padding:'4px 10px', borderRadius:'6px', fontWeight:'bold'}}>{m.category}</div>
-                <div style={{position:'absolute', bottom:0, left:0, right:0, padding:'15px', background:'linear-gradient(to top, rgba(0,0,0,0.9), transparent)', color:'#fff'}}><h2 style={{fontSize:'16px', margin:0, fontWeight:'800'}}>{m.title}</h2></div>
-              </div>
-              <div style={{padding:'12px'}}>
-                <div style={{fontSize:'10px', color:'#94a3b8', marginBottom:'6px'}}>⏰ {m.is_resolved ? '終了日時' : '締切'}: {new Date(m.end_date).toLocaleString()}</div>
-                <div style={{ fontSize: '11px', color: '#64748b', background: '#f1f5f9', padding: '8px 10px', borderRadius: '8px', marginBottom: '12px', borderLeft: '4px solid #cbd5e1', lineHeight: '1.4' }}><strong>判定基準:</strong> {m.description}</div>
-                {m.market_options.map((opt: any, i: number) => { const pct = Math.round((opt.pool / (m.total_pool || 1)) * 100); return (<div key={opt.id} style={{marginBottom:'6px'}}><div style={{display:'flex', justifyContent:'space-between', fontSize:'12px', marginBottom:'2px'}}><span>{m.result_option_id === opt.id ? '👑 ' : ''}{opt.name}</span><span style={{fontWeight:'bold', color: m.result_option_id === opt.id ? '#10b981' : '#2563eb'}}>{opt.pool===0?0:(m.total_pool/opt.pool).toFixed(1)}倍 <span style={{color:'#94a3b8', fontSize:'10px'}}>({pct}%)</span></span></div><div style={{height:'6px', background:'#e2e8f0', borderRadius:'3px', overflow:'hidden'}}><div style={{width:`${pct}%`, height:'100%', background: m.result_option_id === opt.id ? '#10b981' : ['#3b82f6', '#ef4444', '#10b981'][i%3]}} /></div></div>) })}
-                {active ? (selectedMarketId === m.id ? (<div style={{marginTop:'12px', background:'#f8fafc', padding:'12px', borderRadius:'12px', border:'1px solid #e2e8f0'}}><div style={{display:'flex', gap:'6px', flexWrap:'wrap', marginBottom:'12px'}}>{m.market_options.map((o: any) => (<button key={o.id} onClick={()=>setSelectedOptionId(o.id)} style={{padding:'8px 12px', borderRadius:'20px', border:selectedOptionId===o.id?'2px solid #2563eb':'1px solid #cbd5e1', fontSize:'12px', background:'#fff', color:selectedOptionId===o.id?'#2563eb':'#475569'}}>{o.name}</button>))}</div>
-                  <div style={{display:'flex', alignItems:'center', gap:'10px', marginBottom:'12px'}}><input type="range" min="10" max={profile?.point_balance || 1000} step="10" value={voteAmount} onChange={e => setVoteAmount(Number(e.target.value))} style={{flex:1}} /><input type="number" value={voteAmount} onChange={e => setVoteAmount(Number(e.target.value))} style={{width:'70px', border:'1px solid #cbd5e1', borderRadius:'8px', padding:'5px', fontSize:'13px', textAlign:'center'}} /> <span style={{fontSize:'12px'}}>pt</span></div>
-                  <button onClick={handleVote} style={{width:'100%', padding:'12px', background:'#1f2937', color:'#fff', borderRadius:'12px', fontWeight:'bold', border:'none'}}>確定する</button></div>) : (<button onClick={()=>setSelectedMarketId(m.id)} style={{width:'100%', padding:'10px', background:'#3b82f6', color:'#fff', borderRadius:'10px', fontWeight:'bold', border:'none', marginTop:'10px'}}>ヨソる</button>)) : <div style={{textAlign:'center', fontSize:'12px', color: m.is_resolved ? '#10b981' : '#94a3b8', marginTop:'10px', padding:'8px', background: m.is_resolved ? '#ecfdf5' : '#f1f5f9', borderRadius:'8px', fontWeight: m.is_resolved ? 'bold' : 'normal'}}>{m.is_resolved ? `正解：${m.market_options.find((o:any) => o.id === m.result_option_id)?.name || '未設定'}` : '判定中'}</div>}
+
+              <div style={{padding:'12px 14px'}}>
+                {/* 最多票オプションをPolymarket風に大きく表示 */}
+                {!m.is_resolved && topOpt && m.total_pool > 0 && (
+                  <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'10px', padding:'8px 10px', background:'#f8fafc', borderRadius:'10px'}}>
+                    <div style={{fontSize:'26px', fontWeight:'900', color:catColor, lineHeight:1}}>{topPct}%</div>
+                    <div style={{fontSize:'12px', color:'#475569', lineHeight:1.3}}>「{topOpt.name}」に<br/>票が集まっています</div>
+                    <div style={{marginLeft:'auto', fontSize:'11px', color:'#94a3b8', textAlign:'right'}}>{m.total_pool.toLocaleString()}pt<br/>の賭け</div>
+                  </div>
+                )}
+
+                {/* 選択肢バー */}
+                <div style={{marginBottom:'10px'}}>
+                  {m.market_options.map((opt: any, i: number) => {
+                    const pct = Math.round((opt.pool / (m.total_pool || 1)) * 100)
+                    const isWinner = m.result_option_id === opt.id
+                    const barColor = isWinner ? '#10b981' : optColors[i % 3]
+                    return (
+                      <div key={opt.id} style={{marginBottom:'6px'}}>
+                        <div style={{display:'flex', justifyContent:'space-between', fontSize:'12px', marginBottom:'3px'}}>
+                          <span style={{fontWeight: isWinner ? 'bold' : 'normal', color: isWinner ? '#10b981' : '#1e293b'}}>{isWinner ? '👑 ' : ''}{opt.name}</span>
+                          <span style={{fontWeight:'700', color: isWinner ? '#10b981' : '#2563eb', fontSize:'13px'}}>{pct}%<span style={{color:'#94a3b8', fontSize:'10px', fontWeight:'normal', marginLeft:'4px'}}>{m.total_pool > 0 ? `${(m.total_pool/Math.max(opt.pool,1)).toFixed(1)}倍` : '—'}</span></span>
+                        </div>
+                        <div style={{height:'7px', background:'#e2e8f0', borderRadius:'4px', overflow:'hidden'}}>
+                          <div style={{width:`${pct}%`, height:'100%', background:barColor, borderRadius:'4px', transition:'width 0.3s'}} />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* 判定基準（折りたたみ風に小さく） */}
+                <div style={{fontSize:'10px', color:'#94a3b8', marginBottom:'10px', lineHeight:1.4}}>
+                  判定: {m.description?.slice(0, 60)}{(m.description?.length ?? 0) > 60 ? '…' : ''}
+                </div>
+
+                {/* アクションエリア */}
+                {active ? (
+                  selectedMarketId === m.id ? (
+                    <div style={{background:'#f8fafc', padding:'12px', borderRadius:'14px', border:'1px solid #e2e8f0'}}>
+                      <div style={{display:'flex', gap:'6px', flexWrap:'wrap', marginBottom:'10px'}}>
+                        {m.market_options.map((o: any) => (
+                          <button key={o.id} onClick={()=>setSelectedOptionId(o.id)} style={{padding:'8px 14px', borderRadius:'20px', border:selectedOptionId===o.id?`2px solid ${catColor}`:'1px solid #cbd5e1', fontSize:'12px', background: selectedOptionId===o.id ? catColor : '#fff', color:selectedOptionId===o.id?'#fff':'#475569', fontWeight: selectedOptionId===o.id ? 'bold' : 'normal', transition:'all 0.15s'}}>{o.name}</button>
+                        ))}
+                      </div>
+                      <div style={{display:'flex', alignItems:'center', gap:'10px', marginBottom:'10px'}}>
+                        <input type="range" min="10" max={profile?.point_balance || 1000} step="10" value={voteAmount} onChange={e => setVoteAmount(Number(e.target.value))} style={{flex:1, accentColor:catColor}} />
+                        <input type="number" value={voteAmount} onChange={e => setVoteAmount(Number(e.target.value))} style={{width:'70px', border:'1px solid #cbd5e1', borderRadius:'8px', padding:'5px', fontSize:'13px', textAlign:'center'}} />
+                        <span style={{fontSize:'12px', color:'#64748b'}}>pt</span>
+                      </div>
+                      <button onClick={handleVote} style={{width:'100%', padding:'12px', background:'#1f2937', color:'#fff', borderRadius:'12px', fontWeight:'bold', border:'none', fontSize:'14px'}}>ヨソりを確定する</button>
+                    </div>
+                  ) : (
+                    <button onClick={()=>setSelectedMarketId(m.id)} style={{width:'100%', padding:'11px', background:`linear-gradient(135deg, ${catColor}, ${catColor}cc)`, color:'#fff', borderRadius:'12px', fontWeight:'bold', border:'none', fontSize:'14px', boxShadow:`0 4px 12px ${catColor}44`}}>ヨソる →</button>
+                  )
+                ) : (
+                  <div style={{textAlign:'center', fontSize:'12px', color: m.is_resolved ? '#10b981' : '#94a3b8', padding:'8px', background: m.is_resolved ? '#ecfdf5' : '#f1f5f9', borderRadius:'8px', fontWeight: m.is_resolved ? 'bold' : 'normal'}}>
+                    {m.is_resolved ? `正解: ${m.market_options.find((o:any) => o.id === m.result_option_id)?.name || '未設定'}` : '判定中'}
+                  </div>
+                )}
               </div>
             </div>
           )

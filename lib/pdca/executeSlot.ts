@@ -4,6 +4,7 @@ import { draftMarketFromTrend } from './draftMarket'
 import { postPromotionTweet } from './postX'
 import type { PlannedSlot, SlotFlavor } from './planDailySlots'
 import { planDailySlots, upsertSingleMissingSlot } from './planDailySlots'
+import { fetchMarketImage } from './fetchImage'
 import {
   buildTweetBody,
   getPublicBaseUrl,
@@ -130,7 +131,9 @@ export async function executePdcaSlot(
           : defaultCategory
     draft = { ...draft, category: catOk }
 
-    const ins = await insertMarket(draft)
+    const imageUrl = await fetchMarketImage(draft, planned.flavor === 'mlb' ? 'mlb' : 'general', item.link)
+
+    const ins = await insertMarket(draft, imageUrl)
     if (ins.error) {
       errors.push(ins.error)
       await updateSlotError(plan_date, slotIndex, ins.error)

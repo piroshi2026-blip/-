@@ -1,6 +1,7 @@
 import { fetchTrendHeadlines, fetchOhtaniDodgersHeadlines, MLB_TOPIC_RE, buildDailyMlbFallbackItem } from './fetchTrends'
 import { draftMarketFromTrend } from './draftMarket'
 import { postPromotionTweet } from './postX'
+import { fetchMarketImage } from './fetchImage'
 import {
   buildTweetBody,
   getPublicBaseUrl,
@@ -56,7 +57,9 @@ export async function createQuickMarket(): Promise<QuickMarketResult> {
       : defaultCategory
   draft = { ...draft, category: catOk }
 
-  const ins = await insertMarket(draft)
+  const imageUrl = await fetchMarketImage(draft, kind, item.link)
+
+  const ins = await insertMarket(draft, imageUrl)
   if (ins.error) throw new Error(ins.error)
 
   const sb = getServiceSupabase()
