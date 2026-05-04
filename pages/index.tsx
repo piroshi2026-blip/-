@@ -159,7 +159,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key`}
                   <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'10px', padding:'8px 10px', background:'#f8fafc', borderRadius:'10px'}}>
                     <div style={{fontSize:'26px', fontWeight:'900', color:catColor, lineHeight:1}}>{topPct}%</div>
                     <div style={{fontSize:'12px', color:'#475569', lineHeight:1.3}}>「{topOpt.name}」に<br/>票が集まっています</div>
-                    <div style={{marginLeft:'auto', fontSize:'11px', color:'#94a3b8', textAlign:'right'}}>{m.total_pool.toLocaleString()}pt<br/>の賭け</div>
+                    <div style={{marginLeft:'auto', fontSize:'11px', color:'#94a3b8', textAlign:'right'}}>{m.total_pool.toLocaleString()}pt<br/>の予想</div>
                   </div>
                 )}
 
