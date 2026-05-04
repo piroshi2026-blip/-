@@ -27,6 +27,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json(result)
     }
 
+    if (mode === 'hourly') {
+      const [r1, r2] = await Promise.allSettled([createQuickMarket(), createQuickMarket()])
+      return res.status(200).json({
+        market1: r1.status === 'fulfilled' ? r1.value : { error: (r1 as PromiseRejectedResult).reason?.message },
+        market2: r2.status === 'fulfilled' ? r2.value : { error: (r2 as PromiseRejectedResult).reason?.message },
+      })
+    }
+
     const n = Number(slot)
     if (!Number.isInteger(n) || n < 0 || n > 4) {
       return res.status(400).json({ error: 'slot は 0〜4 を指定してください' })

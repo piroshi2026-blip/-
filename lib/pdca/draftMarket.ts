@@ -1,4 +1,5 @@
 import type { TrendItem } from './fetchTrends'
+import Anthropic from '@anthropic-ai/sdk'
 
 export type DraftMarket = {
   title: string
@@ -152,6 +153,35 @@ function ensureResolutionDescription(desc: string): string {
   return `${d} ${DEFAULT_RESOLUTION_DESCRIPTION}`.trim().slice(0, 500)
 }
 
+function extractJsonFromText(text: string): string {
+  const block = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/)
+  if (block) return block[1].trim()
+  const obj = text.match(/\{[\s\S]*\}/)
+  if (obj) return obj[0]
+  return text.trim()
+}
+
+async function callClaudeForDraft(userContent: string): Promise<Partial<DraftMarket> | null> {
+  const key = process.env.ANTHROPIC_API_KEY?.trim()
+  if (!key) return null
+  try {
+    const client = new Anthropic({ apiKey: key })
+    const msg = await client.messages.create({
+      model: process.env.CLAUDE_DRAFT_MODEL ?? 'claude-haiku-4-5-20251001',
+      max_tokens: 600,
+      system: SYSTEM_PROMPT_BASE + '\n\nJSONオブジェクトのみ返す。コードブロック・余計な説明は不要。',
+      messages: [{ role: 'user', content: userContent }],
+    })
+    const text = msg.content.find((b): b is { type: 'text'; text: string } => b.type === 'text')?.text
+    if (!text) return null
+    const parsed = JSON.parse(extractJsonFromText(text)) as Partial<DraftMarket>
+    if (!parsed.title || !Array.isArray(parsed.options) || parsed.options.length < 3) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
 async function rewriteEchoingTitle(
   item: TrendItem,
   badTitle: string,
@@ -210,8 +240,10 @@ export async function draftMarketFromTrend(
     return defaultCategory
   }
 
-  const key = process.env.OPENAI_API_KEY?.trim()
-  if (!key) {
+  const claudeKey = process.env.ANTHROPIC_API_KEY?.trim()
+  const openaiKey = process.env.OPENAI_API_KEY?.trim()
+
+  if (!claudeKey && !openaiKey) {
     return fallbackDraft(item.title, defaultCategory, opts)
   }
 
@@ -220,74 +252,71 @@ export async function draftMarketFromTrend(
     flavor === 'mlb'
       ? '\nこの見出しは大谷翔平・ドジャース、村上宗隆・鈴木誠也・今永 など、メジャーリーグの日本人選手・球団に関するスポーツ予想です。category は「スポーツ」が利用可能なら優先してください。'
       : ''
+  const userContent = `利用可能な category（このいずれかと完全一致）: ${catList}\n\nニュース見出し（題材。これをそのまま問いのタイトルにしないこと）:\n${item.title}${flavorNote}`
 
-  try {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${key}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-        temperature: 0.4,
-        response_format: { type: 'json_object' },
-        messages: [
-          {
-            role: 'system',
-            content: SYSTEM_PROMPT_BASE,
-          },
-          {
-            role: 'user',
-            content: `利用可能な category（このいずれかと完全一致）: ${catList}\n\nニュース見出し（題材。これをそのまま問いのタイトルにしないこと）:\n${item.title}${flavorNote}`,
-          },
-        ],
-      }),
-    })
-    if (!res.ok) {
-      return fallbackDraft(item.title, defaultCategory, opts)
-    }
-    const data = (await res.json()) as { choices?: { message?: { content?: string } }[] }
-    const raw = data.choices?.[0]?.message?.content
-    if (!raw) return fallbackDraft(item.title, defaultCategory, opts)
-    const parsed = JSON.parse(raw) as Partial<DraftMarket>
-    if (
-      !parsed.title ||
-      !Array.isArray(parsed.options) ||
-      parsed.options.length < 3
-    ) {
-      return fallbackDraft(item.title, defaultCategory, opts)
-    }
-    const endDays = Math.min(14, Math.max(3, Number(parsed.endDays) || 7))
+  let parsed: Partial<DraftMarket> | null = null
 
-    let titleRaw = String(parsed.title || '').slice(0, 100).trim()
-    if (!isBlackburnAwardsTopic(item.title) && titleRaw && isLikelyHeadlineEcho(titleRaw, item.title)) {
-      const repaired = await rewriteEchoingTitle(item, titleRaw, catList, flavorNote)
-      if (repaired && !isLikelyHeadlineEcho(repaired, item.title)) titleRaw = repaired
-      else titleRaw = predictionFallbackTitle(item.title)
-    }
+  // Claude 優先（日本語品質が高い）
+  if (claudeKey) {
+    parsed = await callClaudeForDraft(userContent)
+  }
 
-    const descRaw = String(parsed.description || '').trim()
-    const finalDescription = isBlackburnAwardsTopic(item.title)
-      ? BLACKBURN_DESCRIPTION
-      : ensureResolutionDescription(descRaw)
+  // OpenAI フォールバック
+  if (!parsed && openaiKey) {
+    try {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+          temperature: 0.4,
+          response_format: { type: 'json_object' },
+          messages: [
+            { role: 'system', content: SYSTEM_PROMPT_BASE },
+            { role: 'user', content: userContent },
+          ],
+        }),
+      })
+      if (res.ok) {
+        const data = (await res.json()) as { choices?: { message?: { content?: string } }[] }
+        const raw = data.choices?.[0]?.message?.content
+        if (raw) {
+          const p = JSON.parse(raw) as Partial<DraftMarket>
+          if (p.title && Array.isArray(p.options) && p.options.length >= 3) parsed = p
+        }
+      }
+    } catch { /* fallback below */ }
+  }
 
-    const optsRaw = isBlackburnAwardsTopic(item.title)
-      ? BLACKBURN_OPTIONS
-      : parsed.options!.slice(0, 5).map((s) => String(s).slice(0, 40))
+  if (!parsed) return fallbackDraft(item.title, defaultCategory, opts)
 
-    const finalTitle = isBlackburnAwardsTopic(item.title)
-      ? BLACKBURN_TITLE
-      : titleRaw || predictionFallbackTitle(item.title)
+  const endDays = Math.min(14, Math.max(3, Number(parsed.endDays) || 7))
 
-    return {
-      title: finalTitle,
-      description: finalDescription,
-      category: pickCategory(String(parsed.category || defaultCategory)),
-      options: optsRaw.length >= 3 ? optsRaw.slice(0, 3) : fallbackDraft(item.title, defaultCategory, opts).options,
-      endDays,
-    }
-  } catch {
-    return fallbackDraft(item.title, defaultCategory, opts)
+  let titleRaw = String(parsed.title || '').slice(0, 100).trim()
+  if (!isBlackburnAwardsTopic(item.title) && titleRaw && isLikelyHeadlineEcho(titleRaw, item.title)) {
+    const repaired = await rewriteEchoingTitle(item, titleRaw, catList, flavorNote)
+    if (repaired && !isLikelyHeadlineEcho(repaired, item.title)) titleRaw = repaired
+    else titleRaw = predictionFallbackTitle(item.title)
+  }
+
+  const descRaw = String(parsed.description || '').trim()
+  const finalDescription = isBlackburnAwardsTopic(item.title)
+    ? BLACKBURN_DESCRIPTION
+    : ensureResolutionDescription(descRaw)
+
+  const optsRaw = isBlackburnAwardsTopic(item.title)
+    ? BLACKBURN_OPTIONS
+    : parsed.options!.slice(0, 5).map((s) => String(s).slice(0, 40))
+
+  const finalTitle = isBlackburnAwardsTopic(item.title)
+    ? BLACKBURN_TITLE
+    : titleRaw || predictionFallbackTitle(item.title)
+
+  return {
+    title: finalTitle,
+    description: finalDescription,
+    category: pickCategory(String(parsed.category || defaultCategory)),
+    options: optsRaw.length >= 3 ? optsRaw.slice(0, 3) : fallbackDraft(item.title, defaultCategory, opts).options,
+    endDays,
   }
 }
