@@ -2,7 +2,6 @@
   "name": "minna",
   "crons": [
     { "path": "/api/cron/pdca-plan",    "schedule": "0 23 * * *" },
-    { "path": "/api/cron/pdca-hourly",  "schedule": "0 0-14 * * *" },
     { "path": "/api/cron/pdca-analyze", "schedule": "0 15 * * *" }
   ]
 }
