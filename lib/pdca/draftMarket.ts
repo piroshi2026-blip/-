@@ -213,36 +213,50 @@ async function rewriteEchoingTitle(
   catList: string,
   flavorNote: string
 ): Promise<string | null> {
-  const key = process.env.OPENAI_API_KEY?.trim()
-  if (!key) return null
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${key}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-      temperature: 0.35,
-      response_format: { type: 'json_object' },
-      messages: [
-        {
-          role: 'system',
-          content:
-            'あなたは予測市場の編集長です。見出しそのままの問いを「感情に訴える未来の予想」に書き直します。JSONのみ返す。キー: title（60文字以内・「【予想】」などプレフィックス禁止・見出しを「」で引用しない・具体的な数字や人名を含む疑問形または体言止め）',
-        },
-        {
-          role: 'user',
-          content: `ニュース見出し（題材のみ・言葉を使い回さないこと）: ${item.title}\n${flavorNote}\nNG例（コピー気味で却下）: ${badTitle}\n\n見出しの言葉を使わず、Polymarket風に「イラン政権は5月末までに崩壊するか？」のような具体的な数字・期間・人名を使い、読んだ人が予想したくなるtitleだけを出力してください。`,
-        },
-      ],
-    }),
-  })
-  if (!res.ok) return null
-  const data = (await res.json()) as { choices?: { message?: { content?: string } }[] }
-  const raw = data.choices?.[0]?.message?.content
-  if (!raw) return null
+  const rewritePrompt = `ニュース見出し（題材のみ・言葉を使い回さないこと）: ${item.title}\n${flavorNote}\nNG例（コピー気味で却下）: ${badTitle}\n\n見出しの言葉を使わず、「大谷翔平、今季65本塁打の新記録を更新するか？」のような具体的な数字・期間・人名を使い、読んだ人が予想したくなるtitleだけをJSONで返してください。\nキー: title（60文字以内・「【予想】」などプレフィックス禁止）`
+
+  // Claude で書き直し試行
+  const claudeKey = process.env.ANTHROPIC_API_KEY?.trim()
+  if (claudeKey) {
+    try {
+      const client = new Anthropic({ apiKey: claudeKey })
+      const msg = await client.messages.create({
+        model: process.env.CLAUDE_DRAFT_MODEL ?? 'claude-haiku-4-5-20251001',
+        max_tokens: 120,
+        system: 'あなたは予測市場の編集長です。見出しそのままの問いを「感情に訴える未来の予想」に書き直します。JSONオブジェクトのみ返す。',
+        messages: [{ role: 'user', content: rewritePrompt }],
+      })
+      const textBlock = msg.content.find((b) => b.type === 'text')
+      const text = textBlock && 'text' in textBlock ? (textBlock as { text: string }).text : ''
+      if (text) {
+        const parsed = JSON.parse(extractJsonFromText(text)) as { title?: string }
+        const t = String(parsed.title || '').trim().slice(0, 100)
+        if (t) return t
+      }
+    } catch { /* OpenAI にフォールバック */ }
+  }
+
+  // OpenAI フォールバック
+  const openaiKey = process.env.OPENAI_API_KEY?.trim()
+  if (!openaiKey) return null
   try {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+        temperature: 0.35,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: 'あなたは予測市場の編集長です。JSONのみ返す。キー: title（60文字以内・プレフィックス禁止）' },
+          { role: 'user', content: rewritePrompt },
+        ],
+      }),
+    })
+    if (!res.ok) return null
+    const data = (await res.json()) as { choices?: { message?: { content?: string } }[] }
+    const raw = data.choices?.[0]?.message?.content
+    if (!raw) return null
     const parsed = JSON.parse(raw) as { title?: string }
     const t = String(parsed.title || '').trim().slice(0, 100)
     return t || null
@@ -322,8 +336,10 @@ export async function draftMarketFromTrend(
   let titleRaw = String(parsed.title || '').slice(0, 100).trim()
   if (!isBlackburnAwardsTopic(item.title) && titleRaw && isLikelyHeadlineEcho(titleRaw, item.title)) {
     const repaired = await rewriteEchoingTitle(item, titleRaw, catList, flavorNote)
-    if (repaired && !isLikelyHeadlineEcho(repaired, item.title)) titleRaw = repaired
-    else titleRaw = predictionFallbackTitle(item.title)
+    if (repaired && !isLikelyHeadlineEcho(repaired, item.title)) {
+      titleRaw = repaired
+    }
+    // 修正失敗時はAIが生成したtitleRawをそのまま使う（テンプレートより遥かにマシ）
   }
 
   const descRaw = String(parsed.description || '').trim()
