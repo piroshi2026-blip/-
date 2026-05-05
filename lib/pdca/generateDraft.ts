@@ -2,6 +2,7 @@ import { fetchTrendHeadlines, fetchOhtaniDodgersHeadlines, MLB_TOPIC_RE, buildDa
 import { draftMarketFromTrend, type DraftMarket } from './draftMarket'
 import { fetchMarketImage } from './fetchImage'
 import { loadCategories, pickSportsCategory } from './pdcaHelpers'
+import { fetchWorldContext, formatWorldContextForPrompt, type WorldContext } from './fetchContext'
 
 export type DraftCandidate = {
   draft: DraftMarket
@@ -10,11 +11,17 @@ export type DraftCandidate = {
   imageUrl: string | null
 }
 
-export async function generateDraftCandidate(): Promise<DraftCandidate> {
-  const [genResult, mlbResult] = await Promise.all([
+export async function generateDraftCandidate(
+  preloadedContext?: WorldContext,
+  hint?: string
+): Promise<DraftCandidate> {
+  const [genResult, mlbResult, worldCtx] = await Promise.all([
     fetchTrendHeadlines(20),
     fetchOhtaniDodgersHeadlines(10),
+    preloadedContext ? Promise.resolve(preloadedContext) : fetchWorldContext(),
   ])
+
+  const worldContext = formatWorldContextForPrompt(worldCtx)
 
   const pool = [...mlbResult.items.slice(0, 3), ...genResult.items].slice(0, 12)
   if (!pool.length) pool.push(buildDailyMlbFallbackItem())
@@ -30,7 +37,7 @@ export async function generateDraftCandidate(): Promise<DraftCandidate> {
     item,
     kind === 'mlb' ? sportsDefault : defaultCategory,
     allowedCategories,
-    { flavor: kind }
+    { flavor: kind, worldContext, hint }
   )
   const catOk = allowedCategories.includes(draft.category)
     ? draft.category

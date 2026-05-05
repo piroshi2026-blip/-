@@ -244,7 +244,7 @@ export async function draftMarketFromTrend(
   item: TrendItem,
   defaultCategory: string,
   allowedCategories: string[],
-  opts?: { flavor?: 'general' | 'mlb' }
+  opts?: { flavor?: 'general' | 'mlb'; worldContext?: string; hint?: string }
 ): Promise<DraftMarket> {
   const flavor = opts?.flavor ?? 'general'
   const pickCategory = (raw: string) => {
@@ -266,7 +266,9 @@ export async function draftMarketFromTrend(
     flavor === 'mlb'
       ? '\nこの見出しは大谷翔平・ドジャース、村上宗隆・鈴木誠也・今永 など、メジャーリーグの日本人選手・球団に関するスポーツ予想です。category は「スポーツ」が利用可能なら優先してください。'
       : ''
-  const userContent = `利用可能な category（このいずれかと完全一致）: ${catList}\n\nニュース見出し（題材。これをそのまま問いのタイトルにしないこと）:\n${item.title}${flavorNote}`
+  const contextPrefix = opts?.worldContext ? `${opts.worldContext}\n\n` : ''
+  const hintSection = opts?.hint ? `\n\n【編集者からの着眼点・方向性】\n${opts.hint}\n上記の着眼点を意識しながら、ニュース見出しを題材に問いを作ること。` : ''
+  const userContent = `${contextPrefix}利用可能な category（このいずれかと完全一致）: ${catList}\n\nニュース見出し（題材。これをそのまま問いのタイトルにしないこと）:\n${item.title}${flavorNote}${hintSection}`
 
   let parsed: Partial<DraftMarket> | null = null
 

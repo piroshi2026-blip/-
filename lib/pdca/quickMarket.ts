@@ -12,6 +12,7 @@ import {
   resolveNewMarketId,
 } from './pdcaHelpers'
 import { getServiceSupabase } from './supabaseAdmin'
+import { fetchWorldContext, formatWorldContextForPrompt } from './fetchContext'
 
 export type QuickMarketResult = {
   headline: string
@@ -27,10 +28,12 @@ export type QuickMarketResult = {
  * pdca_daily_slots のスロット管理を介さないため、いつでも何度でも呼べる。
  */
 export async function createQuickMarket(): Promise<QuickMarketResult> {
-  const [genResult, mlbResult] = await Promise.all([
+  const [genResult, mlbResult, worldCtx] = await Promise.all([
     fetchTrendHeadlines(20),
     fetchOhtaniDodgersHeadlines(10),
+    fetchWorldContext(),
   ])
+  const worldContext = formatWorldContextForPrompt(worldCtx)
 
   // MLB を先頭に混ぜつつ、上位8件からランダムに1件選ぶ（毎回異なる問いに）
   const pool = [...mlbResult.items.slice(0, 3), ...genResult.items].slice(0, 8)
@@ -48,7 +51,7 @@ export async function createQuickMarket(): Promise<QuickMarketResult> {
     item,
     kind === 'mlb' ? sportsDefault : defaultCategory,
     allowedCategories,
-    { flavor: kind }
+    { flavor: kind, worldContext }
   )
   const catOk = allowedCategories.includes(draft.category)
     ? draft.category

@@ -42,6 +42,7 @@ export default function Admin() {
   const [gachaLoading, setGachaLoading] = useState(false)
   const [gachaPosting, setGachaPosting] = useState<number | null>(null)
   const [gachaPostResults, setGachaPostResults] = useState<Record<number, unknown>>({})
+  const [gachaHint, setGachaHint] = useState('')
 
   useEffect(() => {
     const authStatus = localStorage.getItem('yosoru_admin_auth')
@@ -167,7 +168,7 @@ export default function Admin() {
       const res = await fetch('/api/admin/generate-drafts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adminPassword: pdcaPassword, count: 5 }),
+        body: JSON.stringify({ adminPassword: pdcaPassword, count: 5, hint: gachaHint }),
       })
       const data = await res.json()
       const cards: any[] = data.candidates || []
@@ -422,11 +423,26 @@ export default function Admin() {
             ボタンを押すと最新ニュース・Xトレンドから<strong>5問の候補</strong>を生成します。<br />
             気に入った問いを選び、必要なら編集してからX投稿できます。
           </p>
-          <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
             <div style={{ flex: 1, minWidth: '200px' }}>
               <label style={{ fontSize: '12px', color: '#666', display: 'block', marginBottom: '4px' }}>管理パスワード</label>
               <input type="password" value={pdcaPassword} onChange={e => setPdcaPassword(e.target.value)} placeholder="yosoru_admin" style={s.inp} />
             </div>
+          </div>
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ fontSize: '12px', color: '#78350f', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>
+              💡 AIへの着眼点・指示（任意）
+            </label>
+            <textarea
+              value={gachaHint}
+              onChange={e => setGachaHint(e.target.value)}
+              placeholder={'例：今週の政治ネタで攻めたい&#10;例：エンタメ・アイドル系で若い人が食いつくもの&#10;例：円安・物価上昇で庶民が感じるリアルな問い&#10;例：AI・テクノロジーで近い未来が見えるもの'}
+              rows={3}
+              style={{ ...s.inp, resize: 'vertical', marginBottom: 0, fontSize: '13px', background: '#fffbeb', borderColor: '#fcd34d' }}
+            />
+            <p style={{ fontSize: '11px', color: '#92400e', marginTop: '4px' }}>空欄でもOK。入力するとAIがその方向性で問いを生成します。</p>
+          </div>
+          <div style={{ marginBottom: '16px' }}>
             <button
               onClick={handleGacha}
               disabled={gachaLoading}

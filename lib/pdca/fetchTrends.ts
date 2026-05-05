@@ -4,8 +4,16 @@ const parser = new Parser({ timeout: 15000 })
 
 /** デフォルトの日本語ニュース・話題RSS（追加は env RSS_FEED_URLS でカンマ区切り） */
 const DEFAULT_FEEDS = [
-  'https://news.yahoo.co.jp/rss/topics/top-picks.xml',
-  'https://www.nhk.or.jp/rss/news/cat0.xml',
+  'https://news.yahoo.co.jp/rss/topics/top-picks.xml',   // ヤフー総合
+  'https://news.yahoo.co.jp/rss/topics/politics.xml',    // 政治
+  'https://news.yahoo.co.jp/rss/topics/business.xml',    // ビジネス
+  'https://news.yahoo.co.jp/rss/topics/entertainment.xml', // エンタメ
+  'https://news.yahoo.co.jp/rss/topics/it.xml',          // テクノロジー
+  'https://news.yahoo.co.jp/rss/topics/world.xml',       // 国際
+  'https://www.nhk.or.jp/rss/news/cat0.xml',             // NHK総合
+  'https://www.nhk.or.jp/rss/news/cat4.xml',             // NHK政治
+  'https://www.nhk.or.jp/rss/news/cat5.xml',             // NHK経済
+  'https://www.nhk.or.jp/rss/news/cat1.xml',             // NHK社会
 ]
 
 /** 大谷・ドジャース・MLB 関連を拾うための追加RSS（スポーツ総合からキーワード抽出） */
