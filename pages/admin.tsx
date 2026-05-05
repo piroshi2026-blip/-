@@ -43,6 +43,8 @@ export default function Admin() {
   const [gachaPosting, setGachaPosting] = useState<number | null>(null)
   const [gachaPostResults, setGachaPostResults] = useState<Record<number, unknown>>({})
   const [gachaHint, setGachaHint] = useState('')
+  const [aiTestResult, setAiTestResult] = useState<unknown>(null)
+  const [aiTestLoading, setAiTestLoading] = useState(false)
 
   useEffect(() => {
     const authStatus = localStorage.getItem('yosoru_admin_auth')
@@ -157,6 +159,22 @@ export default function Admin() {
       setPdcaResult({ error: e instanceof Error ? e.message : String(e) })
     }
     setPdcaRunning(false)
+  }
+
+  async function handleTestAi() {
+    setAiTestLoading(true)
+    setAiTestResult(null)
+    try {
+      const res = await fetch('/api/admin/test-ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminPassword: pdcaPassword }),
+      })
+      setAiTestResult(await res.json())
+    } catch (e) {
+      setAiTestResult({ error: e instanceof Error ? e.message : String(e) })
+    }
+    setAiTestLoading(false)
   }
 
   async function handleGacha() {
@@ -428,7 +446,22 @@ export default function Admin() {
               <label style={{ fontSize: '12px', color: '#666', display: 'block', marginBottom: '4px' }}>管理パスワード</label>
               <input type="password" value={pdcaPassword} onChange={e => setPdcaPassword(e.target.value)} placeholder="yosoru_admin" style={s.inp} />
             </div>
+            <button
+              onClick={handleTestAi}
+              disabled={aiTestLoading}
+              style={{ ...s.btn, background: aiTestLoading ? '#9ca3af' : '#64748b', padding: '10px 16px', fontSize: '12px', marginBottom: '10px' }}
+            >
+              {aiTestLoading ? '確認中…' : '🔍 AI接続テスト'}
+            </button>
           </div>
+          {aiTestResult != null && (
+            <div style={{ marginBottom: '16px', padding: '12px', background: '#1e293b', borderRadius: '10px' }}>
+              <div style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '6px' }}>AI接続テスト結果：</div>
+              <pre style={{ color: '#e2e8f0', fontSize: '12px', whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: 0 }}>
+                {JSON.stringify(aiTestResult, null, 2)}
+              </pre>
+            </div>
+          )}
           <div style={{ marginBottom: '16px' }}>
             <label style={{ fontSize: '12px', color: '#78350f', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>
               💡 AIへの着眼点・指示（任意）
