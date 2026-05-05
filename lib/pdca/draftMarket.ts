@@ -175,7 +175,7 @@ function extractJsonFromText(text: string): string {
 }
 
 const CLAUDE_JSON_SYSTEM = `あなたは予測市場「ヨソる」の編集長です。ニュース見出しをもとに「読んだ瞬間に予想したくなる問い」を作ります。
-JSONオブジェクトのみ返す。コードブロック・説明文は不要。
+JSONオブジェクト1つのみ返す。配列・コードブロック・説明文は不要。
 
 必須キー（すべて含めること）:
 title: 問いのタイトル。見出しそのままは禁止。具体的な数字・人名・期日を入れた「〜するか？」形式・60文字以内
@@ -205,7 +205,8 @@ async function callClaudeForDraft(userContent: string): Promise<Partial<DraftMar
 
   let parsed: Partial<DraftMarket>
   try {
-    parsed = JSON.parse(extractJsonFromText(text)) as Partial<DraftMarket>
+    const raw = JSON.parse(extractJsonFromText(text)) as unknown
+    parsed = (Array.isArray(raw) ? raw[0] : raw) as Partial<DraftMarket>
   } catch {
     throw new Error(`JSONパース失敗: ${text.slice(0, 120)}`)
   }
