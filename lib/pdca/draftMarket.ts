@@ -48,7 +48,7 @@ export function isLikelyHeadlineEcho(title: string, headline: string): boolean {
 function predictionFallbackTitle(headline: string): string {
   const oneLine = headline.replace(/\s+/g, ' ').trim()
   const hint = oneLine.length > 30 ? `${oneLine.slice(0, 27)}…` : oneLine
-  return `${hint}、この先どう動く？`
+  return `${hint}、この先どうなる？`
 }
 
 function fallbackDraft(
@@ -176,22 +176,33 @@ function extractJsonFromText(text: string): string {
 
 async function callClaudeForDraft(userContent: string): Promise<Partial<DraftMarket> | null> {
   const key = process.env.ANTHROPIC_API_KEY?.trim()
-  if (!key) return null
+  if (!key) {
+    console.warn('[draftMarket] ANTHROPIC_API_KEY が未設定のためClaudeをスキップ')
+    return null
+  }
   try {
     const client = new Anthropic({ apiKey: key })
+    const model = process.env.CLAUDE_DRAFT_MODEL ?? 'claude-haiku-4-5-20251001'
     const msg = await client.messages.create({
-      model: process.env.CLAUDE_DRAFT_MODEL ?? 'claude-haiku-4-5-20251001',
+      model,
       max_tokens: 600,
       system: SYSTEM_PROMPT_BASE + '\n\nJSONオブジェクトのみ返す。コードブロック・余計な説明は不要。',
       messages: [{ role: 'user', content: userContent }],
     })
     const textBlock = msg.content.find((b) => b.type === 'text')
     const text = textBlock && 'text' in textBlock ? (textBlock.text as string) : undefined
-    if (!text) return null
+    if (!text) {
+      console.warn('[draftMarket] Claudeのレスポンスにtextブロックがありません')
+      return null
+    }
     const parsed = JSON.parse(extractJsonFromText(text)) as Partial<DraftMarket>
-    if (!parsed.title || !Array.isArray(parsed.options) || parsed.options.length < 3) return null
+    if (!parsed.title || !Array.isArray(parsed.options) || parsed.options.length < 3) {
+      console.warn('[draftMarket] ClaudeのJSONが不正:', text.slice(0, 200))
+      return null
+    }
     return parsed
-  } catch {
+  } catch (e) {
+    console.error('[draftMarket] Claude呼び出しエラー:', e instanceof Error ? e.message : e)
     return null
   }
 }
