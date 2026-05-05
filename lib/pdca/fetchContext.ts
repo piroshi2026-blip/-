@@ -76,8 +76,9 @@ function getJstDateString(): string {
 
 export async function fetchWorldContext(): Promise<WorldContext> {
   const dateJst = getJstDateString()
-  const currentFacts =
+  const currentFacts = (
     process.env.PDCA_CURRENT_CONTEXT || '現在の日本の首相：高市早苗（自民党政権）、2026年'
+  ).replace(/\s+/g, ' ').trim()
 
   const todayStr = new Date().toLocaleDateString('ja-JP', {
     timeZone: 'Asia/Tokyo',
