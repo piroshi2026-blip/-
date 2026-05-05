@@ -42,7 +42,8 @@ export async function preloadDraftData(hint?: string): Promise<PreloadedDraftDat
 export async function generateDraftCandidate(
   preloadedContext?: WorldContext,
   hint?: string,
-  preloaded?: PreloadedDraftData
+  preloaded?: PreloadedDraftData,
+  skipImage?: boolean
 ): Promise<DraftCandidate> {
   let pool: TrendItem[]
   let worldCtx: WorldContext
@@ -86,7 +87,7 @@ export async function generateDraftCandidate(
       : defaultCategory
   draft = { ...draft, category: catOk }
 
-  const imageUrl = await fetchMarketImage(draft, kind, item.link)
+  const imageUrl = skipImage ? null : await fetchMarketImage(draft, kind, item.link)
 
   return { draft, headline: item.title, kind, imageUrl }
 }

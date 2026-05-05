@@ -30,9 +30,12 @@ async function fetchTavilyContext(
   const key = process.env.TAVILY_API_KEY?.trim()
   if (!key) return { answer: null, headlines: [] }
   try {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 3000)
     const res = await fetch('https://api.tavily.com/search', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
       body: JSON.stringify({
         api_key: key,
         query,
@@ -52,6 +55,7 @@ async function fetchTavilyContext(
         ],
       }),
     })
+    clearTimeout(timer)
     if (!res.ok) return { answer: null, headlines: [] }
     const data = (await res.json()) as { answer?: string; results?: { title?: string }[] }
     const headlines = (data.results || [])

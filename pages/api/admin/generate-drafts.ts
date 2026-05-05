@@ -62,7 +62,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const preloaded = await preloadDraftData()
 
   const results = await Promise.allSettled(
-    Array.from({ length: n }, () => generateDraftCandidate(undefined, hintText, preloaded))
+    Array.from({ length: n }, () => generateDraftCandidate(undefined, hintText, preloaded, true))
   )
 
   const candidates = results.map((r) =>
