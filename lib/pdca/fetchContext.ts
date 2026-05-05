@@ -102,27 +102,14 @@ export async function fetchWorldContext(): Promise<WorldContext> {
 }
 
 export function formatWorldContextForPrompt(ctx: WorldContext): string {
-  const lines: string[] = [
-    '━━━【今日の世相・最新情報（AIの学習データより必ず優先すること）】━━━',
-    `📅 現在の日時: ${ctx.dateJst}（JST）`,
-    `🏛 現在の状況: ${ctx.currentFacts}`,
+  const parts: string[] = [
+    `[現在情報・最優先] 日時:${ctx.dateJst} / ${ctx.currentFacts}`,
   ]
-
   if (ctx.trendKeywords.length > 0) {
-    lines.push(`🔥 Googleトレンド急上昇: ${ctx.trendKeywords.slice(0, 12).join(' / ')}`)
+    parts.push(`急上昇トレンド: ${ctx.trendKeywords.slice(0, 6).join('・')}`)
   }
-
   if (ctx.headlines.length > 0) {
-    lines.push('📰 今日の主要ニュース・話題:')
-    ctx.headlines.slice(0, 7).forEach((h) => lines.push(`  ・${h}`))
+    parts.push(`主要話題: ${ctx.headlines.slice(0, 3).join(' / ')}`)
   }
-
-  if (ctx.tavilyAnswer) {
-    lines.push(`📊 ウェブ情報サマリー: ${ctx.tavilyAnswer.slice(0, 400)}`)
-  }
-
-  lines.push('⚠️ 上記の現在情報を最優先にし、学習データの背景知識と矛盾する場合は上記を採用すること')
-  lines.push('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-
-  return lines.join('\n')
+  return parts.join(' / ')
 }
