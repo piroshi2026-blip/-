@@ -20,7 +20,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(401).json({ error: 'パスワードが違います' })
   }
 
-  const n = Math.min(10, Math.max(1, Number(count) || 5))
+  const n = Math.min(15, Math.max(1, Number(count) || 10))
   const hintText = typeof hint === 'string' ? hint.trim().slice(0, 500) : ''
 
   // コンテキストを1回だけ取得して全候補に使い回す（API節約）

@@ -168,7 +168,7 @@ export default function Admin() {
       const res = await fetch('/api/admin/generate-drafts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adminPassword: pdcaPassword, count: 5, hint: gachaHint }),
+        body: JSON.stringify({ adminPassword: pdcaPassword, count: 10, hint: gachaHint }),
       })
       const data = await res.json()
       const cards: any[] = data.candidates || []
@@ -420,7 +420,7 @@ export default function Admin() {
         <section style={{ background: '#fffbeb', padding: '24px', borderRadius: '16px' }}>
           <h3 style={{ marginTop: 0, fontSize: '20px' }}>🎰 ガチャ投稿</h3>
           <p style={{ fontSize: '13px', color: '#78350f', marginBottom: '16px', lineHeight: 1.7 }}>
-            ボタンを押すと最新ニュース・Xトレンドから<strong>5問の候補</strong>を生成します。<br />
+            ボタンを押すと最新ニュース・Xトレンドから<strong>10問の候補</strong>を生成します。<br />
             気に入った問いを選び、必要なら編集してからX投稿できます。
           </p>
           <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
@@ -448,7 +448,7 @@ export default function Admin() {
               disabled={gachaLoading}
               style={{ ...s.btn, background: gachaLoading ? '#9ca3af' : '#f59e0b', fontSize: '16px', padding: '12px 28px', minWidth: '160px' }}
             >
-              {gachaLoading ? '⏳ 生成中…' : '🎰 5問ガチャ！'}
+              {gachaLoading ? '⏳ 生成中…' : '🎰 10問ガチャ！'}
             </button>
           </div>
 
@@ -541,11 +541,14 @@ export default function Admin() {
 
       {activeTab === 'pdca' && (
         <section style={{ background: '#f8fafc', padding: '24px', borderRadius: '16px' }}>
-          <h3 style={{ marginTop: 0 }}>🤖 PDCA 手動実行</h3>
+          <h3 style={{ marginTop: 0 }}>🤖 自動投稿スケジュール（PDCA）</h3>
+          <div style={{ padding: '14px', background: '#e0f2fe', borderRadius: '10px', fontSize: '13px', color: '#0369a1', marginBottom: '20px', lineHeight: 1.7 }}>
+            <strong>手動で問いを作って投稿したい場合は「🎰 ガチャ投稿」タブを使ってください。</strong><br />
+            こちらは自動スケジュール（Cron）の手動実行・確認用です。
+          </div>
           <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '20px', lineHeight: 1.6 }}>
-            問い作成 → Supabase 公開 → X 投稿 を手動でまとめて実行します。<br />
-            通常は Vercel Cron が JST 9・11・13・15・17 時に自動実行します。<br />
-            <strong>すでに実行済みのスロット</strong>は skip されます。
+            cron-job.org が JST 9〜23時の毎時に <code>/api/cron/pdca-hourly</code> を自動実行し、2問ずつ生成・公開・X投稿します。<br />
+            下記は PDCA スロット（旧スケジュール）の手動実行です。問いの確認なしに即投稿されます。
           </p>
           <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: '140px' }}>
@@ -567,29 +570,13 @@ export default function Admin() {
               />
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
-            <button
-              onClick={handleRunHourly}
-              disabled={pdcaRunning}
-              style={{ ...s.btn, background: pdcaRunning ? '#9ca3af' : '#0284c7', flex: 1, minWidth: '160px' }}
-            >
-              {pdcaRunning ? '⏳ 実行中…' : '⚡⚡ 今すぐ2問投稿'}
-            </button>
-            <button
-              onClick={handleRunQuick}
-              disabled={pdcaRunning}
-              style={{ ...s.btn, background: pdcaRunning ? '#9ca3af' : '#059669', flex: 1, minWidth: '160px' }}
-            >
-              {pdcaRunning ? '⏳ 実行中…' : '⚡ Quick（1問生成）'}
-            </button>
-            <button
-              onClick={handleRunPdca}
-              disabled={pdcaRunning}
-              style={{ ...s.btn, background: pdcaRunning ? '#9ca3af' : '#7c3aed', flex: 1, minWidth: '160px' }}
-            >
-              {pdcaRunning ? '⏳ 実行中…' : `▶ スロット ${pdcaSlot} を実行`}
-            </button>
-          </div>
+          <button
+            onClick={handleRunPdca}
+            disabled={pdcaRunning}
+            style={{ ...s.btn, background: pdcaRunning ? '#9ca3af' : '#7c3aed', marginBottom: '16px' }}
+          >
+            {pdcaRunning ? '⏳ 実行中…' : `▶ スロット ${pdcaSlot} を即時実行`}
+          </button>
           {pdcaResult != null && (
             <div>
               <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '6px' }}>実行結果：</div>
