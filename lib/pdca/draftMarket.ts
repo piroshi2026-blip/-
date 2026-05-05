@@ -187,37 +187,32 @@ endDays: 3〜14の整数
 出力例:
 {"title":"大谷翔平、今季65本塁打の新記録を更新するか？","description":"2026年シーズン終了時点の本塁打数で判定。公式記録を根拠に、運営判断で確定します。","category":"スポーツ","options":["更新する","届かず","怪我・規定変更で無効"],"endDays":7}`
 
-async function callClaudeForDraft(userContent: string): Promise<Partial<DraftMarket> | null> {
+async function callClaudeForDraft(userContent: string): Promise<Partial<DraftMarket>> {
   const key = process.env.ANTHROPIC_API_KEY?.trim()
-  if (!key) {
-    console.warn('[draftMarket] ANTHROPIC_API_KEY が未設定のためClaudeをスキップ')
-    return null
-  }
+  if (!key) throw new Error('ANTHROPIC_API_KEY未設定')
+
+  const client = new Anthropic({ apiKey: key })
+  const model = process.env.CLAUDE_DRAFT_MODEL ?? 'claude-haiku-4-5-20251001'
+  const msg = await client.messages.create({
+    model,
+    max_tokens: 600,
+    system: CLAUDE_JSON_SYSTEM,
+    messages: [{ role: 'user', content: userContent }],
+  })
+  const textBlock = msg.content.find((b) => b.type === 'text')
+  const text = textBlock && 'text' in textBlock ? (textBlock.text as string) : ''
+  if (!text) throw new Error('Claudeレスポンスにtextなし')
+
+  let parsed: Partial<DraftMarket>
   try {
-    const client = new Anthropic({ apiKey: key })
-    const model = process.env.CLAUDE_DRAFT_MODEL ?? 'claude-haiku-4-5-20251001'
-    const msg = await client.messages.create({
-      model,
-      max_tokens: 600,
-      system: CLAUDE_JSON_SYSTEM,
-      messages: [{ role: 'user', content: userContent }],
-    })
-    const textBlock = msg.content.find((b) => b.type === 'text')
-    const text = textBlock && 'text' in textBlock ? (textBlock.text as string) : undefined
-    if (!text) {
-      console.warn('[draftMarket] Claudeのレスポンスにtextブロックがありません')
-      return null
-    }
-    const parsed = JSON.parse(extractJsonFromText(text)) as Partial<DraftMarket>
-    if (!parsed.title || !Array.isArray(parsed.options) || parsed.options.length < 3) {
-      console.warn('[draftMarket] ClaudeのJSONが不正:', text.slice(0, 200))
-      return null
-    }
-    return parsed
-  } catch (e) {
-    console.error('[draftMarket] Claude呼び出しエラー:', e instanceof Error ? e.message : e)
-    return null
+    parsed = JSON.parse(extractJsonFromText(text)) as Partial<DraftMarket>
+  } catch {
+    throw new Error(`JSONパース失敗: ${text.slice(0, 120)}`)
   }
+  if (!parsed.title || !Array.isArray(parsed.options) || parsed.options.length < 3) {
+    throw new Error(`JSON不正(title/options): ${text.slice(0, 120)}`)
+  }
+  return parsed
 }
 
 async function rewriteEchoingTitle(
