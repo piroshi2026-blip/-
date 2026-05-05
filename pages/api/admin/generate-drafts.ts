@@ -1,8 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import Anthropic from '@anthropic-ai/sdk'
-import { generateDraftCandidate } from '../../../lib/pdca/generateDraft'
-import { fetchWorldContext, formatWorldContextForPrompt } from '../../../lib/pdca/fetchContext'
-import { loadCategories } from '../../../lib/pdca/pdcaHelpers'
+import { generateDraftCandidate, preloadDraftData } from '../../../lib/pdca/generateDraft'
+import { formatWorldContextForPrompt } from '../../../lib/pdca/fetchContext'
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'yosoru_admin'
 
@@ -28,10 +27,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const key = process.env.ANTHROPIC_API_KEY?.trim()
     if (!key) return res.status(200).json({ debug: { error: 'ANTHROPIC_API_KEY 未設定' } })
     try {
-      const worldCtx = await fetchWorldContext()
-      const worldContext = formatWorldContextForPrompt(worldCtx)
-      const { names: allowedCategories, defaultCategory } = await loadCategories()
-      const catList = allowedCategories.length ? allowedCategories.join(' / ') : defaultCategory
+      const preloaded = await preloadDraftData()
+      const worldContext = formatWorldContextForPrompt(preloaded.worldCtx)
+      const catList = preloaded.allowedCategories.length
+        ? preloaded.allowedCategories.join(' / ')
+        : preloaded.defaultCategory
       const userContent = `${worldContext}\n\n利用可能な category（このいずれかと完全一致）: ${catList}\n\nニュース見出し（題材。これをそのまま問いのタイトルにしないこと）:\nカンボジアで日本人を保護 誘拐か`
       const client = new Anthropic({ apiKey: key })
       const msg = await client.messages.create({
@@ -58,10 +58,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const n = Math.min(15, Math.max(1, Number(count) || 10))
   const hintText = typeof hint === 'string' ? hint.trim().slice(0, 500) : ''
 
-  const worldCtx = await fetchWorldContext()
+  // worldCtx・トレンド・カテゴリを1回だけ取得（タイムアウト対策）
+  const preloaded = await preloadDraftData()
 
   const results = await Promise.allSettled(
-    Array.from({ length: n }, () => generateDraftCandidate(worldCtx, hintText))
+    Array.from({ length: n }, () => generateDraftCandidate(undefined, hintText, preloaded))
   )
 
   const candidates = results.map((r) =>

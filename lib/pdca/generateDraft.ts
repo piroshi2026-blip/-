@@ -1,4 +1,4 @@
-import { fetchTrendHeadlines, fetchOhtaniDodgersHeadlines, MLB_TOPIC_RE, buildDailyMlbFallbackItem } from './fetchTrends'
+import { fetchTrendHeadlines, fetchOhtaniDodgersHeadlines, MLB_TOPIC_RE, buildDailyMlbFallbackItem, type TrendItem } from './fetchTrends'
 import { draftMarketFromTrend, type DraftMarket } from './draftMarket'
 import { fetchMarketImage } from './fetchImage'
 import { loadCategories, pickSportsCategory } from './pdcaHelpers'
@@ -11,27 +11,67 @@ export type DraftCandidate = {
   imageUrl: string | null
 }
 
-export async function generateDraftCandidate(
-  preloadedContext?: WorldContext,
-  hint?: string
-): Promise<DraftCandidate> {
-  const [genResult, mlbResult, worldCtx] = await Promise.all([
+export type PreloadedDraftData = {
+  worldCtx: WorldContext
+  pool: TrendItem[]
+  allowedCategories: string[]
+  defaultCategory: string
+  sportsDefault: string
+}
+
+/** worldCtx・トレンドプール・カテゴリを一括プリロード（generate-drafts で1回だけ呼ぶ）*/
+export async function preloadDraftData(hint?: string): Promise<PreloadedDraftData> {
+  void hint
+  const [worldCtx, genResult, mlbResult, catData] = await Promise.all([
+    fetchWorldContext(),
     fetchTrendHeadlines(20),
     fetchOhtaniDodgersHeadlines(10),
-    preloadedContext ? Promise.resolve(preloadedContext) : fetchWorldContext(),
+    loadCategories(),
   ])
-
-  const worldContext = formatWorldContextForPrompt(worldCtx)
 
   const pool = [...mlbResult.items.slice(0, 3), ...genResult.items].slice(0, 12)
   if (!pool.length) pool.push(buildDailyMlbFallbackItem())
 
+  const { names: allowedCategories, defaultCategory } = catData
+  const sportsDefault = pickSportsCategory(allowedCategories, defaultCategory)
+
+  return { worldCtx, pool, allowedCategories, defaultCategory, sportsDefault }
+}
+
+/** プリロード済みデータから1候補を生成（Claude API呼び出しのみ）*/
+export async function generateDraftCandidate(
+  preloadedContext?: WorldContext,
+  hint?: string,
+  preloaded?: PreloadedDraftData
+): Promise<DraftCandidate> {
+  let pool: TrendItem[]
+  let worldCtx: WorldContext
+  let allowedCategories: string[]
+  let defaultCategory: string
+  let sportsDefault: string
+
+  if (preloaded) {
+    ;({ pool, worldCtx, allowedCategories, defaultCategory, sportsDefault } = preloaded)
+  } else {
+    const [genResult, mlbResult, ctx] = await Promise.all([
+      fetchTrendHeadlines(20),
+      fetchOhtaniDodgersHeadlines(10),
+      preloadedContext ? Promise.resolve(preloadedContext) : fetchWorldContext(),
+    ])
+    worldCtx = ctx
+    pool = [...mlbResult.items.slice(0, 3), ...genResult.items].slice(0, 12)
+    if (!pool.length) pool.push(buildDailyMlbFallbackItem())
+    const catData = await loadCategories()
+    allowedCategories = catData.names
+    defaultCategory = catData.defaultCategory
+    sportsDefault = pickSportsCategory(allowedCategories, defaultCategory)
+  }
+
+  const worldContext = formatWorldContextForPrompt(worldCtx)
+
   const item = pool[Math.floor(Math.random() * pool.length)]
   const isMlb = MLB_TOPIC_RE.test(item.title)
   const kind: 'mlb' | 'general' = isMlb ? 'mlb' : 'general'
-
-  const { names: allowedCategories, defaultCategory } = await loadCategories()
-  const sportsDefault = pickSportsCategory(allowedCategories, defaultCategory)
 
   let draft = await draftMarketFromTrend(
     item,
