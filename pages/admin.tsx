@@ -177,6 +177,22 @@ export default function Admin() {
     setAiTestLoading(false)
   }
 
+  async function handleDebugDraft() {
+    setAiTestLoading(true)
+    setAiTestResult(null)
+    try {
+      const res = await fetch('/api/admin/generate-drafts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminPassword: pdcaPassword, debug: true }),
+      })
+      setAiTestResult(await res.json())
+    } catch (e) {
+      setAiTestResult({ error: e instanceof Error ? e.message : String(e) })
+    }
+    setAiTestLoading(false)
+  }
+
   async function handleGacha() {
     setGachaLoading(true)
     setGachaCards([])
@@ -452,6 +468,13 @@ export default function Admin() {
               style={{ ...s.btn, background: aiTestLoading ? '#9ca3af' : '#64748b', padding: '10px 16px', fontSize: '12px', marginBottom: '10px' }}
             >
               {aiTestLoading ? '確認中…' : '🔍 AI接続テスト'}
+            </button>
+            <button
+              onClick={handleDebugDraft}
+              disabled={aiTestLoading}
+              style={{ ...s.btn, background: aiTestLoading ? '#9ca3af' : '#7c3aed', padding: '10px 16px', fontSize: '12px', marginBottom: '10px' }}
+            >
+              {aiTestLoading ? '確認中…' : '🔬 ガチャ診断'}
             </button>
           </div>
           {aiTestResult != null && (
