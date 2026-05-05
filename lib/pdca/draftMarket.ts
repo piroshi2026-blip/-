@@ -174,6 +174,19 @@ function extractJsonFromText(text: string): string {
   return text.trim()
 }
 
+const CLAUDE_JSON_SYSTEM = `あなたは予測市場「ヨソる」の編集長です。ニュース見出しをもとに「読んだ瞬間に予想したくなる問い」を作ります。
+JSONオブジェクトのみ返す。コードブロック・説明文は不要。
+
+必須キー（すべて含めること）:
+title: 問いのタイトル。見出しそのままは禁止。具体的な数字・人名・期日を入れた「〜するか？」形式・60文字以内
+description: 判定基準1〜2文。「公式の公表・実績・主要報道を根拠に、運営判断で確定します。」趣旨を含む
+category: 利用可能なカテゴリ一覧から完全一致で1つ選ぶ
+options: ちょうど3つの選択肢（各15文字以内・体言止め）
+endDays: 3〜14の整数
+
+出力例:
+{"title":"大谷翔平、今季65本塁打の新記録を更新するか？","description":"2026年シーズン終了時点の本塁打数で判定。公式記録を根拠に、運営判断で確定します。","category":"スポーツ","options":["更新する","届かず","怪我・規定変更で無効"],"endDays":7}`
+
 async function callClaudeForDraft(userContent: string): Promise<Partial<DraftMarket> | null> {
   const key = process.env.ANTHROPIC_API_KEY?.trim()
   if (!key) {
@@ -186,7 +199,7 @@ async function callClaudeForDraft(userContent: string): Promise<Partial<DraftMar
     const msg = await client.messages.create({
       model,
       max_tokens: 600,
-      system: SYSTEM_PROMPT_BASE + '\n\nJSONオブジェクトのみ返す。コードブロック・余計な説明は不要。',
+      system: CLAUDE_JSON_SYSTEM,
       messages: [{ role: 'user', content: userContent }],
     })
     const textBlock = msg.content.find((b) => b.type === 'text')

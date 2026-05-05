@@ -3,6 +3,9 @@ import Anthropic from '@anthropic-ai/sdk'
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'yosoru_admin'
 
+const DRAFT_SYSTEM = `あなたは予測市場アプリの編集長です。JSONオブジェクトのみ返す。コードブロック・余計な説明は不要。
+出力キー: title（60文字以内）, description（1〜2文）, category（利用可能な一覧から完全一致）, options（3つ・各15文字以内・体言止め）, endDays（3〜14の整数）`
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST')
@@ -26,26 +29,58 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       PDCA_CURRENT_CONTEXT: process.env.PDCA_CURRENT_CONTEXT || '❌ 未設定',
       CLAUDE_DRAFT_MODEL: process.env.CLAUDE_DRAFT_MODEL || '（デフォルト: claude-haiku-4-5-20251001）',
     },
-    claude: null as unknown,
+    claude_ping: null as unknown,
+    claude_draft: null as unknown,
     openai: null as unknown,
   }
 
-  // Claude テスト
+  // Claude 接続テスト
   if (anthropicKey) {
     try {
       const client = new Anthropic({ apiKey: anthropicKey })
+      const model = process.env.CLAUDE_DRAFT_MODEL ?? 'claude-haiku-4-5-20251001'
       const msg = await client.messages.create({
-        model: process.env.CLAUDE_DRAFT_MODEL ?? 'claude-haiku-4-5-20251001',
+        model,
         max_tokens: 50,
         messages: [{ role: 'user', content: '「テスト」とだけ返してください。' }],
       })
-      const text = msg.content.find((b) => b.type === 'text')
-      result.claude = { status: '✅ 接続OK', response: text && 'text' in text ? (text as { text: string }).text : '(no text)' }
+      const textBlock = msg.content.find((b) => b.type === 'text')
+      const text = textBlock && 'text' in textBlock ? (textBlock as { text: string }).text : '(no text)'
+      result.claude_ping = { status: '✅ 接続OK', response: text }
     } catch (e) {
-      result.claude = { status: '❌ エラー', error: e instanceof Error ? e.message : String(e) }
+      result.claude_ping = { status: '❌ エラー', error: e instanceof Error ? e.message : String(e) }
+    }
+
+    // Claude ドラフト生成テスト（実際のプロンプトで試す）
+    try {
+      const client = new Anthropic({ apiKey: anthropicKey })
+      const model = process.env.CLAUDE_DRAFT_MODEL ?? 'claude-haiku-4-5-20251001'
+      const userContent = `利用可能な category（このいずれかと完全一致）: スポーツ / 政治 / 経済 / エンタメ / その他
+
+ニュース見出し（題材。これをそのまま問いのタイトルにしないこと）:
+大谷翔平が2本塁打でドジャース勝利`
+      const msg = await client.messages.create({
+        model,
+        max_tokens: 600,
+        system: DRAFT_SYSTEM,
+        messages: [{ role: 'user', content: userContent }],
+      })
+      const textBlock = msg.content.find((b) => b.type === 'text')
+      const rawText = textBlock && 'text' in textBlock ? (textBlock as { text: string }).text : ''
+      let parseStatus = ''
+      try {
+        const obj = JSON.parse(rawText.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/)?.[1]?.trim() ?? rawText.match(/\{[\s\S]*\}/)?.[0] ?? rawText)
+        parseStatus = obj.title ? `✅ パース成功: title="${obj.title}"` : '⚠️ titleなし'
+      } catch {
+        parseStatus = '❌ JSONパース失敗'
+      }
+      result.claude_draft = { status: parseStatus, rawResponse: rawText.slice(0, 800) }
+    } catch (e) {
+      result.claude_draft = { status: '❌ エラー', error: e instanceof Error ? e.message : String(e) }
     }
   } else {
-    result.claude = { status: '❌ キー未設定のためスキップ' }
+    result.claude_ping = { status: '❌ キー未設定のためスキップ' }
+    result.claude_draft = { status: '❌ キー未設定のためスキップ' }
   }
 
   // OpenAI テスト
