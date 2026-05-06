@@ -57,15 +57,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const sb = getServiceSupabase()
 
-  const { data: markets, error } = await sb
-    .from('markets')
-    .select('id, title, category')
-    .is('image_url', null)
-    .order('id', { ascending: false })
-    .limit(20)
+  // image_url が NULL または空文字の問いを取得
+  const [nullRes, emptyRes] = await Promise.all([
+    sb.from('markets').select('id, title, category').is('image_url', null).order('id', { ascending: false }).limit(20),
+    sb.from('markets').select('id, title, category').eq('image_url', '').order('id', { ascending: false }).limit(20),
+  ])
+  const seen = new Set<number>()
+  const markets = [...(nullRes.data ?? []), ...(emptyRes.data ?? [])]
+    .filter((m) => { if (seen.has(m.id)) return false; seen.add(m.id); return true })
+    .slice(0, 20)
 
-  if (error) return res.status(500).json({ error: error.message })
-  if (!markets?.length) {
+  if (!markets.length) {
     return res.status(200).json({ updated: 0, remaining: 0, message: '画像なしの問いはありません' })
   }
 
@@ -83,11 +85,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     .filter((r) => r.status === 'rejected')
     .map((r) => (r as PromiseRejectedResult).reason?.message ?? 'error')
 
-  // まだ残っているか確認
-  const { count } = await sb
-    .from('markets')
-    .select('id', { count: 'exact', head: true })
-    .is('image_url', null)
+  // まだ残っているか確認（NULL + 空文字の合計）
+  const [cNull, cEmpty] = await Promise.all([
+    sb.from('markets').select('id', { count: 'exact', head: true }).is('image_url', null),
+    sb.from('markets').select('id', { count: 'exact', head: true }).eq('image_url', ''),
+  ])
+  const count = (cNull.count ?? 0) + (cEmpty.count ?? 0)
 
-  return res.status(200).json({ updated, errors, remaining: count ?? 0 })
+  return res.status(200).json({ updated, errors, remaining: count })
 }

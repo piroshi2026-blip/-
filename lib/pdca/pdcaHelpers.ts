@@ -82,7 +82,7 @@ export async function insertMarket(
     category_input: draft.category,
     end_date_input: end.toISOString(),
     description_input: draft.description,
-    image_url_input: imageUrl ?? '',
+    image_url_input: imageUrl || null,
     options_input: draft.options,
   })
   return { error: error ? error.message : null }
