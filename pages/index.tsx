@@ -17,8 +17,8 @@ export default function Home() {
   const [newUsername, setNewUsername] = useState(''); const [isEditingName, setIsEditingName] = useState(false)
   const [activeCategory, setActiveCategory] = useState('すべて')
 
-  // 初期表示を締切順に設定
-  const [sortBy, setSortBy] = useState<'new' | 'deadline' | 'popular'>('deadline')
+  // 初期表示を新着順に設定
+  const [sortBy, setSortBy] = useState<'new' | 'deadline' | 'popular'>('new')
 
   const [voteAmount, setVoteAmount] = useState(100)
   const [selectedMarketId, setSelectedMarketId] = useState<number | null>(null)
@@ -171,8 +171,8 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key`}
                     const barColor = isWinner ? '#10b981' : optColors[i % 3]
                     return (
                       <div key={opt.id}>
-                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'baseline', fontSize:'12px', marginBottom:'3px', gap:'4px'}}>
-                          <span style={{fontWeight: isWinner ? 'bold' : 'normal', color: isWinner ? '#10b981' : '#1e293b', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', minWidth:0, flex:1}}>{isWinner ? '👑 ' : ''}{opt.name}</span>
+                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', fontSize:'12px', marginBottom:'3px', gap:'4px'}}>
+                          <span style={{fontWeight: isWinner ? 'bold' : 'normal', color: isWinner ? '#10b981' : '#1e293b', flex:1, lineHeight:'1.3', fontSize: opt.name.length > 10 ? '10px' : opt.name.length > 6 ? '11px' : '12px'}}>{isWinner ? '👑 ' : ''}{opt.name}</span>
                           <span style={{fontWeight:'700', color: isWinner ? '#10b981' : '#2563eb', fontSize:'13px', whiteSpace:'nowrap', flexShrink:0}}>{pct}%<span style={{color:'#94a3b8', fontSize:'10px', fontWeight:'normal', marginLeft:'4px'}}>{m.total_pool > 0 ? `${(m.total_pool/Math.max(opt.pool,1)).toFixed(1)}倍` : '—'}</span></span>
                         </div>
                         <div style={{height:'7px', background:'#e2e8f0', borderRadius:'4px', overflow:'hidden'}}>
