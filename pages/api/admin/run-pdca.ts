@@ -22,13 +22,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    if (mode === 'quick') {
-      const result = await createQuickMarket()
-      return res.status(200).json(result)
-    }
-
-    if (mode === 'hourly') {
-      const [r1, r2] = await Promise.allSettled([createQuickMarket(), createQuickMarket()])
+    if (mode === 'quick' || mode === 'hourly') {
+      const { preloadDraftData } = await import('../../../lib/pdca/generateDraft')
+      const preloaded = await preloadDraftData()
+      if (mode === 'quick') {
+        const result = await createQuickMarket(preloaded, true)
+        return res.status(200).json(result)
+      }
+      const [r1, r2] = await Promise.allSettled([
+        createQuickMarket(preloaded, true),
+        createQuickMarket(preloaded, true),
+      ])
       return res.status(200).json({
         market1: r1.status === 'fulfilled' ? r1.value : { error: (r1 as PromiseRejectedResult).reason?.message },
         market2: r2.status === 'fulfilled' ? r2.value : { error: (r2 as PromiseRejectedResult).reason?.message },

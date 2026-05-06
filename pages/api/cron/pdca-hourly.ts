@@ -4,7 +4,9 @@ import { createQuickMarket, type QuickMarketResult } from '../../../lib/pdca/qui
 import { preloadDraftData } from '../../../lib/pdca/generateDraft'
 
 /**
- * JST 9:00〜23:00 毎時実行。RSS/worldCtx を1回プリロードし、2問を並列生成・公開・X投稿。
+ * JST 9:00〜23:00 毎時実行（cron-job.org から呼ばれる）。
+ * RSS/worldCtx を1回プリロードし、2問を並列生成・公開・X投稿。
+ * 画像はタイムアウト防止のためスキップ（後で batch-add-images で補完）。
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET' && req.method !== 'POST') {
@@ -16,8 +18,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const preloaded = await preloadDraftData()
 
   const [r1, r2] = await Promise.allSettled([
-    createQuickMarket(preloaded),
-    createQuickMarket(preloaded),
+    createQuickMarket(preloaded, true),   // skipImage=true で10秒以内に収める
+    createQuickMarket(preloaded, true),
   ])
 
   const toResult = (r: PromiseSettledResult<QuickMarketResult>) =>

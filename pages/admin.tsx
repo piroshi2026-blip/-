@@ -662,55 +662,53 @@ export default function Admin() {
 
       {activeTab === 'pdca' && (
         <section style={{ background: '#f8fafc', padding: '24px', borderRadius: '16px' }}>
-          <h3 style={{ marginTop: 0 }}>🤖 自動投稿スケジュール（PDCA）</h3>
-          <div style={{ padding: '14px', background: '#e0f2fe', borderRadius: '10px', fontSize: '13px', color: '#0369a1', marginBottom: '20px', lineHeight: 1.7 }}>
-            <strong>手動で問いを作って投稿したい場合は「🎰 ガチャ投稿」タブを使ってください。</strong><br />
-            こちらは自動スケジュール（Cron）の手動実行・確認用です。
+          <h3 style={{ marginTop: 0 }}>🤖 自動投稿（毎時 JST 9〜23時）</h3>
+
+          {/* cron-job.org 設定手順 */}
+          <div style={{ padding: '16px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '10px', marginBottom: '20px', fontSize: '13px', lineHeight: 1.8 }}>
+            <strong style={{ color: '#166534' }}>⚙️ cron-job.org の設定手順（初回のみ）</strong><br />
+            <ol style={{ margin: '8px 0 0', paddingLeft: '18px', color: '#166534' }}>
+              <li><a href="https://cron-job.org" target="_blank" rel="noopener noreferrer" style={{ color: '#15803d' }}>cron-job.org</a> で無料アカウントを作成</li>
+              <li>「CREATE CRONJOB」→ 以下のURLを設定：<br />
+                <code style={{ background: '#dcfce7', padding: '2px 6px', borderRadius: '4px', wordBreak: 'break-all', fontSize: '12px' }}>
+                  {typeof window !== 'undefined' ? window.location.origin : 'https://your-site.vercel.app'}/api/cron/pdca-hourly?secret=【CRON_SECRETの値】
+                </code>
+              </li>
+              <li>スケジュール：「Every hour」で時間を「0〜14時（UTC）」に限定 ＝ JST 9〜23時</li>
+              <li>「CRON_SECRETの値」は Vercel Dashboard → Settings → Environment Variables で確認</li>
+            </ol>
           </div>
-          <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '20px', lineHeight: 1.6 }}>
-            cron-job.org が JST 9〜23時の毎時に <code>/api/cron/pdca-hourly</code> を自動実行し、2問ずつ生成・公開・X投稿します。<br />
-            下記は PDCA スロット（旧スケジュール）の手動実行です。問いの確認なしに即投稿されます。
-          </p>
-          <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', flexWrap: 'wrap' }}>
-            <div style={{ flex: 1, minWidth: '140px' }}>
-              <label style={{ fontSize: '12px', color: '#666', display: 'block', marginBottom: '4px' }}>スロット番号</label>
-              <select value={pdcaSlot} onChange={e => setPdcaSlot(Number(e.target.value))} style={s.inp}>
-                {[0, 1, 2, 3, 4].map(n => (
-                  <option key={n} value={n}>スロット {n}（JST {['9:00', '11:00', '13:00', '15:00', '17:00'][n]}）</option>
-                ))}
-              </select>
-            </div>
-            <div style={{ flex: 1, minWidth: '180px' }}>
+
+          {/* 手動実行 */}
+          <div style={{ padding: '16px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', marginBottom: '20px' }}>
+            <strong style={{ fontSize: '14px' }}>手動で今すぐ投稿</strong>
+            <p style={{ fontSize: '12px', color: '#64748b', margin: '6px 0 12px' }}>確認なしで即投稿されます。画像は後で「🖼 画像なし問いに一括追加」で補完できます。</p>
+            <div style={{ marginBottom: '12px' }}>
               <label style={{ fontSize: '12px', color: '#666', display: 'block', marginBottom: '4px' }}>管理パスワード</label>
-              <input
-                type="password"
-                value={pdcaPassword}
-                onChange={e => setPdcaPassword(e.target.value)}
-                placeholder="yosoru_admin"
-                style={s.inp}
-              />
+              <input type="password" value={pdcaPassword} onChange={e => setPdcaPassword(e.target.value)} placeholder="yosoru_admin" style={{ ...s.inp, marginBottom: 0 }} />
+            </div>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <button onClick={handleRunHourly} disabled={pdcaRunning}
+                style={{ ...s.btn, background: pdcaRunning ? '#9ca3af' : '#7c3aed', flex: 1 }}>
+                {pdcaRunning ? '⏳ 実行中…' : '▶ 今すぐ2問投稿'}
+              </button>
+              <button onClick={handleRunQuick} disabled={pdcaRunning}
+                style={{ ...s.btn, background: pdcaRunning ? '#9ca3af' : '#3b82f6', flex: 1 }}>
+                {pdcaRunning ? '⏳ 実行中…' : '▶ 今すぐ1問投稿'}
+              </button>
             </div>
           </div>
-          <button
-            onClick={handleRunPdca}
-            disabled={pdcaRunning}
-            style={{ ...s.btn, background: pdcaRunning ? '#9ca3af' : '#7c3aed', marginBottom: '16px' }}
-          >
-            {pdcaRunning ? '⏳ 実行中…' : `▶ スロット ${pdcaSlot} を即時実行`}
-          </button>
+
           {pdcaResult != null && (
             <div>
               <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '6px' }}>実行結果：</div>
-              <pre style={{
-                background: '#1e293b', color: '#e2e8f0', padding: '16px',
-                borderRadius: '8px', fontSize: '12px', overflow: 'auto',
-                maxHeight: '320px', whiteSpace: 'pre-wrap', wordBreak: 'break-all'
-              }}>
+              <pre style={{ background: '#1e293b', color: '#e2e8f0', padding: '16px', borderRadius: '8px', fontSize: '12px', overflow: 'auto', maxHeight: '320px', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
                 {JSON.stringify(pdcaResult, null, 2)}
               </pre>
             </div>
           )}
-          <div style={{ marginTop: '20px', padding: '12px', background: '#fef9c3', borderRadius: '8px', fontSize: '12px', color: '#854d0e' }}>
+
+          <div style={{ marginTop: '16px', padding: '12px', background: '#fef9c3', borderRadius: '8px', fontSize: '12px', color: '#854d0e' }}>
             <strong>X 投稿が 402 エラーになる場合：</strong><br />
             developer.twitter.com → Products でクレジット残高を確認・チャージしてください。
           </div>

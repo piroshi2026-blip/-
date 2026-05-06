@@ -26,7 +26,7 @@ export type QuickMarketResult = {
  * RSS から1件ランダムに選び、問いを生成 → Supabase 公開 → X 投稿までまとめて実行。
  * preloaded を渡すと RSS/worldCtx 取得をスキップできる（pdca-hourly で2並列時に効果的）。
  */
-export async function createQuickMarket(preloaded?: PreloadedDraftData): Promise<QuickMarketResult> {
+export async function createQuickMarket(preloaded?: PreloadedDraftData, skipImage = false): Promise<QuickMarketResult> {
   const { pool, worldCtx, allowedCategories, defaultCategory, sportsDefault } =
     preloaded ?? (await preloadDraftData())
   const worldContext = formatWorldContextForPrompt(worldCtx)
@@ -48,7 +48,7 @@ export async function createQuickMarket(preloaded?: PreloadedDraftData): Promise
       : defaultCategory
   draft = { ...draft, category: catOk }
 
-  const imageUrl = await fetchMarketImage(draft, kind, item.link).catch(() => null)
+  const imageUrl = skipImage ? null : await fetchMarketImage(draft, kind, item.link).catch(() => null)
 
   const ins = await insertMarket(draft, imageUrl)
   if (ins.error) throw new Error(ins.error)
