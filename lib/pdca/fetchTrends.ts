@@ -1,6 +1,7 @@
 import Parser from 'rss-parser'
 
 const parser = new Parser({ timeout: 15000 })
+const fastParser = new Parser({ timeout: 5000 }) // 補助フィードは短いタイムアウト
 
 /** デフォルトの日本語ニュース・話題RSS（追加は env RSS_FEED_URLS でカンマ区切り） */
 const DEFAULT_FEEDS = [
@@ -18,6 +19,21 @@ const DEFAULT_FEEDS = [
 
 /** 大谷・ドジャース・MLB 関連を拾うための追加RSS（スポーツ総合からキーワード抽出） */
 const MLB_EXTRA_FEEDS = ['https://news.yahoo.co.jp/rss/categories/sports.xml']
+
+/** テック・AI・ゲーム・スタートアップ系フィード */
+const TECH_AI_FEEDS = [
+  'https://gigazine.net/news/rss_2.0/',                    // Gigazine（テック/ゲーム/科学）
+  'https://rss.itmedia.co.jp/rss/2.0/news_bursts.xml',    // ITmedia速報
+  'https://techcrunch.com/feed/',                           // TechCrunch（AI/スタートアップ）
+  'https://ascii.jp/rss.xml',                              // ASCII（テック/ガジェット）
+]
+
+/** 科学・医療・文化・スポーツ系フィード */
+const SCIENCE_CULTURE_FEEDS = [
+  'https://www.nhk.or.jp/rss/news/cat3.xml',  // NHK 科学・医療
+  'https://www.nhk.or.jp/rss/news/cat6.xml',  // NHK 生活・文化
+  'https://www.nhk.or.jp/rss/news/cat7.xml',  // NHK スポーツ
+]
 
 export type TrendItem = { title: string; link?: string; source: string }
 
@@ -124,6 +140,50 @@ export async function fetchOhtaniDodgersHeadlines(
   }
 
   return { items: filtered, feedsUsed: [...new Set(feedsUsed)] }
+}
+
+/** 複数URLを並列取得して dedup したアイテム一覧を返す内部ヘルパー */
+async function fetchFromUrls(urls: string[], maxPerFeed = 6): Promise<{ items: TrendItem[]; feedsUsed: string[] }> {
+  const results = await Promise.allSettled(
+    urls.map(async (url) => {
+      const feed = await fastParser.parseURL(url)
+      const items: TrendItem[] = []
+      for (const entry of feed.items || []) {
+        const title = entry.title?.trim()
+        if (!title || title.length < 8) continue
+        if (BAD_TOPIC_RE.test(title)) continue
+        items.push({ title: title.slice(0, 200), link: entry.link, source: url })
+        if (items.length >= maxPerFeed) break
+      }
+      return { url, items }
+    })
+  )
+  const seen = new Set<string>()
+  const items: TrendItem[] = []
+  const feedsUsed: string[] = []
+  for (const r of results) {
+    if (r.status !== 'fulfilled') continue
+    feedsUsed.push(r.value.url)
+    for (const it of r.value.items) {
+      const k = it.title.slice(0, 15).toLowerCase()
+      if (seen.has(k)) continue
+      seen.add(k)
+      items.push(it)
+    }
+  }
+  return { items, feedsUsed }
+}
+
+/** テック・AI・ゲーム系の見出しを取得 */
+export async function fetchTechAiHeadlines(maxItems = 10): Promise<{ items: TrendItem[]; feedsUsed: string[] }> {
+  const { items, feedsUsed } = await fetchFromUrls(TECH_AI_FEEDS, 6)
+  return { items: items.slice(0, maxItems), feedsUsed }
+}
+
+/** 科学・医療・文化・スポーツ系の見出しを取得 */
+export async function fetchScienceCultureHeadlines(maxItems = 8): Promise<{ items: TrendItem[]; feedsUsed: string[] }> {
+  const { items, feedsUsed } = await fetchFromUrls(SCIENCE_CULTURE_FEEDS, 6)
+  return { items: items.slice(0, maxItems), feedsUsed }
 }
 
 /** RSS にヒットがなくても「1日1件」用のフォールバック（日付で見出しが変わるので重複判定しやすい） */

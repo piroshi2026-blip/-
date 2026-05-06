@@ -61,8 +61,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // worldCtx・トレンド・カテゴリを1回だけ取得（タイムアウト対策）
   const preloaded = await preloadDraftData()
 
+  // プールをシャッフルして各カードに別々のニュース記事を割り当て（重複防止）
+  const shuffled = [...preloaded.pool].sort(() => Math.random() - 0.5)
+
   const results = await Promise.allSettled(
-    Array.from({ length: n }, () => generateDraftCandidate(undefined, hintText, preloaded, true))
+    Array.from({ length: n }, (_, i) => {
+      const item = shuffled[i % shuffled.length]
+      return generateDraftCandidate(undefined, hintText, preloaded, true, item)
+    })
   )
 
   const candidates = results.map((r) =>

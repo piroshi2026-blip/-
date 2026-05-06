@@ -1,4 +1,4 @@
-import { fetchTrendHeadlines, fetchOhtaniDodgersHeadlines, MLB_TOPIC_RE, buildDailyMlbFallbackItem, type TrendItem } from './fetchTrends'
+import { fetchTrendHeadlines, fetchOhtaniDodgersHeadlines, fetchTechAiHeadlines, fetchScienceCultureHeadlines, MLB_TOPIC_RE, buildDailyMlbFallbackItem, type TrendItem } from './fetchTrends'
 import { draftMarketFromTrend, type DraftMarket } from './draftMarket'
 import { fetchMarketImage } from './fetchImage'
 import { loadCategories, pickSportsCategory } from './pdcaHelpers'
@@ -23,14 +23,31 @@ export type PreloadedDraftData = {
 /** worldCtx・トレンドプール・カテゴリを一括プリロード（generate-drafts で1回だけ呼ぶ）*/
 export async function preloadDraftData(hint?: string): Promise<PreloadedDraftData> {
   void hint
-  const [worldCtx, genResult, mlbResult, catData] = await Promise.all([
+  const [worldCtx, genResult, mlbResult, techResult, sciResult, catData] = await Promise.all([
     fetchWorldContext(),
     fetchTrendHeadlines(20),
     fetchOhtaniDodgersHeadlines(10),
+    fetchTechAiHeadlines(10),
+    fetchScienceCultureHeadlines(8),
     loadCategories(),
   ])
 
-  const pool = [...mlbResult.items.slice(0, 3), ...genResult.items].slice(0, 12)
+  // 多様なソースから合成: MLB(3) + テック/AI(8) + 科学/文化(5) + 一般ニュース(16)
+  const combined = [
+    ...mlbResult.items.slice(0, 3),
+    ...techResult.items.slice(0, 8),
+    ...sciResult.items.slice(0, 5),
+    ...genResult.items.slice(0, 16),
+  ]
+  // 重複タイトルを除去（先頭15文字で判定）
+  const seen = new Set<string>()
+  const pool: TrendItem[] = []
+  for (const item of combined) {
+    const key = item.title.slice(0, 15).toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    pool.push(item)
+  }
   if (!pool.length) pool.push(buildDailyMlbFallbackItem())
 
   const { names: allowedCategories, defaultCategory } = catData
@@ -44,7 +61,8 @@ export async function generateDraftCandidate(
   preloadedContext?: WorldContext,
   hint?: string,
   preloaded?: PreloadedDraftData,
-  skipImage?: boolean
+  skipImage?: boolean,
+  forcedItem?: TrendItem,
 ): Promise<DraftCandidate> {
   let pool: TrendItem[]
   let worldCtx: WorldContext
@@ -55,23 +73,38 @@ export async function generateDraftCandidate(
   if (preloaded) {
     ;({ pool, worldCtx, allowedCategories, defaultCategory, sportsDefault } = preloaded)
   } else {
-    const [genResult, mlbResult, ctx] = await Promise.all([
+    const [genResult, mlbResult, techResult, sciResult, ctx] = await Promise.all([
       fetchTrendHeadlines(20),
       fetchOhtaniDodgersHeadlines(10),
+      fetchTechAiHeadlines(10),
+      fetchScienceCultureHeadlines(8),
       preloadedContext ? Promise.resolve(preloadedContext) : fetchWorldContext(),
     ])
     worldCtx = ctx
-    pool = [...mlbResult.items.slice(0, 3), ...genResult.items].slice(0, 12)
+    const combined = [
+      ...mlbResult.items.slice(0, 3),
+      ...techResult.items.slice(0, 8),
+      ...sciResult.items.slice(0, 5),
+      ...genResult.items.slice(0, 16),
+    ]
+    const seen2 = new Set<string>()
+    pool = []
+    for (const it of combined) {
+      const k = it.title.slice(0, 15).toLowerCase()
+      if (seen2.has(k)) continue
+      seen2.add(k)
+      pool.push(it)
+    }
     if (!pool.length) pool.push(buildDailyMlbFallbackItem())
     const catData = await loadCategories()
     allowedCategories = catData.names
     defaultCategory = catData.defaultCategory
-    sportsDefault = pickSportsCategory(allowedCategories, defaultCategory)
+    sportsDefault = pickSportsCategory(allowedCategories, catData.defaultCategory)
   }
 
   const worldContext = formatWorldContextForPrompt(worldCtx)
 
-  const item = pool[Math.floor(Math.random() * pool.length)]
+  const item = forcedItem ?? pool[Math.floor(Math.random() * pool.length)]
   const isMlb = MLB_TOPIC_RE.test(item.title)
   const kind: 'mlb' | 'general' = isMlb ? 'mlb' : 'general'
 
