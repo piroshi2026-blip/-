@@ -58,8 +58,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const n = Math.min(15, Math.max(1, Number(count) || 10))
   const hintText = typeof hint === 'string' ? hint.trim().slice(0, 500) : ''
 
-  // worldCtx・トレンド・カテゴリを1回だけ取得（タイムアウト対策）
-  const preloaded = await preloadDraftData()
+  // worldCtx・トレンド・カテゴリを1回だけ取得（Tavily でトレンド系トピックも補完）
+  const preloaded = await preloadDraftData(undefined, { enrichWithTavily: true })
 
   // プールをシャッフルして各カードに別々のニュース記事を割り当て（重複防止）
   const shuffled = [...preloaded.pool].sort(() => Math.random() - 0.5)

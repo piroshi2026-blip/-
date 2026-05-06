@@ -188,6 +188,55 @@ export async function fetchScienceCultureHeadlines(maxItems = 8): Promise<{ item
   return { items: items.slice(0, maxItems), feedsUsed }
 }
 
+/**
+ * Tavily検索でトピック別の最新記事を取得（ガチャ多様化用）。
+ * RSS では拾えないAI・宇宙・核融合・エネルギー等のドメインを補完する。
+ */
+export async function fetchTavilyTopicItems(queries: string[], maxPerQuery = 3): Promise<TrendItem[]> {
+  const key = process.env.TAVILY_API_KEY?.trim()
+  if (!key) return []
+
+  const results = await Promise.allSettled(
+    queries.map(async (query) => {
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 8000)
+      try {
+        const res = await fetch('https://api.tavily.com/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ api_key: key, query, search_depth: 'basic', max_results: maxPerQuery }),
+          signal: controller.signal,
+        })
+        if (!res.ok) return [] as TrendItem[]
+        const data = await res.json() as { results?: { title?: string; url?: string; content?: string }[] }
+        return (data.results ?? [])
+          .map(r => ({
+            title: (r.title ?? '').trim().slice(0, 200),
+            link: r.url,
+            source: `tavily:${query.slice(0, 20)}`,
+            snippet: (r.content ?? '').trim().slice(0, 200) || undefined,
+          }))
+          .filter(it => it.title.length >= 8 && !BAD_TOPIC_RE.test(it.title)) as TrendItem[]
+      } finally {
+        clearTimeout(timer)
+      }
+    })
+  )
+
+  const seen = new Set<string>()
+  const items: TrendItem[] = []
+  for (const r of results) {
+    if (r.status !== 'fulfilled') continue
+    for (const it of r.value) {
+      const k = it.title.slice(0, 15).toLowerCase()
+      if (seen.has(k)) continue
+      seen.add(k)
+      items.push(it)
+    }
+  }
+  return items
+}
+
 /** RSS にヒットがなくても「1日1件」用のフォールバック（日付で見出しが変わるので重複判定しやすい） */
 export function buildDailyMlbFallbackItem(): TrendItem {
   const d = new Date()

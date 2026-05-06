@@ -1,4 +1,4 @@
-import { fetchTrendHeadlines, fetchOhtaniDodgersHeadlines, fetchTechAiHeadlines, fetchScienceCultureHeadlines, MLB_TOPIC_RE, buildDailyMlbFallbackItem, type TrendItem } from './fetchTrends'
+import { fetchTrendHeadlines, fetchOhtaniDodgersHeadlines, fetchTechAiHeadlines, fetchScienceCultureHeadlines, fetchTavilyTopicItems, MLB_TOPIC_RE, buildDailyMlbFallbackItem, type TrendItem } from './fetchTrends'
 import { draftMarketFromTrend, type DraftMarket } from './draftMarket'
 import { fetchMarketImage } from './fetchImage'
 import { loadCategories, pickSportsCategory } from './pdcaHelpers'
@@ -21,24 +21,38 @@ export type PreloadedDraftData = {
   sportsDefault: string
 }
 
+/**
+ * ガチャ多様化用の Tavily 検索クエリ。
+ * RSS だけでは拾えない「大きなトレンド・ストーリー」ドメインをカバーする。
+ */
+const GACHA_CURATED_QUERIES = [
+  'AIエージェント 自律型AI LLM Claude OpenAI Gemini 最新 2026',
+  '宇宙開発 JAXA SpaceX NASA 月探査 火星 小惑星 2026',
+  '核融合発電 ITER クリーンエネルギー 水素社会 2026',
+  '先端芸術 生成AIアート デジタルアート 映像 音楽テクノロジー クリエイティブ',
+  '科学的発見 医療革命 バイオテクノロジー 量子コンピュータ 長寿研究 最新',
+]
+
 /** worldCtx・トレンドプール・カテゴリを一括プリロード（generate-drafts で1回だけ呼ぶ）*/
-export async function preloadDraftData(hint?: string): Promise<PreloadedDraftData> {
+export async function preloadDraftData(hint?: string, opts?: { enrichWithTavily?: boolean }): Promise<PreloadedDraftData> {
   void hint
-  const [worldCtx, genResult, mlbResult, techResult, sciResult, catData] = await Promise.all([
+  const [worldCtx, genResult, mlbResult, techResult, sciResult, catData, tavilyItems] = await Promise.all([
     fetchWorldContext(),
     fetchTrendHeadlines(20),
     fetchOhtaniDodgersHeadlines(10),
     fetchTechAiHeadlines(10),
     fetchScienceCultureHeadlines(8),
     loadCategories(),
+    opts?.enrichWithTavily ? fetchTavilyTopicItems(GACHA_CURATED_QUERIES, 2) : Promise.resolve([] as TrendItem[]),
   ])
 
-  // 多様なソースから合成: MLB(3) + テック/AI(8) + 科学/文化(5) + 一般ニュース(16)
+  // キュレートトピック優先で前方に配置 → シャッフル後も先頭カードがトレンド系になりやすい
   const combined = [
-    ...mlbResult.items.slice(0, 3),
-    ...techResult.items.slice(0, 8),
-    ...sciResult.items.slice(0, 5),
-    ...genResult.items.slice(0, 16),
+    ...tavilyItems,                      // AI/宇宙/核融合/芸術/科学（最大10件）
+    ...mlbResult.items.slice(0, 3),      // MLB
+    ...techResult.items.slice(0, 8),     // テック/IT
+    ...sciResult.items.slice(0, 5),      // 科学/文化/スポーツ
+    ...genResult.items.slice(0, 14),     // 一般ニュース
   ]
   // 重複タイトルを除去（先頭15文字で判定）
   const seen = new Set<string>()
