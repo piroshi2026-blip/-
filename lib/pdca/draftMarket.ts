@@ -308,7 +308,11 @@ export async function draftMarketFromTrend(
 
   // Claude 優先（日本語品質が高い）
   if (claudeKey) {
-    parsed = await callClaudeForDraft(userContent)
+    try {
+      parsed = await callClaudeForDraft(userContent)
+    } catch {
+      /* fallbackDraft below */
+    }
   }
 
   // OpenAI フォールバック

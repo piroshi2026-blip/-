@@ -1,9 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { assertCronAuthorized } from '../../../lib/pdca/cronGuard'
-import { createQuickMarket } from '../../../lib/pdca/quickMarket'
+import { createQuickMarket, type QuickMarketResult } from '../../../lib/pdca/quickMarket'
+import { preloadDraftData } from '../../../lib/pdca/generateDraft'
 
 /**
- * JST 9:00〜23:00 毎時実行。createQuickMarket を2回呼んで2問を公開・X投稿。
+ * JST 9:00〜23:00 毎時実行。RSS/worldCtx を1回プリロードし、2問を並列生成・公開・X投稿。
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET' && req.method !== 'POST') {
@@ -12,13 +13,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
   if (!assertCronAuthorized(req, res)) return
 
-  const market1 = await createQuickMarket().catch((e: unknown) => ({
-    error: e instanceof Error ? e.message : String(e),
-  }))
+  const preloaded = await preloadDraftData()
 
-  const market2 = await createQuickMarket().catch((e: unknown) => ({
-    error: e instanceof Error ? e.message : String(e),
-  }))
+  const [r1, r2] = await Promise.allSettled([
+    createQuickMarket(preloaded),
+    createQuickMarket(preloaded),
+  ])
 
-  return res.status(200).json({ market1, market2 })
+  const toResult = (r: PromiseSettledResult<QuickMarketResult>) =>
+    r.status === 'fulfilled'
+      ? r.value
+      : { error: (r.reason as Error)?.message ?? String(r.reason) }
+
+  return res.status(200).json({ market1: toResult(r1), market2: toResult(r2) })
 }

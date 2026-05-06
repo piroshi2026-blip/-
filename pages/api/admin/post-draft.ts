@@ -9,6 +9,7 @@ import {
 } from '../../../lib/pdca/pdcaHelpers'
 import { postPromotionTweet } from '../../../lib/pdca/postX'
 import { getServiceSupabase } from '../../../lib/pdca/supabaseAdmin'
+import { fetchMarketImage } from '../../../lib/pdca/fetchImage'
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'yosoru_admin'
 
@@ -18,12 +19,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { adminPassword, draft, headline, kind, imageUrl } = req.body as {
+  const { adminPassword, draft, headline, kind, imageUrl, sourceLink } = req.body as {
     adminPassword?: string
     draft?: DraftMarket
     headline?: string
     kind?: 'mlb' | 'general'
     imageUrl?: string | null
+    sourceLink?: string | null
   }
 
   if (!adminPassword || adminPassword !== ADMIN_PASSWORD) {
@@ -34,7 +36,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: 'draft が不正です（title と options が必要）' })
   }
 
-  const ins = await insertMarket(draft, imageUrl ?? null)
+  // imageUrl が未指定の場合は sourceLink から OGP 取得を試みる
+  let finalImageUrl: string | null = imageUrl ?? null
+  if (!finalImageUrl) {
+    finalImageUrl = await fetchMarketImage(
+      { title: draft.title, category: draft.category ?? '' },
+      kind ?? 'general',
+      sourceLink ?? undefined
+    ).catch(() => null)
+  }
+
+  const ins = await insertMarket(draft, finalImageUrl)
   if (ins.error) return res.status(500).json({ error: ins.error })
 
   const sb = getServiceSupabase()
@@ -57,5 +69,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     marketId != null
   )
 
-  return res.status(200).json({ marketId, tweetId, tweetError })
+  return res.status(200).json({ marketId, tweetId, tweetError, imageUrl: finalImageUrl })
 }

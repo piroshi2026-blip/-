@@ -9,6 +9,7 @@ export type DraftCandidate = {
   headline: string
   kind: 'mlb' | 'general'
   imageUrl: string | null
+  sourceLink: string | null
 }
 
 export type PreloadedDraftData = {
@@ -89,5 +90,5 @@ export async function generateDraftCandidate(
 
   const imageUrl = skipImage ? null : await fetchMarketImage(draft, kind, item.link)
 
-  return { draft, headline: item.title, kind, imageUrl }
+  return { draft, headline: item.title, kind, imageUrl, sourceLink: item.link ?? null }
 }

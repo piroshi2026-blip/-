@@ -34,6 +34,7 @@ export default function Admin() {
     headline: string
     kind: 'mlb' | 'general'
     imageUrl: string | null
+    sourceLink?: string | null
     error?: string
   }
   type EditCard = { title: string; options: string[]; endDays: number }
@@ -228,7 +229,7 @@ export default function Admin() {
       const res = await fetch('/api/admin/post-draft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adminPassword: pdcaPassword, draft, headline: card.headline, kind: card.kind, imageUrl: card.imageUrl }),
+        body: JSON.stringify({ adminPassword: pdcaPassword, draft, headline: card.headline, kind: card.kind, imageUrl: card.imageUrl, sourceLink: card.sourceLink }),
       })
       const data = await res.json()
       setGachaPostResults(prev => ({ ...prev, [idx]: data }))
@@ -236,6 +237,33 @@ export default function Admin() {
       setGachaPostResults(prev => ({ ...prev, [idx]: { error: e instanceof Error ? e.message : String(e) } }))
     }
     setGachaPosting(null)
+  }
+
+  const [batchImageLoading, setBatchImageLoading] = useState(false)
+  const [batchImageResult, setBatchImageResult] = useState<unknown>(null)
+
+  async function handleBatchAddImages() {
+    if (!confirm('画像なしの問いに自動で画像を追加します（最大20件ずつ）。続けますか？')) return
+    setBatchImageLoading(true)
+    setBatchImageResult(null)
+    try {
+      const res = await fetch('/api/admin/batch-add-images', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminPassword: ADMIN_PASSWORD }),
+      })
+      const data = await res.json()
+      setBatchImageResult(data)
+      if ((data.remaining ?? 0) > 0) {
+        alert(`${data.updated}件更新。残り${data.remaining}件。もう一度ボタンを押してください。`)
+      } else {
+        alert(`完了：${data.updated}件更新しました。`)
+      }
+      fetchData()
+    } catch (e) {
+      setBatchImageResult({ error: e instanceof Error ? e.message : String(e) })
+    }
+    setBatchImageLoading(false)
   }
 
   async function handleUpdateConfig() { await supabase.from('site_config').update(siteConfig).eq('id', siteConfig.id); alert('保存完了'); }
@@ -354,6 +382,21 @@ export default function Admin() {
             </p>
           </div>
 
+          <div style={{ marginBottom: '16px', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              onClick={handleBatchAddImages}
+              disabled={batchImageLoading}
+              style={{ ...s.btn, background: batchImageLoading ? '#9ca3af' : '#0891b2', padding: '8px 16px', fontSize: '13px' }}
+            >
+              {batchImageLoading ? '処理中…' : '🖼 画像なし問いに一括追加（20件ずつ）'}
+            </button>
+            {batchImageResult != null && (
+              <span style={{ fontSize: '12px', color: '#64748b' }}>
+                {JSON.stringify(batchImageResult)}
+              </span>
+            )}
+          </div>
+
           <section style={{ background: '#f4f4f4', padding: '20px', borderRadius: '12px', marginBottom: '30px' }}>
             <h3>🆕 新規問い作成</h3>
             <input placeholder="タイトル" value={newMarket.title} onChange={e => setNewMarket({...newMarket, title: e.target.value})} style={s.inp} />
@@ -396,7 +439,10 @@ export default function Admin() {
                   <label style={{fontSize:'11px', color:'#666'}}>締切日時修正</label>
                   <input type="datetime-local" value={editForm.end_date} onChange={e => setEditForm({...editForm, end_date: e.target.value})} style={s.inp} />
 
-                  <div style={{marginBottom:'10px'}}><label style={{fontSize:'12px'}}>画像変更</label><br/><input type="file" onChange={e => uploadImage(e, true)} /></div>
+                  <label style={{fontSize:'11px', color:'#666'}}>画像URL（直接入力 or ファイルアップロード）</label>
+                  <input placeholder="https://..." value={editForm.image_url ?? ''} onChange={e => setEditForm({...editForm, image_url: e.target.value})} style={s.inp} />
+                  {editForm.image_url && <img src={editForm.image_url} alt="" style={{width:'100%', maxHeight:'120px', objectFit:'cover', borderRadius:'6px', marginBottom:'8px'}} />}
+                  <div style={{marginBottom:'10px'}}><label style={{fontSize:'12px', color:'#666'}}>または画像ファイルをアップロード</label><br/><input type="file" onChange={e => uploadImage(e, true)} /></div>
 
                   <label style={{fontSize:'11px', color:'#666'}}>選択肢名の修正</label>
                   {editForm.market_options.map((opt: any, idx: number) => (

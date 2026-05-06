@@ -67,7 +67,7 @@ async function searchUnsplash(keywords: string, accessKey: string): Promise<stri
 
 async function fetchOgpImage(articleUrl: string): Promise<string | null> {
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 5000)
+  const timer = setTimeout(() => controller.abort(), 3000)
   try {
     const res = await fetch(articleUrl, {
       headers: { 'User-Agent': 'Mozilla/5.0' },
