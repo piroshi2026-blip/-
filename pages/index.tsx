@@ -25,7 +25,7 @@ export default function Home() {
   const [selectedOptionId, setSelectedOptionId] = useState<number | null>(null)
   const [justVoted, setJustVoted] = useState<any>(null)
 
-  const [submitForm, setSubmitForm] = useState({ title: '', category: 'その他', options: ['', '', ''], endDays: 7, description: '' })
+  const [submitForm, setSubmitForm] = useState({ title: '', category: 'その他', optionsText: '', endDays: 7, description: '' })
   const [submitLoading, setSubmitLoading] = useState(false)
   const [submitDone, setSubmitDone] = useState(false)
 
@@ -92,8 +92,8 @@ export default function Home() {
   const handleSubmitQuestion = async () => {
     if (!session) { setShowAuthModal(true); return }
     if (!submitForm.title.trim()) return alert('タイトルを入力してください')
-    const validOpts = submitForm.options.filter(o => o.trim())
-    if (validOpts.length < 2) return alert('選択肢を2つ以上入力してください')
+    const validOpts = submitForm.optionsText.split(',').map(s => s.trim()).filter(s => s)
+    if (validOpts.length < 2) return alert('選択肢をカンマ区切りで2つ以上入力してください')
     setSubmitLoading(true)
     try {
       const { error } = await supabase.from('user_proposals').insert({
@@ -107,7 +107,7 @@ export default function Home() {
       })
       if (error) throw error
       setSubmitDone(true)
-      setSubmitForm({ title: '', category: 'その他', options: ['', '', ''], endDays: 7, description: '' })
+      setSubmitForm({ title: '', category: 'その他', optionsText: '', endDays: 7, description: '' })
     } catch (e) {
       alert('送信に失敗しました: ' + (e instanceof Error ? e.message : String(e)))
     } finally {
@@ -378,15 +378,29 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key`}
                 <div>
                   <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#374151', display: 'block', marginBottom: '5px' }}>締め切り</label>
                   <select value={submitForm.endDays} onChange={e => setSubmitForm(f => ({ ...f, endDays: Number(e.target.value) }))} style={{ width: '100%', padding: '10px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', background: '#fff' }}>
-                    {[3, 7, 14, 30].map(d => <option key={d} value={d}>{d}日後</option>)}
+                    {[
+                      { days: 3, label: '3日後' }, { days: 7, label: '1週間後' }, { days: 14, label: '2週間後' },
+                      { days: 30, label: '1ヶ月後' }, { days: 90, label: '3ヶ月後' }, { days: 180, label: '6ヶ月後' },
+                      { days: 240, label: '8ヶ月後' }, { days: 365, label: '1年後' },
+                    ].map(({ days, label }) => <option key={days} value={days}>{label}</option>)}
                   </select>
                 </div>
               </div>
               <div>
-                <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#374151', display: 'block', marginBottom: '5px' }}>選択肢 <span style={{ color: '#ef4444' }}>*</span> <span style={{ color: '#94a3b8', fontWeight: 'normal' }}>（2〜3つ）</span></label>
-                {submitForm.options.map((opt, i) => (
-                  <input key={i} value={opt} onChange={e => setSubmitForm(f => { const o = [...f.options]; o[i] = e.target.value; return { ...f, options: o } })} placeholder={i < 2 ? `選択肢 ${i + 1}（必須）` : `選択肢 ${i + 1}（任意）`} style={{ width: '100%', padding: '9px 10px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', marginBottom: '6px', boxSizing: 'border-box' }} />
-                ))}
+                <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#374151', display: 'block', marginBottom: '5px' }}>選択肢 <span style={{ color: '#ef4444' }}>*</span> <span style={{ color: '#94a3b8', fontWeight: 'normal' }}>（カンマ区切りで入力・2つ以上）</span></label>
+                <input
+                  value={submitForm.optionsText}
+                  onChange={e => setSubmitForm(f => ({ ...f, optionsText: e.target.value }))}
+                  placeholder="例：超える, 超えない, わからない"
+                  style={{ width: '100%', padding: '9px 10px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box' }}
+                />
+                {submitForm.optionsText.trim() && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginTop: '6px' }}>
+                    {submitForm.optionsText.split(',').map(s => s.trim()).filter(s => s).map((opt, i) => (
+                      <span key={i} style={{ fontSize: '11px', background: '#eff6ff', color: '#1d4ed8', borderRadius: '20px', padding: '2px 10px' }}>{opt}</span>
+                    ))}
+                  </div>
+                )}
               </div>
               <div>
                 <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#374151', display: 'block', marginBottom: '5px' }}>補足・コメント <span style={{ color: '#94a3b8', fontWeight: 'normal' }}>（任意）</span></label>
