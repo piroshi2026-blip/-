@@ -6,10 +6,13 @@ export default function Admin() {
   const ADMIN_PASSWORD = 'yosoru_admin' 
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [passInput, setPassInput] = useState('')
-  const [activeTab, setActiveTab] = useState<'markets' | 'categories' | 'users' | 'config' | 'pdca' | 'gacha'>('markets')
+  const [activeTab, setActiveTab] = useState<'markets' | 'categories' | 'users' | 'config' | 'pdca' | 'gacha' | 'proposals'>('markets')
   const [markets, setMarkets] = useState<any[]>([])
   /** '' = すべて表示 */
   const [marketCategoryFilter, setMarketCategoryFilter] = useState<string>('')
+  const [marketSortBy, setMarketSortBy] = useState<'new' | 'deadline' | 'popular'>('new')
+  const [proposals, setProposals] = useState<any[]>([])
+  const [proposalsLoading, setProposalsLoading] = useState(false)
   const [categories, setCategories] = useState<any[]>([])
   const [users, setUsers] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -93,9 +96,15 @@ export default function Admin() {
     }
     return [...list].sort((a: any, b: any) => {
       if (Boolean(a.is_resolved) !== Boolean(b.is_resolved)) return a.is_resolved ? 1 : -1
-      return new Date(a.end_date).getTime() - new Date(b.end_date).getTime()
+      if (marketSortBy === 'deadline') return new Date(a.end_date).getTime() - new Date(b.end_date).getTime()
+      if (marketSortBy === 'popular') {
+        const aPool = (a.market_options ?? []).reduce((s: number, o: any) => s + (o.pool ?? 0), 0)
+        const bPool = (b.market_options ?? []).reduce((s: number, o: any) => s + (o.pool ?? 0), 0)
+        return bPool - aPool
+      }
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     })
-  }, [markets, marketCategoryFilter])
+  }, [markets, marketCategoryFilter, marketSortBy])
 
   async function handleResolve(marketId: number, optionId: number, optionName: string) {
     if(!confirm(`「${optionName}」の結果で確定させますか？`)) return;
@@ -161,6 +170,43 @@ export default function Admin() {
       setPdcaResult({ error: e instanceof Error ? e.message : String(e) })
     }
     setPdcaRunning(false)
+  }
+
+  async function fetchProposals() {
+    setProposalsLoading(true)
+    try {
+      const res = await fetch('/api/admin/get-proposals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminPassword: ADMIN_PASSWORD }),
+      })
+      const data = await res.json()
+      setProposals(data.proposals ?? [])
+    } catch (e) {
+      alert('提案取得エラー: ' + (e instanceof Error ? e.message : String(e)))
+    }
+    setProposalsLoading(false)
+  }
+
+  async function handleProposalAction(proposalId: number, action: 'approve' | 'reject') {
+    const label = action === 'approve' ? '承認' : '却下'
+    if (!confirm(`この提案を${label}しますか？`)) return
+    try {
+      const res = await fetch('/api/admin/approve-proposal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminPassword: ADMIN_PASSWORD, proposalId, action }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        alert(`${label}しました`)
+        fetchProposals()
+      } else {
+        alert(`エラー: ${data.error}`)
+      }
+    } catch (e) {
+      alert('エラー: ' + (e instanceof Error ? e.message : String(e)))
+    }
   }
 
   async function handleTestAi() {
@@ -354,6 +400,7 @@ export default function Admin() {
         <button onClick={() => setActiveTab('users')} style={s.tab(activeTab === 'users')}>ユーザー</button>
         <button onClick={() => setActiveTab('config')} style={s.tab(activeTab === 'config')}>サイト設定</button>
         <button onClick={() => setActiveTab('pdca')} style={s.tab(activeTab === 'pdca')}>🤖 PDCA</button>
+        <button onClick={() => { setActiveTab('proposals'); fetchProposals() }} style={s.tab(activeTab === 'proposals')}>✏️ 投稿提案</button>
       </div>
 
       {activeTab === 'markets' && (
@@ -379,9 +426,15 @@ export default function Admin() {
                 </button>
               ))}
             </div>
-            <p style={{ fontSize: '11px', color: '#64748b', margin: '8px 0 0' }}>
-              締切が近い順 · 確定済みは一覧の後ろに表示されます
-            </p>
+            <div style={{ display: 'flex', gap: '6px', marginTop: '10px', alignItems: 'center' }}>
+              <span style={{ fontSize: '11px', color: '#64748b', marginRight: '4px' }}>並び順:</span>
+              {(['new', 'deadline', 'popular'] as const).map(v => (
+                <button key={v} type="button" onClick={() => setMarketSortBy(v)} style={s.sortBtn(marketSortBy === v)}>
+                  {v === 'new' ? '新着順' : v === 'deadline' ? '締切順' : '人気順'}
+                </button>
+              ))}
+              <span style={{ fontSize: '11px', color: '#94a3b8', marginLeft: '6px' }}>確定済みは後ろに表示</span>
+            </div>
           </div>
 
           <div style={{ marginBottom: '16px', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -732,6 +785,51 @@ export default function Admin() {
             <strong>X 投稿が 402 エラーになる場合：</strong><br />
             developer.twitter.com → Products でクレジット残高を確認・チャージしてください。
           </div>
+        </section>
+      )}
+
+      {activeTab === 'proposals' && (
+        <section style={{ background: '#f8fafc', padding: '24px', borderRadius: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <h3 style={{ margin: 0 }}>✏️ ユーザー投稿提案</h3>
+            <button onClick={fetchProposals} disabled={proposalsLoading} style={{ ...s.btn, background: proposalsLoading ? '#9ca3af' : '#3b82f6', padding: '8px 16px', fontSize: '13px' }}>
+              {proposalsLoading ? '読み込み中…' : '🔄 更新'}
+            </button>
+          </div>
+          {proposals.length === 0 && !proposalsLoading && (
+            <p style={{ color: '#64748b', fontSize: '14px' }}>提案がありません</p>
+          )}
+          {proposals.map((p: any) => (
+            <div key={p.id} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px', marginBottom: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '8px' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 'bold', fontSize: '15px', marginBottom: '4px' }}>{p.title}</div>
+                  <div style={{ fontSize: '12px', color: '#64748b' }}>
+                    カテゴリ: {p.category} ／ 締切: {p.end_days}日 ／ 投稿: {new Date(p.created_at).toLocaleString()}
+                  </div>
+                </div>
+                <span style={{
+                  fontSize: '11px', padding: '3px 10px', borderRadius: '20px', fontWeight: 'bold', whiteSpace: 'nowrap',
+                  background: p.status === 'pending' ? '#fef3c7' : p.status === 'approved' ? '#d1fae5' : '#fee2e2',
+                  color: p.status === 'pending' ? '#92400e' : p.status === 'approved' ? '#065f46' : '#991b1b',
+                }}>
+                  {p.status === 'pending' ? '審査中' : p.status === 'approved' ? '承認済' : '却下'}
+                </span>
+              </div>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                {(Array.isArray(p.options) ? p.options : JSON.parse(p.options ?? '[]')).map((opt: string, i: number) => (
+                  <span key={i} style={{ fontSize: '12px', background: '#f1f5f9', padding: '3px 10px', borderRadius: '20px', color: '#334155' }}>{opt}</span>
+                ))}
+              </div>
+              {p.description && <p style={{ fontSize: '12px', color: '#475569', margin: '0 0 10px' }}>{p.description}</p>}
+              {p.status === 'pending' && (
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button onClick={() => handleProposalAction(p.id, 'approve')} style={{ ...s.btn, background: '#10b981', padding: '8px 18px', fontSize: '13px' }}>✅ 承認して公開</button>
+                  <button onClick={() => handleProposalAction(p.id, 'reject')} style={{ ...s.btn, background: '#ef4444', padding: '8px 18px', fontSize: '13px' }}>❌ 却下</button>
+                </div>
+              )}
+            </div>
+          ))}
         </section>
       )}
 

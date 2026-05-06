@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<'home' | 'ranking' | 'mypage' | 'info'>('home')
+  const [activeTab, setActiveTab] = useState<'home' | 'ranking' | 'mypage' | 'info' | 'submit'>('home')
   const [session, setSession] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const [markets, setMarkets] = useState<any[]>([])
@@ -24,6 +24,10 @@ export default function Home() {
   const [selectedMarketId, setSelectedMarketId] = useState<number | null>(null)
   const [selectedOptionId, setSelectedOptionId] = useState<number | null>(null)
   const [justVoted, setJustVoted] = useState<any>(null)
+
+  const [submitForm, setSubmitForm] = useState({ title: '', category: 'その他', options: ['', '', ''], endDays: 7, description: '' })
+  const [submitLoading, setSubmitLoading] = useState(false)
+  const [submitDone, setSubmitDone] = useState(false)
 
   const categoryMeta: any = { 'こども': { color: '#f43f5e' }, '経済・投資': { color: '#3b82f6' }, 'エンタメ': { color: '#a855f7' }, 'スポーツ': { color: '#22c55e' }, '旅・生活': { color: '#f59e0b' }, 'ゲーム': { color: '#10b981' }, '恋愛': { color: '#ec4899' }, '芸術・デザイン': { color: '#8b5cf6' }, '自然・科学': { color: '#06b6d4' }, '政治・思想': { color: '#6366f1' }, 'その他': { color: '#6b7280' } }
 
@@ -83,6 +87,32 @@ export default function Home() {
       const m = markets.find(m => m.id === selectedMarketId); const o = m?.market_options.find((o: any) => o.id === selectedOptionId)
       setJustVoted({ title: m?.title, option: o?.name }); setSelectedMarketId(null); setSelectedOptionId(null); fetchMarkets(); initUserData(session.user.id)
     } else alert(error.message)
+  }
+
+  const handleSubmitQuestion = async () => {
+    if (!session) { setShowAuthModal(true); return }
+    if (!submitForm.title.trim()) return alert('タイトルを入力してください')
+    const validOpts = submitForm.options.filter(o => o.trim())
+    if (validOpts.length < 2) return alert('選択肢を2つ以上入力してください')
+    setSubmitLoading(true)
+    try {
+      const { error } = await supabase.from('user_proposals').insert({
+        user_id: session.user.id,
+        title: submitForm.title.trim(),
+        category: submitForm.category,
+        options: validOpts,
+        end_days: submitForm.endDays,
+        description: submitForm.description.trim(),
+        status: 'pending',
+      })
+      if (error) throw error
+      setSubmitDone(true)
+      setSubmitForm({ title: '', category: 'その他', options: ['', '', ''], endDays: 7, description: '' })
+    } catch (e) {
+      alert('送信に失敗しました: ' + (e instanceof Error ? e.message : String(e)))
+    } finally {
+      setSubmitLoading(false)
+    }
   }
 
   if (!isSupabaseConfigured) {
@@ -316,9 +346,64 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key`}
         </div>
       )}
 
-      <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: '#fff', display: 'flex', justifyContent: 'space-around', padding: '12px 0', borderTop: '1px solid #e2e8f0', zIndex: 100 }}>
+      {activeTab === 'submit' && (
+        <div style={{ padding: '4px 0 20px' }}>
+          <h2 style={{ fontSize: '18px', fontWeight: '900', margin: '0 0 4px' }}>✏️ 問いを投稿する</h2>
+          <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 18px' }}>あなたが気になる未来を問いにしよう。審査後に掲載されます。</p>
+          {!session ? (
+            <div style={{ textAlign: 'center', padding: '40px 20px', background: '#fff', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+              <p style={{ color: '#64748b', marginBottom: '16px', fontSize: '14px' }}>投稿するにはログインが必要です</p>
+              <button onClick={() => setShowAuthModal(true)} style={{ padding: '12px 28px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 'bold', fontSize: '14px' }}>ログインして投稿</button>
+            </div>
+          ) : submitDone ? (
+            <div style={{ textAlign: 'center', padding: '40px 20px', background: '#fff', borderRadius: '16px', border: '2px solid #10b981' }}>
+              <div style={{ fontSize: '48px', marginBottom: '12px' }}>🎉</div>
+              <h3 style={{ fontWeight: '900', margin: '0 0 8px', fontSize: '20px' }}>投稿しました！</h3>
+              <p style={{ color: '#64748b', marginBottom: '20px', fontSize: '13px' }}>審査後に掲載されます。ありがとうございます！</p>
+              <button onClick={() => setSubmitDone(false)} style={{ padding: '10px 24px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>もう一つ投稿する</button>
+            </div>
+          ) : (
+            <div style={{ background: '#fff', borderRadius: '16px', border: '1px solid #e2e8f0', padding: '18px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#374151', display: 'block', marginBottom: '5px' }}>問いのタイトル <span style={{ color: '#ef4444' }}>*</span></label>
+                <textarea value={submitForm.title} onChange={e => setSubmitForm(f => ({ ...f, title: e.target.value }))} placeholder="例：大谷翔平は今シーズン60本塁打を超えるか？" rows={2} style={{ width: '100%', padding: '10px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'sans-serif' }} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#374151', display: 'block', marginBottom: '5px' }}>カテゴリ</label>
+                  <select value={submitForm.category} onChange={e => setSubmitForm(f => ({ ...f, category: e.target.value }))} style={{ width: '100%', padding: '10px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', background: '#fff' }}>
+                    {dbCategories.filter(c => c.name !== 'すべて').map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#374151', display: 'block', marginBottom: '5px' }}>締め切り</label>
+                  <select value={submitForm.endDays} onChange={e => setSubmitForm(f => ({ ...f, endDays: Number(e.target.value) }))} style={{ width: '100%', padding: '10px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', background: '#fff' }}>
+                    {[3, 7, 14, 30].map(d => <option key={d} value={d}>{d}日後</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#374151', display: 'block', marginBottom: '5px' }}>選択肢 <span style={{ color: '#ef4444' }}>*</span> <span style={{ color: '#94a3b8', fontWeight: 'normal' }}>（2〜3つ）</span></label>
+                {submitForm.options.map((opt, i) => (
+                  <input key={i} value={opt} onChange={e => setSubmitForm(f => { const o = [...f.options]; o[i] = e.target.value; return { ...f, options: o } })} placeholder={i < 2 ? `選択肢 ${i + 1}（必須）` : `選択肢 ${i + 1}（任意）`} style={{ width: '100%', padding: '9px 10px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', marginBottom: '6px', boxSizing: 'border-box' }} />
+                ))}
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#374151', display: 'block', marginBottom: '5px' }}>補足・コメント <span style={{ color: '#94a3b8', fontWeight: 'normal' }}>（任意）</span></label>
+                <textarea value={submitForm.description} onChange={e => setSubmitForm(f => ({ ...f, description: e.target.value }))} placeholder="判定基準や理由など" rows={2} style={{ width: '100%', padding: '10px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'sans-serif' }} />
+              </div>
+              <button onClick={handleSubmitQuestion} disabled={submitLoading} style={{ width: '100%', padding: '14px', background: submitLoading ? '#94a3b8' : '#3b82f6', color: '#fff', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '15px', cursor: submitLoading ? 'default' : 'pointer' }}>
+                {submitLoading ? '送信中…' : '✏️ 問いを投稿する'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: '#fff', display: 'flex', justifyContent: 'space-around', padding: '10px 0', borderTop: '1px solid #e2e8f0', zIndex: 100 }}>
         <button onClick={() => setActiveTab('home')} style={{ background: 'none', border: 'none', color: activeTab === 'home' ? '#3b82f6' : '#94a3b8', fontSize:'11px', fontWeight:'bold' }}>🏠<br />ホーム</button>
         <button onClick={() => setActiveTab('ranking')} style={{ background: 'none', border: 'none', color: activeTab === 'ranking' ? '#3b82f6' : '#94a3b8', fontSize:'11px', fontWeight:'bold' }}>👑<br />ランク</button>
+        <button onClick={() => setActiveTab('submit')} style={{ background: 'none', border: 'none', color: activeTab === 'submit' ? '#3b82f6' : '#94a3b8', fontSize:'11px', fontWeight:'bold' }}>✏️<br />投稿</button>
         <button onClick={() => setActiveTab('mypage')} style={{ background: 'none', border: 'none', color: activeTab === 'mypage' ? '#3b82f6' : '#94a3b8', fontSize:'11px', fontWeight:'bold' }}>👤<br />マイペ</button>
         <button onClick={() => setActiveTab('info')} style={{ background: 'none', border: 'none', color: activeTab === 'info' ? '#3b82f6' : '#94a3b8', fontSize:'11px', fontWeight:'bold' }}>📖<br />ガイド</button>
       </nav>
