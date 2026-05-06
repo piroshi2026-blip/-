@@ -164,16 +164,16 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key`}
                 )}
 
                 {/* 選択肢バー */}
-                <div style={{marginBottom:'10px'}}>
+                <div style={{display:'grid', gridTemplateColumns: m.market_options.length > 3 ? 'repeat(2, 1fr)' : '1fr', gap:'6px 10px', marginBottom:'10px'}}>
                   {m.market_options.map((opt: any, i: number) => {
                     const pct = Math.round((opt.pool / (m.total_pool || 1)) * 100)
                     const isWinner = m.result_option_id === opt.id
                     const barColor = isWinner ? '#10b981' : optColors[i % 3]
                     return (
-                      <div key={opt.id} style={{marginBottom:'6px'}}>
-                        <div style={{display:'flex', justifyContent:'space-between', fontSize:'12px', marginBottom:'3px'}}>
-                          <span style={{fontWeight: isWinner ? 'bold' : 'normal', color: isWinner ? '#10b981' : '#1e293b'}}>{isWinner ? '👑 ' : ''}{opt.name}</span>
-                          <span style={{fontWeight:'700', color: isWinner ? '#10b981' : '#2563eb', fontSize:'13px'}}>{pct}%<span style={{color:'#94a3b8', fontSize:'10px', fontWeight:'normal', marginLeft:'4px'}}>{m.total_pool > 0 ? `${(m.total_pool/Math.max(opt.pool,1)).toFixed(1)}倍` : '—'}</span></span>
+                      <div key={opt.id}>
+                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'baseline', fontSize:'12px', marginBottom:'3px', gap:'4px'}}>
+                          <span style={{fontWeight: isWinner ? 'bold' : 'normal', color: isWinner ? '#10b981' : '#1e293b', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', minWidth:0, flex:1}}>{isWinner ? '👑 ' : ''}{opt.name}</span>
+                          <span style={{fontWeight:'700', color: isWinner ? '#10b981' : '#2563eb', fontSize:'13px', whiteSpace:'nowrap', flexShrink:0}}>{pct}%<span style={{color:'#94a3b8', fontSize:'10px', fontWeight:'normal', marginLeft:'4px'}}>{m.total_pool > 0 ? `${(m.total_pool/Math.max(opt.pool,1)).toFixed(1)}倍` : '—'}</span></span>
                         </div>
                         <div style={{height:'7px', background:'#e2e8f0', borderRadius:'4px', overflow:'hidden'}}>
                           <div style={{width:`${pct}%`, height:'100%', background:barColor, borderRadius:'4px', transition:'width 0.3s'}} />
