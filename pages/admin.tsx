@@ -13,6 +13,7 @@ export default function Admin() {
   const [marketSortBy, setMarketSortBy] = useState<'new' | 'deadline' | 'popular'>('new')
   const [proposals, setProposals] = useState<any[]>([])
   const [proposalsLoading, setProposalsLoading] = useState(false)
+  const [proposalsTableMissing, setProposalsTableMissing] = useState(false)
   const [categories, setCategories] = useState<any[]>([])
   const [users, setUsers] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -174,6 +175,7 @@ export default function Admin() {
 
   async function fetchProposals() {
     setProposalsLoading(true)
+    setProposalsTableMissing(false)
     try {
       const res = await fetch('/api/admin/get-proposals', {
         method: 'POST',
@@ -181,7 +183,11 @@ export default function Admin() {
         body: JSON.stringify({ adminPassword: ADMIN_PASSWORD }),
       })
       const data = await res.json()
-      setProposals(data.proposals ?? [])
+      if (data.error && /does not exist|undefined.*table/i.test(data.error)) {
+        setProposalsTableMissing(true)
+      } else {
+        setProposals(data.proposals ?? [])
+      }
     } catch (e) {
       alert('提案取得エラー: ' + (e instanceof Error ? e.message : String(e)))
     }
@@ -796,7 +802,55 @@ export default function Admin() {
               {proposalsLoading ? '読み込み中…' : '🔄 更新'}
             </button>
           </div>
-          {proposals.length === 0 && !proposalsLoading && (
+
+          {proposalsTableMissing && (() => {
+            const sql = `CREATE TABLE IF NOT EXISTS user_proposals (
+  id BIGSERIAL PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT 'その他',
+  options JSONB NOT NULL DEFAULT '["はい","いいえ","どちらとも言えない"]',
+  end_days INT NOT NULL DEFAULT 7,
+  description TEXT DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE user_proposals ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "insert_own" ON user_proposals FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "select_own" ON user_proposals FOR SELECT TO authenticated USING (auth.uid() = user_id);`
+            return (
+              <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+                <div style={{ fontWeight: 'bold', color: '#92400e', marginBottom: '10px', fontSize: '15px' }}>⚠️ データベースのセットアップが必要です</div>
+                <p style={{ color: '#78350f', fontSize: '13px', margin: '0 0 14px', lineHeight: 1.7 }}>
+                  以下の手順で1回だけ実行してください：<br />
+                  <strong>① 下のボタンで SQL エディタを開く</strong><br />
+                  <strong>② SQL をコピーして貼り付ける</strong><br />
+                  <strong>③ 「Run」ボタンを押す</strong>
+                </p>
+                <div style={{ display: 'flex', gap: '10px', marginBottom: '14px', flexWrap: 'wrap' }}>
+                  <a
+                    href="https://supabase.com/dashboard/project/qtjavdmcubhxbbmrmnvi/sql/new"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ ...s.btn, background: '#3b82f6', padding: '10px 18px', fontSize: '13px', textDecoration: 'none', display: 'inline-block' }}
+                  >
+                    🔗 ① Supabase SQL エディタを開く
+                  </a>
+                  <button
+                    onClick={() => { navigator.clipboard.writeText(sql); alert('SQLをコピーしました！エディタに貼り付けてRunを押してください') }}
+                    style={{ ...s.btn, background: '#10b981', padding: '10px 18px', fontSize: '13px' }}
+                  >
+                    📋 ② SQL をコピー
+                  </button>
+                </div>
+                <pre style={{ background: '#1e293b', color: '#e2e8f0', padding: '14px', borderRadius: '8px', fontSize: '11px', whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: 0 }}>
+                  {sql}
+                </pre>
+              </div>
+            )
+          })()}
+
+          {!proposalsTableMissing && proposals.length === 0 && !proposalsLoading && (
             <p style={{ color: '#64748b', fontSize: '14px' }}>提案がありません</p>
           )}
           {proposals.map((p: any) => (
