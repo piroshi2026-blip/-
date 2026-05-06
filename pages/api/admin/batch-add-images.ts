@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import Anthropic from '@anthropic-ai/sdk'
 import { getServiceSupabase } from '../../../lib/pdca/supabaseAdmin'
+import { fetchImageViaSearch, fetchWikipediaImage } from '../../../lib/pdca/fetchImage'
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'yosoru_admin'
 
@@ -37,29 +38,6 @@ async function getSearchTermsBatch(
   return result
 }
 
-/** Wikipedia API で画像URLを取得 */
-async function fetchWikipediaImage(searchTerm: string): Promise<string | null> {
-  for (const lang of ['ja', 'en']) {
-    try {
-      const controller = new AbortController()
-      setTimeout(() => controller.abort(), 3000)
-      const url =
-        `https://${lang}.wikipedia.org/w/api.php?action=query` +
-        `&titles=${encodeURIComponent(searchTerm)}` +
-        `&prop=pageimages&format=json&pithumbsize=800&redirects=1`
-      const res = await fetch(url, { signal: controller.signal })
-      if (!res.ok) continue
-      const data = (await res.json()) as {
-        query?: { pages?: Record<string, { thumbnail?: { source: string } }> }
-      }
-      const pages = Object.values(data.query?.pages ?? {})
-      const src = pages[0]?.thumbnail?.source
-      if (src) return src
-    } catch { continue }
-  }
-  return null
-}
-
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST')
@@ -87,26 +65,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json({ updated: 0, remaining: 0, message: '画像なしの問いはありません' })
   }
 
-  // Claude で検索ワードを一括取得
-  const searchTerms = await getSearchTermsBatch(markets)
+  // Tavily検索（ネット記事）と Wikipedia ワード取得を並列で準備
+  const [tavilyResults, wikiTerms] = await Promise.all([
+    // 各問いで Tavily 検索を並列実行
+    Promise.allSettled(markets.map((m) => fetchImageViaSearch(m.title))),
+    // Claude で Wikipedia 検索ワードを一括取得
+    getSearchTermsBatch(markets),
+  ])
 
-  // Wikipedia 画像を並列取得 → Supabase 更新
-  const results = await Promise.allSettled(
-    markets.map(async (m) => {
-      const term = searchTerms[m.id]
-      const wikiImage = await fetchWikipediaImage(term)
-      const imageUrl = wikiImage ?? `https://picsum.photos/seed/${m.id}/800/400`
-      await sb.from('markets').update({ image_url: imageUrl }).eq('id', m.id)
-      return { id: m.id, term, imageUrl, source: wikiImage ? 'wikipedia' : 'picsum' }
+  // Wikipedia 画像が必要な問いのみ取得
+  const needsWiki = markets.filter(
+    (_, i) => !(tavilyResults[i].status === 'fulfilled' && tavilyResults[i].status === 'fulfilled' && (tavilyResults[i] as PromiseFulfilledResult<string | null>).value)
+  )
+  const wikiImages: Record<number, string | null> = {}
+  await Promise.allSettled(
+    needsWiki.map(async (m) => {
+      wikiImages[m.id] = await fetchWikipediaImage(wikiTerms[m.id])
     })
   )
 
-  const updated = results.filter((r) => r.status === 'fulfilled').length
-  const details = results
-    .filter((r) => r.status === 'fulfilled')
-    .map((r) => (r as PromiseFulfilledResult<{ id: number; term: string; source: string }>).value)
+  // Supabase 更新
+  const updateResults = await Promise.allSettled(
+    markets.map(async (m, i) => {
+      const tavilyImg = tavilyResults[i].status === 'fulfilled'
+        ? (tavilyResults[i] as PromiseFulfilledResult<string | null>).value
+        : null
+      const imageUrl = tavilyImg ?? wikiImages[m.id] ?? `https://picsum.photos/seed/${m.id}/800/400`
+      const source = tavilyImg ? 'tavily' : wikiImages[m.id] ? 'wikipedia' : 'picsum'
+      await sb.from('markets').update({ image_url: imageUrl }).eq('id', m.id)
+      return { id: m.id, source, imageUrl }
+    })
+  )
 
-  // 残り件数
+  const updated = updateResults.filter((r) => r.status === 'fulfilled').length
+  const details = updateResults
+    .filter((r) => r.status === 'fulfilled')
+    .map((r) => (r as PromiseFulfilledResult<{ id: number; source: string }>).value)
+
   const [cNull, cEmpty] = await Promise.all([
     sb.from('markets').select('id', { count: 'exact', head: true }).is('image_url', null),
     sb.from('markets').select('id', { count: 'exact', head: true }).eq('image_url', ''),

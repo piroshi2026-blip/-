@@ -2,41 +2,56 @@ import Anthropic from '@anthropic-ai/sdk'
 import type { DraftMarket } from './draftMarket'
 
 const CATEGORY_KEYWORDS: Record<string, string> = {
-  'スポーツ':   'sports competition stadium crowd',
-  '経済・投資': 'stock market finance trading',
-  '政治・思想': 'government politics parliament',
-  'エンタメ':   'entertainment concert stage lights',
-  '自然・科学': 'nature science technology',
-  '旅・生活':   'travel city lifestyle',
-  'こども':     'children school education',
-  '恋愛':       'couple romance',
-  'ゲーム':     'gaming esports controller',
+  'スポーツ':       'sports competition stadium crowd',
+  '経済・投資':     'stock market finance trading',
+  '政治・思想':     'government politics parliament',
+  'エンタメ':       'entertainment concert stage lights',
+  '自然・科学':     'nature science technology',
+  '旅・生活':       'travel city lifestyle',
+  'こども':         'children school education',
+  '恋愛':           'couple romance',
+  'ゲーム':         'gaming esports controller',
   '芸術・デザイン': 'art design creative',
-  'その他':     'news world event',
+  'その他':         'news world event',
 }
 
-/** Claude で問いタイトルから Wikipedia 検索ワードを抽出 */
-async function getWikipediaSearchTerm(title: string): Promise<string | null> {
-  const key = process.env.ANTHROPIC_API_KEY?.trim()
+/** Tavily で検索して画像URLを取得（include_images=true） */
+export async function fetchImageViaSearch(query: string): Promise<string | null> {
+  const key = process.env.TAVILY_API_KEY?.trim()
   if (!key) return null
   try {
-    const client = new Anthropic({ apiKey: key })
-    const msg = await client.messages.create({
-      model: process.env.CLAUDE_DRAFT_MODEL ?? 'claude-haiku-4-5-20251001',
-      max_tokens: 20,
-      system: '日本語の予測市場の問いから、Wikipedia検索に使う固有名詞を1つだけ返す。人物・球団・企業・政党を優先。余分な説明不要。',
-      messages: [{ role: 'user', content: title }],
+    const controller = new AbortController()
+    setTimeout(() => controller.abort(), 5000)
+    const res = await fetch('https://api.tavily.com/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+      body: JSON.stringify({
+        api_key: key,
+        query,
+        search_depth: 'basic',
+        include_answer: false,
+        include_images: true,
+        max_results: 3,
+      }),
     })
-    const tb = msg.content.find((b) => b.type === 'text')
-    const term = tb && 'text' in tb ? (tb as { text: string }).text.trim().slice(0, 50) : ''
-    return term || null
-  } catch {
-    return null
-  }
+    if (!res.ok) return null
+    const data = (await res.json()) as {
+      images?: string[]
+      results?: { url?: string }[]
+    }
+    // images フィールドに直接URLが入っている場合
+    const direct = (data.images ?? []).find((u) => typeof u === 'string' && u.startsWith('http'))
+    if (direct) return direct
+    // フォールバック: 最初の記事URLから OGP 取得
+    const firstUrl = data.results?.[0]?.url
+    if (firstUrl) return fetchOgpImage(firstUrl)
+  } catch { /* fall through */ }
+  return null
 }
 
-/** Wikipedia API で画像URLを取得（日本語 → 英語の順で試す） */
-async function fetchWikipediaImage(searchTerm: string): Promise<string | null> {
+/** Wikipedia API で画像URLを取得 */
+export async function fetchWikipediaImage(searchTerm: string): Promise<string | null> {
   for (const lang of ['ja', 'en']) {
     try {
       const controller = new AbortController()
@@ -92,7 +107,7 @@ async function fetchOgpImage(articleUrl: string): Promise<string | null> {
 }
 
 /**
- * 優先順位: Unsplash API（キーあり）→ 記事OGP → Wikipedia画像 → null
+ * 優先順位: Unsplash API（キーあり）→ 記事OGP（trendLink）→ Tavily 検索画像 → null
  */
 export async function fetchMarketImage(
   draft: Pick<DraftMarket, 'title' | 'category'>,
@@ -113,21 +128,6 @@ export async function fetchMarketImage(
     if (ogp) return ogp
   }
 
-  // Wikipedia（Claude でキーワード抽出 → Wikipedia 画像）
-  if (flavor === 'mlb') {
-    // MLB は選手名を問いから直接抽出して Wikipedia を引く
-    const term = await getWikipediaSearchTerm(draft.title)
-    if (term) {
-      const img = await fetchWikipediaImage(term)
-      if (img) return img
-    }
-  } else {
-    const term = await getWikipediaSearchTerm(draft.title)
-    if (term) {
-      const img = await fetchWikipediaImage(term)
-      if (img) return img
-    }
-  }
-
-  return null
+  // Tavily 検索で関連画像取得
+  return fetchImageViaSearch(draft.title)
 }
