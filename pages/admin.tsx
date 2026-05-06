@@ -35,6 +35,7 @@ export default function Admin() {
     kind: 'mlb' | 'general'
     imageUrl: string | null
     sourceLink?: string | null
+    sourceSnippet?: string | null
     error?: string
   }
   type EditCard = { title: string; options: string[]; endDays: number }
@@ -590,10 +591,29 @@ export default function Admin() {
                 if (!edit) return null
                 return (
                   <div key={idx} style={{ background: '#fff', border: posted ? '2px solid #10b981' : '1px solid #fcd34d', borderRadius: '14px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px', gap: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px', gap: '8px' }}>
                       <span style={{ fontSize: '11px', color: '#9ca3af', flex: 1 }}>📰 {card.headline}</span>
                       <span style={{ fontSize: '11px', background: '#e0f2fe', color: '#0369a1', borderRadius: '20px', padding: '2px 10px', whiteSpace: 'nowrap' }}>{card.draft?.category}</span>
                     </div>
+
+                    {(card.sourceLink || card.sourceSnippet) && (() => {
+                      let domain = ''
+                      try { domain = card.sourceLink ? new URL(card.sourceLink).hostname.replace(/^www\./, '') : '' } catch { domain = (card.sourceLink ?? '').slice(0, 40) }
+                      return (
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'baseline', padding: '5px 10px', background: '#f0f9ff', borderRadius: '7px', fontSize: '11px', color: '#64748b', marginBottom: '10px', lineHeight: 1.5 }}>
+                          {domain && (
+                            <a href={card.sourceLink!} target="_blank" rel="noopener noreferrer" style={{ color: '#0284c7', whiteSpace: 'nowrap', fontWeight: 600, textDecoration: 'none', flexShrink: 0 }}>
+                              🔗 {domain}
+                            </a>
+                          )}
+                          {card.sourceSnippet && (
+                            <span style={{ overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' } as React.CSSProperties}>
+                              {card.sourceSnippet}
+                            </span>
+                          )}
+                        </div>
+                      )
+                    })()}
 
                     <div style={{ marginBottom: '10px' }}>
                       <label style={{ fontSize: '11px', color: '#666', display: 'block', marginBottom: '4px' }}>タイトル（編集可）</label>

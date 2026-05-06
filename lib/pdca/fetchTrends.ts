@@ -35,7 +35,7 @@ const SCIENCE_CULTURE_FEEDS = [
   'https://www.nhk.or.jp/rss/news/cat7.xml',  // NHK スポーツ
 ]
 
-export type TrendItem = { title: string; link?: string; source: string }
+export type TrendItem = { title: string; link?: string; source: string; snippet?: string }
 
 /**
  * 見出しが MLB / 大谷・ドジャース / 大リーグの日本人選手 等かどうか。
@@ -80,7 +80,8 @@ export async function fetchTrendHeadlines(maxItems = 12): Promise<{ items: Trend
         const title = entry.title?.trim()
         if (!title || title.length < 8) continue
         if (BAD_TOPIC_RE.test(title)) continue
-        items.push({ title: title.slice(0, 200), link: entry.link, source: url })
+        const snippet = (entry.contentSnippet || '').trim().slice(0, 200) || undefined
+        items.push({ title: title.slice(0, 200), link: entry.link, source: url, snippet })
         if (items.length >= maxItems * 2) break
       }
     } catch {
@@ -120,7 +121,7 @@ export async function fetchOhtaniDodgersHeadlines(
         const title = entry.title?.trim()
         if (!title || title.length < 6) continue
         if (!MLB_TOPIC_RE.test(title)) continue
-        raw.push({ title: title.slice(0, 200), link: entry.link, source: url })
+        raw.push({ title: title.slice(0, 200), link: entry.link, source: url, snippet: (entry.contentSnippet || '').trim().slice(0, 200) || undefined })
         if (raw.length >= 80) break
       }
     } catch {
@@ -152,7 +153,8 @@ async function fetchFromUrls(urls: string[], maxPerFeed = 6): Promise<{ items: T
         const title = entry.title?.trim()
         if (!title || title.length < 8) continue
         if (BAD_TOPIC_RE.test(title)) continue
-        items.push({ title: title.slice(0, 200), link: entry.link, source: url })
+        const snip = (entry.contentSnippet || '').trim().slice(0, 200) || undefined
+        items.push({ title: title.slice(0, 200), link: entry.link, source: url, snippet: snip })
         if (items.length >= maxPerFeed) break
       }
       return { url, items }
