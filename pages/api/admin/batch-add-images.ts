@@ -4,23 +4,9 @@ import { getServiceSupabase } from '../../../lib/pdca/supabaseAdmin'
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'yosoru_admin'
 
-const CATEGORY_FALLBACK: Record<string, string> = {
-  'スポーツ':       'sports stadium competition athlete',
-  '経済・投資':     'stock market finance economy',
-  '政治・思想':     'government politics parliament',
-  'エンタメ':       'entertainment concert celebrity',
-  '自然・科学':     'nature science technology',
-  '旅・生活':       'travel city lifestyle',
-  'こども':         'children school education',
-  '恋愛':           'couple romance relationship',
-  'ゲーム':         'gaming esports',
-  '芸術・デザイン': 'art design creative',
-  'その他':         'news world event',
-}
-
-/** Claude で各問いタイトルから画像検索用の英語キーワードを一括生成 */
-async function getKeywordsBatch(
-  markets: { id: number; title: string; category: string }[]
+/** Claude で全問の Wikipedia 検索ワードを一括生成 */
+async function getSearchTermsBatch(
+  markets: { id: number; title: string }[]
 ): Promise<Record<number, string>> {
   const result: Record<number, string> = {}
   const key = process.env.ANTHROPIC_API_KEY?.trim()
@@ -28,46 +14,50 @@ async function getKeywordsBatch(
   if (key) {
     try {
       const client = new Anthropic({ apiKey: key })
-      const numbered = markets.map((m, i) => `${i + 1}. ${m.title}`).join('\n')
+      const prompt = markets.map((m, i) => `${i + 1}. ${m.title}`).join('\n')
       const msg = await client.messages.create({
         model: process.env.CLAUDE_DRAFT_MODEL ?? 'claude-haiku-4-5-20251001',
         max_tokens: 400,
         system:
-          '各日本語の予測市場の問いに対して、ストックフォト検索に使う英語キーワードを3〜4語で答えてください。\n番号付きで1行1問。形式: "N. keyword1 keyword2 keyword3"\n余分な説明は不要。',
-        messages: [{ role: 'user', content: numbered }],
+          '各問いから、Wikipedia検索に最適な固有名詞を1つ抽出。人物・球団・企業・政党などを優先。\n番号付きで1行1問。形式: "N. 検索ワード"\n余分な説明不要。',
+        messages: [{ role: 'user', content: prompt }],
       })
       const tb = msg.content.find((b) => b.type === 'text')
       const text = tb && 'text' in tb ? (tb as { text: string }).text : ''
       const lines = text.trim().split('\n')
       for (let i = 0; i < markets.length; i++) {
-        const kw = (lines[i] ?? '').replace(/^\d+\.\s*/, '').trim().slice(0, 80)
-        result[markets[i].id] = kw || (CATEGORY_FALLBACK[markets[i].category] ?? 'news event world')
+        const term = (lines[i] ?? '').replace(/^\d+\.\s*/, '').trim().slice(0, 50)
+        result[markets[i].id] = term || markets[i].title.slice(0, 20)
       }
       return result
-    } catch { /* fall through to category fallback */ }
+    } catch { /* fall through */ }
   }
 
-  for (const m of markets) {
-    result[m.id] = CATEGORY_FALLBACK[m.category] ?? 'news event world'
-  }
+  for (const m of markets) result[m.id] = m.title.slice(0, 20)
   return result
 }
 
-async function fetchImageUrl(marketId: number, keywords: string): Promise<string> {
-  try {
-    const controller = new AbortController()
-    setTimeout(() => controller.abort(), 4000)
-    const res = await fetch(
-      `https://source.unsplash.com/800x400/?${encodeURIComponent(keywords)}`,
-      { redirect: 'follow', signal: controller.signal }
-    )
-    if (res.ok && res.url.includes('images.unsplash.com')) {
-      return res.url
-    }
-  } catch { /* fall through */ }
-
-  // Picsum フォールバック（市場IDシード・確実に動く）
-  return `https://picsum.photos/seed/${marketId}/800/400`
+/** Wikipedia API で画像URLを取得 */
+async function fetchWikipediaImage(searchTerm: string): Promise<string | null> {
+  for (const lang of ['ja', 'en']) {
+    try {
+      const controller = new AbortController()
+      setTimeout(() => controller.abort(), 3000)
+      const url =
+        `https://${lang}.wikipedia.org/w/api.php?action=query` +
+        `&titles=${encodeURIComponent(searchTerm)}` +
+        `&prop=pageimages&format=json&pithumbsize=800&redirects=1`
+      const res = await fetch(url, { signal: controller.signal })
+      if (!res.ok) continue
+      const data = (await res.json()) as {
+        query?: { pages?: Record<string, { thumbnail?: { source: string } }> }
+      }
+      const pages = Object.values(data.query?.pages ?? {})
+      const src = pages[0]?.thumbnail?.source
+      if (src) return src
+    } catch { continue }
+  }
+  return null
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -97,23 +87,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json({ updated: 0, remaining: 0, message: '画像なしの問いはありません' })
   }
 
-  // Claude で全問のキーワードを一括取得
-  const keywordsMap = await getKeywordsBatch(markets)
+  // Claude で検索ワードを一括取得
+  const searchTerms = await getSearchTermsBatch(markets)
 
-  // 画像URLを並列取得 → Supabase 更新
+  // Wikipedia 画像を並列取得 → Supabase 更新
   const results = await Promise.allSettled(
     markets.map(async (m) => {
-      const keywords = keywordsMap[m.id]
-      const imageUrl = await fetchImageUrl(m.id, keywords)
+      const term = searchTerms[m.id]
+      const wikiImage = await fetchWikipediaImage(term)
+      const imageUrl = wikiImage ?? `https://picsum.photos/seed/${m.id}/800/400`
       await sb.from('markets').update({ image_url: imageUrl }).eq('id', m.id)
-      return { id: m.id, title: m.title, keywords, imageUrl }
+      return { id: m.id, term, imageUrl, source: wikiImage ? 'wikipedia' : 'picsum' }
     })
   )
 
   const updated = results.filter((r) => r.status === 'fulfilled').length
-  const errors = results
-    .filter((r) => r.status === 'rejected')
-    .map((r) => (r as PromiseRejectedResult).reason?.message ?? 'error')
+  const details = results
+    .filter((r) => r.status === 'fulfilled')
+    .map((r) => (r as PromiseFulfilledResult<{ id: number; term: string; source: string }>).value)
 
   // 残り件数
   const [cNull, cEmpty] = await Promise.all([
@@ -122,5 +113,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   ])
   const remaining = (cNull.count ?? 0) + (cEmpty.count ?? 0)
 
-  return res.status(200).json({ updated, errors, remaining })
+  return res.status(200).json({ updated, remaining, details })
 }

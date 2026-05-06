@@ -4,37 +4,47 @@ import { getServiceSupabase } from '../../../lib/pdca/supabaseAdmin'
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'yosoru_admin'
 
-const CATEGORY_FALLBACK: Record<string, string> = {
-  'スポーツ':       'sports stadium competition athlete',
-  '経済・投資':     'stock market finance economy',
-  '政治・思想':     'government politics parliament',
-  'エンタメ':       'entertainment concert celebrity',
-  '自然・科学':     'nature science technology',
-  '旅・生活':       'travel city lifestyle',
-  'こども':         'children school education',
-  '恋愛':           'couple romance relationship',
-  'ゲーム':         'gaming esports',
-  '芸術・デザイン': 'art design creative',
-  'その他':         'news world event',
+/** Claude で問いタイトルから Wikipedia 検索ワードを1つ抽出 */
+async function getSearchTerm(title: string): Promise<string> {
+  const key = process.env.ANTHROPIC_API_KEY?.trim()
+  if (!key) return title.slice(0, 20)
+  try {
+    const client = new Anthropic({ apiKey: key })
+    const msg = await client.messages.create({
+      model: process.env.CLAUDE_DRAFT_MODEL ?? 'claude-haiku-4-5-20251001',
+      max_tokens: 20,
+      system: '日本語の予測市場の問いから、Wikipedia検索に使う固有名詞を1つだけ返してください。人物・球団・企業・政党などを優先。余分な説明は不要。\n例: 「大谷翔平は今季65本塁打を超えるか？」→ 大谷翔平\n例: 「次の参院選で自民党が過半数割れするか？」→ 自民党',
+      messages: [{ role: 'user', content: title }],
+    })
+    const tb = msg.content.find((b) => b.type === 'text')
+    const term = tb && 'text' in tb ? (tb as { text: string }).text.trim().slice(0, 50) : ''
+    return term || title.slice(0, 20)
+  } catch {
+    return title.slice(0, 20)
+  }
 }
 
-async function getKeywords(title: string, category: string): Promise<string> {
-  const key = process.env.ANTHROPIC_API_KEY?.trim()
-  if (key) {
+/** Wikipedia API で画像URLを取得（日本語 → 英語の順で試す） */
+async function fetchWikipediaImage(searchTerm: string): Promise<string | null> {
+  for (const lang of ['ja', 'en']) {
     try {
-      const client = new Anthropic({ apiKey: key })
-      const msg = await client.messages.create({
-        model: process.env.CLAUDE_DRAFT_MODEL ?? 'claude-haiku-4-5-20251001',
-        max_tokens: 25,
-        system: 'Output 3-4 English keywords for a stock photo search based on the Japanese text. Keywords only, space-separated, no punctuation.',
-        messages: [{ role: 'user', content: title }],
-      })
-      const tb = msg.content.find((b) => b.type === 'text')
-      const kw = tb && 'text' in tb ? (tb as { text: string }).text.trim().slice(0, 80) : ''
-      if (kw) return kw
-    } catch { /* fall through */ }
+      const controller = new AbortController()
+      setTimeout(() => controller.abort(), 3000)
+      const url =
+        `https://${lang}.wikipedia.org/w/api.php?action=query` +
+        `&titles=${encodeURIComponent(searchTerm)}` +
+        `&prop=pageimages&format=json&pithumbsize=800&redirects=1`
+      const res = await fetch(url, { signal: controller.signal })
+      if (!res.ok) continue
+      const data = (await res.json()) as {
+        query?: { pages?: Record<string, { thumbnail?: { source: string } }> }
+      }
+      const pages = Object.values(data.query?.pages ?? {})
+      const src = pages[0]?.thumbnail?.source
+      if (src) return src
+    } catch { continue }
   }
-  return CATEGORY_FALLBACK[category] ?? 'news world event'
+  return null
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -60,11 +70,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(404).json({ error: `問いが見つかりません: ${fetchError?.message ?? ''}` })
   }
 
-  // Claude でキーワード生成（失敗してもカテゴリフォールバック）
-  const keywords = await getKeywords(market.title, market.category)
-
-  // Picsum（確実に動く・marketId ベースのシードで一貫した画像）
-  const imageUrl = `https://picsum.photos/seed/${market.id}/800/400`
+  const searchTerm = await getSearchTerm(market.title)
+  const wikiImage = await fetchWikipediaImage(searchTerm)
+  const imageUrl = wikiImage ?? `https://picsum.photos/seed/${market.id}/800/400`
 
   const { error: updateError } = await sb
     .from('markets')
@@ -75,5 +83,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: `DB更新失敗: ${updateError.message}` })
   }
 
-  return res.status(200).json({ imageUrl, keywords })
+  return res.status(200).json({ imageUrl, searchTerm, source: wikiImage ? 'wikipedia' : 'picsum' })
 }
