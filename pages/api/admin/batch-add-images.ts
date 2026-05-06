@@ -1,36 +1,62 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
+import Anthropic from '@anthropic-ai/sdk'
 import { getServiceSupabase } from '../../../lib/pdca/supabaseAdmin'
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'yosoru_admin'
 
-const CATEGORY_KEYWORDS: Record<string, string> = {
+const CATEGORY_FALLBACK: Record<string, string> = {
   'スポーツ':       'sports stadium competition athlete',
   '経済・投資':     'stock market finance economy',
   '政治・思想':     'government politics parliament',
-  'エンタメ':       'entertainment concert celebrity stage',
+  'エンタメ':       'entertainment concert celebrity',
   '自然・科学':     'nature science technology',
   '旅・生活':       'travel city lifestyle',
   'こども':         'children school education',
   '恋愛':           'couple romance relationship',
-  'ゲーム':         'gaming esports video game',
+  'ゲーム':         'gaming esports',
   '芸術・デザイン': 'art design creative',
   'その他':         'news world event',
 }
 
-const MLB_RE = /大谷|ドジャー|村上|鈴木誠也|今永|佐々木朗希|千賀|MLB|メジャー|本塁打|投手|打者|baseball/i
+/** Claude で各問いタイトルから画像検索用の英語キーワードを一括生成 */
+async function getKeywordsBatch(
+  markets: { id: number; title: string; category: string }[]
+): Promise<Record<number, string>> {
+  const result: Record<number, string> = {}
+  const key = process.env.ANTHROPIC_API_KEY?.trim()
 
-function getKeywords(title: string, category: string): string {
-  if (MLB_RE.test(title)) return 'baseball stadium MLB player action'
-  return CATEGORY_KEYWORDS[category] ?? 'news world event'
+  if (key) {
+    try {
+      const client = new Anthropic({ apiKey: key })
+      const numbered = markets.map((m, i) => `${i + 1}. ${m.title}`).join('\n')
+      const msg = await client.messages.create({
+        model: process.env.CLAUDE_DRAFT_MODEL ?? 'claude-haiku-4-5-20251001',
+        max_tokens: 400,
+        system:
+          '各日本語の予測市場の問いに対して、ストックフォト検索に使う英語キーワードを3〜4語で答えてください。\n番号付きで1行1問。形式: "N. keyword1 keyword2 keyword3"\n余分な説明は不要。',
+        messages: [{ role: 'user', content: numbered }],
+      })
+      const tb = msg.content.find((b) => b.type === 'text')
+      const text = tb && 'text' in tb ? (tb as { text: string }).text : ''
+      const lines = text.trim().split('\n')
+      for (let i = 0; i < markets.length; i++) {
+        const kw = (lines[i] ?? '').replace(/^\d+\.\s*/, '').trim().slice(0, 80)
+        result[markets[i].id] = kw || (CATEGORY_FALLBACK[markets[i].category] ?? 'news event world')
+      }
+      return result
+    } catch { /* fall through to category fallback */ }
+  }
+
+  for (const m of markets) {
+    result[m.id] = CATEGORY_FALLBACK[m.category] ?? 'news event world'
+  }
+  return result
 }
 
-async function fetchImageUrl(marketId: number, title: string, category: string): Promise<string> {
-  const keywords = getKeywords(title, category)
-
-  // Unsplash Source（APIキー不要・リダイレクト先の実画像URLを取得）
+async function fetchImageUrl(marketId: number, keywords: string): Promise<string> {
   try {
     const controller = new AbortController()
-    setTimeout(() => controller.abort(), 3500)
+    setTimeout(() => controller.abort(), 4000)
     const res = await fetch(
       `https://source.unsplash.com/800x400/?${encodeURIComponent(keywords)}`,
       { redirect: 'follow', signal: controller.signal }
@@ -40,7 +66,7 @@ async function fetchImageUrl(marketId: number, title: string, category: string):
     }
   } catch { /* fall through */ }
 
-  // フォールバック: Picsum（ID をシードにした一貫した写真）
+  // Picsum フォールバック（市場IDシード・確実に動く）
   return `https://picsum.photos/seed/${marketId}/800/400`
 }
 
@@ -71,12 +97,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json({ updated: 0, remaining: 0, message: '画像なしの問いはありません' })
   }
 
-  // 20件を並列処理
+  // Claude で全問のキーワードを一括取得
+  const keywordsMap = await getKeywordsBatch(markets)
+
+  // 画像URLを並列取得 → Supabase 更新
   const results = await Promise.allSettled(
     markets.map(async (m) => {
-      const imageUrl = await fetchImageUrl(m.id, m.title, m.category)
+      const keywords = keywordsMap[m.id]
+      const imageUrl = await fetchImageUrl(m.id, keywords)
       await sb.from('markets').update({ image_url: imageUrl }).eq('id', m.id)
-      return { id: m.id, imageUrl }
+      return { id: m.id, title: m.title, keywords, imageUrl }
     })
   )
 
@@ -85,12 +115,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     .filter((r) => r.status === 'rejected')
     .map((r) => (r as PromiseRejectedResult).reason?.message ?? 'error')
 
-  // まだ残っているか確認（NULL + 空文字の合計）
+  // 残り件数
   const [cNull, cEmpty] = await Promise.all([
     sb.from('markets').select('id', { count: 'exact', head: true }).is('image_url', null),
     sb.from('markets').select('id', { count: 'exact', head: true }).eq('image_url', ''),
   ])
-  const count = (cNull.count ?? 0) + (cEmpty.count ?? 0)
+  const remaining = (cNull.count ?? 0) + (cEmpty.count ?? 0)
 
-  return res.status(200).json({ updated, errors, remaining: count })
+  return res.status(200).json({ updated, errors, remaining })
 }

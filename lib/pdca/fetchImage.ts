@@ -1,3 +1,4 @@
+import Anthropic from '@anthropic-ai/sdk'
 import type { DraftMarket } from './draftMarket'
 
 const CATEGORY_KEYWORDS: Record<string, string> = {
@@ -21,27 +22,19 @@ async function resolveKeywords(
 ): Promise<string> {
   if (flavor === 'mlb') return 'baseball MLB stadium action player'
 
-  const key = process.env.OPENAI_API_KEY?.trim()
-  if (key) {
+  const claudeKey = process.env.ANTHROPIC_API_KEY?.trim()
+  if (claudeKey) {
     try {
-      const res = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-          temperature: 0.2,
-          max_tokens: 20,
-          messages: [{
-            role: 'user',
-            content: `Prediction market question (Japanese): "${title}"\nRespond with 3 English keywords for a stock photo search. Keywords only, space-separated.`,
-          }],
-        }),
+      const client = new Anthropic({ apiKey: claudeKey })
+      const msg = await client.messages.create({
+        model: process.env.CLAUDE_DRAFT_MODEL ?? 'claude-haiku-4-5-20251001',
+        max_tokens: 25,
+        system: 'Output 3-4 English keywords for a stock photo search based on the Japanese text. Keywords only, space-separated, no punctuation.',
+        messages: [{ role: 'user', content: title }],
       })
-      if (res.ok) {
-        const data = await res.json() as { choices?: { message?: { content?: string } }[] }
-        const kw = data.choices?.[0]?.message?.content?.trim().slice(0, 80)
-        if (kw) return kw
-      }
+      const tb = msg.content.find((b) => b.type === 'text')
+      const kw = tb && 'text' in tb ? (tb as { text: string }).text.trim().slice(0, 80) : ''
+      if (kw) return kw
     } catch { /* fall through */ }
   }
 
@@ -86,25 +79,41 @@ async function fetchOgpImage(articleUrl: string): Promise<string | null> {
   }
 }
 
+async function fetchUnsplashSource(keywords: string): Promise<string | null> {
+  try {
+    const controller = new AbortController()
+    setTimeout(() => controller.abort(), 3000)
+    const res = await fetch(
+      `https://source.unsplash.com/800x400/?${encodeURIComponent(keywords)}`,
+      { redirect: 'follow', signal: controller.signal }
+    )
+    if (res.ok && res.url.includes('images.unsplash.com')) return res.url
+  } catch { /* fall through */ }
+  return null
+}
+
 /**
  * 問いの内容を表す画像URLを取得する。
- * 優先順位: Unsplash（UNSPLASH_ACCESS_KEY 必須）→ 記事OGP → null
+ * 優先順位: Unsplash API（キーあり時）→ 記事OGP → Unsplash Source（キー不要）→ null
  */
 export async function fetchMarketImage(
   draft: Pick<DraftMarket, 'title' | 'category'>,
   flavor: 'mlb' | 'general',
   trendLink?: string
 ): Promise<string | null> {
+  const keywords = await resolveKeywords(draft.title, draft.category, flavor)
+
   const unsplashKey = process.env.UNSPLASH_ACCESS_KEY?.trim()
   if (unsplashKey) {
-    const keywords = await resolveKeywords(draft.title, draft.category, flavor)
     const url = await searchUnsplash(keywords, unsplashKey)
     if (url) return url
   }
 
   if (trendLink) {
-    return fetchOgpImage(trendLink)
+    const ogp = await fetchOgpImage(trendLink)
+    if (ogp) return ogp
   }
 
-  return null
+  // Unsplash Source（APIキー不要）
+  return fetchUnsplashSource(keywords)
 }
