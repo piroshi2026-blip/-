@@ -241,6 +241,7 @@ export default function Admin() {
 
   const [batchImageLoading, setBatchImageLoading] = useState(false)
   const [batchImageResult, setBatchImageResult] = useState<unknown>(null)
+  const [refreshImageLoading, setRefreshImageLoading] = useState(false)
 
   async function handleBatchAddImages() {
     if (!confirm('画像なしの問いに自動で画像を追加します（最大20件ずつ）。続けますか？')) return
@@ -441,12 +442,23 @@ export default function Admin() {
 
                   <label style={{fontSize:'11px', color:'#666'}}>画像</label>
                   {editForm.image_url && <img src={editForm.image_url} alt="" style={{width:'100%', maxHeight:'120px', objectFit:'cover', borderRadius:'6px', marginBottom:'8px'}} />}
-                  <button type="button" onClick={async () => {
-                    const res = await fetch('/api/admin/refresh-image', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ adminPassword: ADMIN_PASSWORD, marketId: editingId }) })
-                    const data = await res.json()
-                    if (data.imageUrl) setEditForm((f: any) => ({ ...f, image_url: data.imageUrl }))
-                  }} style={{...s.btn, background:'#0891b2', padding:'8px 14px', fontSize:'12px', marginBottom:'8px', width:'100%'}}>
-                    🔄 AIで画像を再取得
+                  <button type="button" disabled={refreshImageLoading} onClick={async () => {
+                    setRefreshImageLoading(true)
+                    try {
+                      const res = await fetch('/api/admin/refresh-image', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ adminPassword: ADMIN_PASSWORD, marketId: editingId }) })
+                      const data = await res.json()
+                      if (data.imageUrl) {
+                        setEditForm((f: any) => ({ ...f, image_url: data.imageUrl }))
+                        alert(`画像を取得しました（キーワード: ${data.keywords}）\n「更新内容を保存」で確定してください。`)
+                      } else {
+                        alert('画像取得失敗: ' + (data.error ?? JSON.stringify(data)))
+                      }
+                    } catch (e) {
+                      alert('通信エラー: ' + (e instanceof Error ? e.message : String(e)))
+                    }
+                    setRefreshImageLoading(false)
+                  }} style={{...s.btn, background: refreshImageLoading ? '#9ca3af' : '#0891b2', padding:'8px 14px', fontSize:'12px', marginBottom:'8px', width:'100%'}}>
+                    {refreshImageLoading ? 'AI処理中…（数秒かかります）' : '🔄 AIで画像を再取得'}
                   </button>
                   <div style={{marginBottom:'10px'}}><label style={{fontSize:'12px', color:'#666'}}>または画像ファイルをアップロード</label><br/><input type="file" onChange={e => uploadImage(e, true)} /></div>
 
