@@ -37,19 +37,6 @@ async function getKeywords(title: string, category: string): Promise<string> {
   return CATEGORY_FALLBACK[category] ?? 'news world event'
 }
 
-async function fetchUnsplashImage(keywords: string): Promise<string | null> {
-  try {
-    const controller = new AbortController()
-    setTimeout(() => controller.abort(), 4000)
-    const res = await fetch(
-      `https://source.unsplash.com/800x400/?${encodeURIComponent(keywords)}`,
-      { redirect: 'follow', signal: controller.signal }
-    )
-    if (res.ok && res.url.includes('images.unsplash.com')) return res.url
-  } catch { /* fall through */ }
-  return null
-}
-
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST')
@@ -63,18 +50,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!marketId) return res.status(400).json({ error: 'marketId が必要です' })
 
   const sb = getServiceSupabase()
-  const { data: market } = await sb
+  const { data: market, error: fetchError } = await sb
     .from('markets')
     .select('id, title, category')
     .eq('id', marketId)
     .single()
 
-  if (!market) return res.status(404).json({ error: '問いが見つかりません' })
+  if (fetchError || !market) {
+    return res.status(404).json({ error: `問いが見つかりません: ${fetchError?.message ?? ''}` })
+  }
 
+  // Claude でキーワード生成（失敗してもカテゴリフォールバック）
   const keywords = await getKeywords(market.title, market.category)
-  const imageUrl = (await fetchUnsplashImage(keywords)) ?? `https://picsum.photos/seed/${market.id}/800/400`
 
-  await sb.from('markets').update({ image_url: imageUrl }).eq('id', market.id)
+  // Picsum（確実に動く・marketId ベースのシードで一貫した画像）
+  const imageUrl = `https://picsum.photos/seed/${market.id}/800/400`
+
+  const { error: updateError } = await sb
+    .from('markets')
+    .update({ image_url: imageUrl })
+    .eq('id', market.id)
+
+  if (updateError) {
+    return res.status(500).json({ error: `DB更新失敗: ${updateError.message}` })
+  }
 
   return res.status(200).json({ imageUrl, keywords })
 }

@@ -449,7 +449,8 @@ export default function Admin() {
                       const data = await res.json()
                       if (data.imageUrl) {
                         setEditForm((f: any) => ({ ...f, image_url: data.imageUrl }))
-                        alert(`画像を取得しました（キーワード: ${data.keywords}）\n「更新内容を保存」で確定してください。`)
+                        await fetchData()
+                        alert(`画像を更新しました！\nキーワード: ${data.keywords}\nURL: ${data.imageUrl}`)
                       } else {
                         alert('画像取得失敗: ' + (data.error ?? JSON.stringify(data)))
                       }
