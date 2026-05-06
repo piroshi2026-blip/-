@@ -439,9 +439,15 @@ export default function Admin() {
                   <label style={{fontSize:'11px', color:'#666'}}>締切日時修正</label>
                   <input type="datetime-local" value={editForm.end_date} onChange={e => setEditForm({...editForm, end_date: e.target.value})} style={s.inp} />
 
-                  <label style={{fontSize:'11px', color:'#666'}}>画像URL（直接入力 or ファイルアップロード）</label>
-                  <input placeholder="https://..." value={editForm.image_url ?? ''} onChange={e => setEditForm({...editForm, image_url: e.target.value})} style={s.inp} />
+                  <label style={{fontSize:'11px', color:'#666'}}>画像</label>
                   {editForm.image_url && <img src={editForm.image_url} alt="" style={{width:'100%', maxHeight:'120px', objectFit:'cover', borderRadius:'6px', marginBottom:'8px'}} />}
+                  <button type="button" onClick={async () => {
+                    const res = await fetch('/api/admin/refresh-image', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ adminPassword: ADMIN_PASSWORD, marketId: editingId }) })
+                    const data = await res.json()
+                    if (data.imageUrl) setEditForm((f: any) => ({ ...f, image_url: data.imageUrl }))
+                  }} style={{...s.btn, background:'#0891b2', padding:'8px 14px', fontSize:'12px', marginBottom:'8px', width:'100%'}}>
+                    🔄 AIで画像を再取得
+                  </button>
                   <div style={{marginBottom:'10px'}}><label style={{fontSize:'12px', color:'#666'}}>または画像ファイルをアップロード</label><br/><input type="file" onChange={e => uploadImage(e, true)} /></div>
 
                   <label style={{fontSize:'11px', color:'#666'}}>選択肢名の修正</label>
