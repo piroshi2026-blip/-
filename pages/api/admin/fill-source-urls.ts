@@ -54,10 +54,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const sb = getServiceSupabase()
 
+  // NULL（未処理）または ''（前回検索で未発見）の両方を対象にする
   const { data: markets, error } = await sb
     .from('markets')
     .select('id, title')
-    .is('source_url', null)
+    .or('source_url.is.null,source_url.eq.')
     .order('created_at', { ascending: false })
     .limit(Math.min(50, Number(limit) || 30))
 
@@ -66,7 +67,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json({ updated: 0, remaining: 0 })
   }
 
-  // 並列で記事 URL を検索・更新（見つからない場合も '' でマークして次回対象から除外）
+  // 並列で記事 URL を検索・更新（見つからない場合も '' で保存）
   const results = await Promise.allSettled(
     markets.map(async (m) => {
       const url = await findArticleUrl(m.title)
@@ -82,7 +83,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const { count } = await sb
     .from('markets')
     .select('id', { count: 'exact', head: true })
-    .is('source_url', null)
+    .or('source_url.is.null,source_url.eq.')
 
   return res.status(200).json({ updated, remaining: count ?? 0 })
 }
