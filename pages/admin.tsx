@@ -306,6 +306,8 @@ export default function Admin() {
   const [batchImageLoading, setBatchImageLoading] = useState(false)
   const [batchImageResult, setBatchImageResult] = useState<unknown>(null)
   const [refreshImageLoading, setRefreshImageLoading] = useState(false)
+  const [fillUrlLoading, setFillUrlLoading] = useState(false)
+  const [fillUrlResult, setFillUrlResult] = useState<{ updated: number; remaining: number } | null>(null)
 
   async function handleBatchAddImages() {
     if (!confirm('画像なしの問いに自動で画像を追加します（最大20件ずつ）。続けますか？')) return
@@ -329,6 +331,30 @@ export default function Admin() {
       setBatchImageResult({ error: e instanceof Error ? e.message : String(e) })
     }
     setBatchImageLoading(false)
+  }
+
+  async function handleFillSourceUrls() {
+    if (!confirm('参考URLがない問いに Tavily で自動補完します（15件ずつ）。続けますか？')) return
+    setFillUrlLoading(true)
+    setFillUrlResult(null)
+    try {
+      const res = await fetch('/api/admin/fill-source-urls', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminPassword: ADMIN_PASSWORD }),
+      })
+      const data = await res.json()
+      setFillUrlResult(data)
+      if ((data.remaining ?? 0) > 0) {
+        alert(`${data.updated}件補完。残り${data.remaining}件。もう一度押してください。`)
+      } else {
+        alert(`完了：${data.updated}件補完しました。`)
+      }
+      fetchData()
+    } catch (e) {
+      alert('エラー: ' + (e instanceof Error ? e.message : String(e)))
+    }
+    setFillUrlLoading(false)
   }
 
   async function handleUpdateConfig() { await supabase.from('site_config').update(siteConfig).eq('id', siteConfig.id); alert('保存完了'); }
@@ -463,10 +489,18 @@ export default function Admin() {
             >
               {batchImageLoading ? '処理中…' : '🖼 画像なし問いに一括追加（20件ずつ）'}
             </button>
+            <button
+              onClick={handleFillSourceUrls}
+              disabled={fillUrlLoading}
+              style={{ ...s.btn, background: fillUrlLoading ? '#9ca3af' : '#7c3aed', padding: '8px 16px', fontSize: '13px' }}
+            >
+              {fillUrlLoading ? '検索中…' : '🔗 参考URL一括補完（15件ずつ）'}
+            </button>
             {batchImageResult != null && (
-              <span style={{ fontSize: '12px', color: '#64748b' }}>
-                {JSON.stringify(batchImageResult)}
-              </span>
+              <span style={{ fontSize: '12px', color: '#64748b' }}>{JSON.stringify(batchImageResult)}</span>
+            )}
+            {fillUrlResult != null && (
+              <span style={{ fontSize: '12px', color: '#64748b' }}>参考URL: {fillUrlResult.updated}件補完、残り{fillUrlResult.remaining}件</span>
             )}
           </div>
 
@@ -513,7 +547,17 @@ export default function Admin() {
                   <textarea value={editForm.description} onChange={e => setEditForm({...editForm, description: e.target.value})} style={{...s.inp, height:'60px'}} />
 
                   <label style={{fontSize:'11px', color:'#666'}}>参考記事 URL</label>
-                  <input value={editForm.source_url ?? ''} onChange={e => setEditForm({...editForm, source_url: e.target.value})} placeholder="https://..." style={s.inp} />
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '10px' }}>
+                    <input value={editForm.source_url ?? ''} onChange={e => setEditForm({...editForm, source_url: e.target.value})} placeholder="https://..." style={{ ...s.inp, marginBottom: 0, flex: 1 }} />
+                    <a
+                      href={`https://news.google.com/search?q=${encodeURIComponent(editForm.title ?? '')}&hl=ja`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ ...s.btn, background: '#1a73e8', padding: '8px 12px', fontSize: '12px', textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}
+                    >
+                      🔍 記事を探す
+                    </a>
+                  </div>
 
                   <label style={{fontSize:'11px', color:'#666'}}>カテゴリ</label>
                   <select value={editForm.category} onChange={e => setEditForm({...editForm, category: e.target.value})} style={s.inp}>
