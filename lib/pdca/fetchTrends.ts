@@ -199,7 +199,7 @@ export async function fetchTavilyTopicItems(queries: string[], maxPerQuery = 3):
   const results = await Promise.allSettled(
     queries.map(async (query) => {
       const controller = new AbortController()
-      const timer = setTimeout(() => controller.abort(), 8000)
+      const timer = setTimeout(() => controller.abort(), 4000)
       try {
         const res = await fetch('https://api.tavily.com/search', {
           method: 'POST',

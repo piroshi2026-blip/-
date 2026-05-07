@@ -60,6 +60,7 @@ export default function Admin() {
   const handleLogin = () => {
     if (passInput === ADMIN_PASSWORD) {
       setIsAuthenticated(true)
+      setPdcaPassword(passInput)
       localStorage.setItem('yosoru_admin_auth', 'true')
     } else { alert('パスワードが違います') }
   }
@@ -248,6 +249,7 @@ export default function Admin() {
   }
 
   async function handleGacha() {
+    if (!pdcaPassword) { alert('管理パスワードを入力してください'); return }
     setGachaLoading(true)
     setGachaCards([])
     setGachaEdits([])
@@ -256,16 +258,25 @@ export default function Admin() {
       const res = await fetch('/api/admin/generate-drafts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adminPassword: pdcaPassword, count: 10, hint: gachaHint }),
+        body: JSON.stringify({ adminPassword: pdcaPassword, count: 5, hint: gachaHint }),
       })
       const data = await res.json()
+      if (!res.ok) {
+        setGachaCards([{ draft: { title: '', description: '', category: '', options: [], endDays: 7 }, headline: '', kind: 'general', imageUrl: null, error: data.error ?? `エラー (${res.status})` }])
+        setGachaLoading(false)
+        return
+      }
       const cards: any[] = data.candidates || []
-      setGachaCards(cards)
-      setGachaEdits(cards.map((c: any) => ({
-        title: c.draft?.title ?? '',
-        options: c.draft?.options ?? ['', '', ''],
-        endDays: c.draft?.endDays ?? 7,
-      })))
+      if (cards.length === 0) {
+        setGachaCards([{ draft: { title: '', description: '', category: '', options: [], endDays: 7 }, headline: '', kind: 'general', imageUrl: null, error: '候補が生成されませんでした。APIキーやパスワードを確認してください。' }])
+      } else {
+        setGachaCards(cards)
+        setGachaEdits(cards.map((c: any) => ({
+          title: c.draft?.title ?? '',
+          options: c.draft?.options ?? ['', '', ''],
+          endDays: c.draft?.endDays ?? 7,
+        })))
+      }
     } catch (e) {
       setGachaCards([{ draft: { title: '', description: '', category: '', options: [], endDays: 7 }, headline: '', kind: 'general', imageUrl: null, error: e instanceof Error ? e.message : String(e) }])
     }

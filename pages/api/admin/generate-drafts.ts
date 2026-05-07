@@ -3,6 +3,8 @@ import Anthropic from '@anthropic-ai/sdk'
 import { generateDraftCandidate, preloadDraftData } from '../../../lib/pdca/generateDraft'
 import { formatWorldContextForPrompt } from '../../../lib/pdca/fetchContext'
 
+export const maxDuration = 60
+
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'yosoru_admin'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
