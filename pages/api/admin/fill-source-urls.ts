@@ -8,14 +8,28 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'yosoru_admin'
 const rssParser = new Parser({ timeout: 6000 })
 
 async function findArticleUrl(title: string): Promise<string | null> {
-  // 1. Google ニュース RSS（APIキー不要）
+  // 句読点・疑問符を除いた短縮クエリ（30文字以内）
+  const short = title.replace(/[？?。、「」【】『』〈〉]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 30).trim()
+
+  // 1a. フルタイトルで Google ニュース RSS（JP ロケール）
   try {
-    const q = encodeURIComponent(title)
-    const feedUrl = `https://news.google.com/rss/search?q=${q}&hl=ja&gl=JP&ceid=JP:ja`
-    const feed = await rssParser.parseURL(feedUrl)
+    const feed = await rssParser.parseURL(
+      `https://news.google.com/rss/search?q=${encodeURIComponent(title)}&hl=ja&gl=JP&ceid=JP:ja`
+    )
     const link = feed.items?.[0]?.link
     if (link) return link
   } catch { /* fallthrough */ }
+
+  // 1b. 短縮クエリで Google ニュース RSS（JP ロケール）
+  if (short && short !== title) {
+    try {
+      const feed = await rssParser.parseURL(
+        `https://news.google.com/rss/search?q=${encodeURIComponent(short)}&hl=ja&gl=JP&ceid=JP:ja`
+      )
+      const link = feed.items?.[0]?.link
+      if (link) return link
+    } catch { /* fallthrough */ }
+  }
 
   // 2. Tavily（キーがある場合のみ）
   const tavilyKey = process.env.TAVILY_API_KEY?.trim()
@@ -26,7 +40,7 @@ async function findArticleUrl(title: string): Promise<string | null> {
       const res = await fetch('https://api.tavily.com/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ api_key: tavilyKey, query: `${title} ニュース`, search_depth: 'basic', max_results: 3 }),
+        body: JSON.stringify({ api_key: tavilyKey, query: `${short || title} ニュース`, search_depth: 'basic', max_results: 3 }),
         signal: controller.signal,
       })
       clearTimeout(timer)

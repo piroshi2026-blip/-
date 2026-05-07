@@ -542,7 +542,13 @@ export default function Admin() {
               <span style={{ fontSize: '12px', color: '#64748b' }}>{JSON.stringify(batchImageResult)}</span>
             )}
             {fillUrlResult != null && (
-              <span style={{ fontSize: '12px', color: '#64748b' }}>参考URL: {fillUrlResult.updated}件補完、残り{fillUrlResult.remaining}件</span>
+              <span style={{ fontSize: '12px', color: '#64748b' }}>参考URL: {fillUrlResult.updated}件補完、残り{fillUrlResult.remaining}件
+                {fillUrlResult.updated === 0 && fillUrlResult.remaining > 0 && (
+                  <span style={{ color: '#b45309', marginLeft: '6px' }}>
+                    ※自動検索で記事が見つかりません。Vercel環境変数に <code>TAVILY_API_KEY</code> を追加すると改善する場合があります。残りは手動入力してください。
+                  </span>
+                )}
+              </span>
             )}
           </div>
 
