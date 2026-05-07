@@ -68,11 +68,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const sb = getServiceSupabase()
 
-  // NULL（未処理）または ''（前回検索で未発見）の両方を対象にする
+  // NULL（未処理）のみ対象。''（試したが見つからず）は手動補完待ちとして除外
   const { data: markets, error } = await sb
     .from('markets')
     .select('id, title')
-    .or('source_url.is.null,source_url.eq.')
+    .is('source_url', null)
     .order('created_at', { ascending: false })
     .limit(Math.min(50, Number(limit) || 30))
 
@@ -97,7 +97,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const { count } = await sb
     .from('markets')
     .select('id', { count: 'exact', head: true })
-    .or('source_url.is.null,source_url.eq.')
+    .is('source_url', null)
 
   return res.status(200).json({ updated, remaining: count ?? 0 })
 }
