@@ -59,7 +59,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     .select('id, title')
     .is('source_url', null)
     .order('created_at', { ascending: false })
-    .limit(Math.min(20, Number(limit) || 15))
+    .limit(Math.min(50, Number(limit) || 30))
 
   if (error) return res.status(500).json({ error: error.message })
   if (!markets || markets.length === 0) {

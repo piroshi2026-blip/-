@@ -91,6 +91,11 @@ export default function Admin() {
 
   useEffect(() => { fetchData() }, [fetchData])
 
+  useEffect(() => {
+    setUrlCandidates([])
+    setUrlCandidateIndex(0)
+  }, [editingId])
+
   const displayedMarkets = useMemo(() => {
     let list = markets
     if (marketCategoryFilter) {
@@ -309,6 +314,8 @@ export default function Admin() {
   const [fillUrlLoading, setFillUrlLoading] = useState(false)
   const [fillUrlResult, setFillUrlResult] = useState<{ updated: number; remaining: number } | null>(null)
   const [findSingleUrlLoading, setFindSingleUrlLoading] = useState(false)
+  const [urlCandidates, setUrlCandidates] = useState<string[]>([])
+  const [urlCandidateIndex, setUrlCandidateIndex] = useState(0)
 
   async function handleBatchAddImages() {
     if (!confirm('画像なしの問いに自動で画像を追加します（最大20件ずつ）。続けますか？')) return
@@ -335,17 +342,30 @@ export default function Admin() {
   }
 
   async function handleFindSingleUrl() {
-    if (!editingId || !editForm.title) return
+    if (!editForm.title) return
+
+    // 候補が既にある場合は次の候補に切り替え
+    if (urlCandidates.length > 0) {
+      const next = (urlCandidateIndex + 1) % urlCandidates.length
+      setUrlCandidateIndex(next)
+      setEditForm((f: any) => ({ ...f, source_url: urlCandidates[next] }))
+      return
+    }
+
+    // 初回: API を呼んで候補リストを取得
     setFindSingleUrlLoading(true)
     try {
       const res = await fetch('/api/admin/find-source-url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adminPassword: ADMIN_PASSWORD, marketId: editingId, title: editForm.title }),
+        body: JSON.stringify({ adminPassword: ADMIN_PASSWORD, title: editForm.title }),
       })
       const data = await res.json()
-      if (data.url) {
-        setEditForm((f: any) => ({ ...f, source_url: data.url }))
+      const urls: string[] = data.urls ?? []
+      if (urls.length > 0) {
+        setUrlCandidates(urls)
+        setUrlCandidateIndex(0)
+        setEditForm((f: any) => ({ ...f, source_url: urls[0] }))
       } else {
         alert('記事が見つかりませんでした。手動で入力してください。')
       }
@@ -516,7 +536,7 @@ export default function Admin() {
               disabled={fillUrlLoading}
               style={{ ...s.btn, background: fillUrlLoading ? '#9ca3af' : '#7c3aed', padding: '8px 16px', fontSize: '13px' }}
             >
-              {fillUrlLoading ? '検索中…' : '🔗 参考URL一括補完（15件ずつ）'}
+              {fillUrlLoading ? '検索中…' : '🔗 参考URL一括補完（30件ずつ）'}
             </button>
             {batchImageResult != null && (
               <span style={{ fontSize: '12px', color: '#64748b' }}>{JSON.stringify(batchImageResult)}</span>
@@ -577,7 +597,11 @@ export default function Admin() {
                       onClick={handleFindSingleUrl}
                       style={{ ...s.btn, background: findSingleUrlLoading ? '#9ca3af' : '#7c3aed', padding: '8px 12px', fontSize: '12px', whiteSpace: 'nowrap', flexShrink: 0 }}
                     >
-                      {findSingleUrlLoading ? '検索中…' : '🔄 自動補完'}
+                      {findSingleUrlLoading
+                        ? '検索中…'
+                        : urlCandidates.length > 0
+                          ? `🔄 次の候補 (${urlCandidateIndex + 1}/${urlCandidates.length})`
+                          : '🔄 自動補完'}
                     </button>
                     <a
                       href={`https://news.google.com/search?q=${encodeURIComponent(editForm.title ?? '')}&hl=ja`}
