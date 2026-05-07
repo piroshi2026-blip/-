@@ -51,6 +51,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const sb = getServiceSupabase()
   const marketId = await resolveNewMarketId(sb, draft.title)
+
+  if (marketId && sourceLink) {
+    await sb.from('markets').update({ source_url: sourceLink }).eq('id', marketId)
+  }
+
   const baseUrl = getPublicBaseUrl()
   const body = buildTweetBody(kind ?? 'general', draft.title, baseUrl)
 

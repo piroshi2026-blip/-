@@ -352,12 +352,13 @@ export default function Admin() {
   }
 
   async function handleUpdateMarket() {
-    await supabase.from('markets').update({ 
-      title: editForm.title, 
-      description: editForm.description, 
-      category: editForm.category, // ここでカテゴリーも更新されます
-      end_date: new Date(editForm.end_date).toISOString(), 
-      image_url: editForm.image_url 
+    await supabase.from('markets').update({
+      title: editForm.title,
+      description: editForm.description,
+      category: editForm.category,
+      end_date: new Date(editForm.end_date).toISOString(),
+      image_url: editForm.image_url,
+      source_url: editForm.source_url || null,
     }).eq('id', editingId);
 
     for (const opt of editForm.market_options) { 
@@ -485,30 +486,41 @@ export default function Admin() {
           </section>
 
           {displayedMarkets.map(m => (
-            <div key={m.id} style={{ border: '1px solid #eee', padding: '20px', marginBottom: '15px', borderRadius: '12px', background:'#fff' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div><strong>{m.title}</strong><div style={{fontSize:'12px', color:'#666'}}>{m.category} | {new Date(m.end_date).toLocaleString()}</div></div>
-                <div style={{display:'flex', gap:'5px'}}>
-                  <button onClick={() => { setEditingId(m.id); setEditForm({...m, end_date: new Date(m.end_date).toISOString().slice(0,16)}); }} style={{...s.btn, background:'#3b82f6', padding:'8px 15px'}}>編集</button>
-                  <button onClick={() => handleDeleteMarket(m.id, m.title)} style={{...s.btn, background:'#ef4444', padding:'8px 15px'}}>削除</button>
+            <div key={m.id} style={{ border: '1px solid #e2e8f0', padding: '10px 14px', marginBottom: '6px', borderRadius: '10px', background: m.is_resolved ? '#f8fafc' : '#fff' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 'bold', fontSize: '13px', lineHeight: 1.4 }}>{m.title}</div>
+                  <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <span>{m.category}</span>
+                    <span>{new Date(m.end_date).toLocaleDateString()}</span>
+                    {m.is_resolved && <span style={{ color: '#10b981', fontWeight: 'bold' }}>✓確定済</span>}
+                    {m.source_url && <a href={m.source_url} target="_blank" rel="noopener noreferrer" style={{ color: '#0284c7', textDecoration: 'none' }}>🔗参考</a>}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+                  <button onClick={() => { setEditingId(editingId === m.id ? null : m.id); setEditForm({...m, end_date: new Date(m.end_date).toISOString().slice(0,16), source_url: m.source_url ?? ''}); }} style={{...s.btn, background: editingId === m.id ? '#64748b' : '#3b82f6', padding:'5px 10px', fontSize:'12px'}}>
+                    {editingId === m.id ? '閉じる' : '編集'}
+                  </button>
+                  <button onClick={() => handleDeleteMarket(m.id, m.title)} style={{...s.btn, background:'#ef4444', padding:'5px 10px', fontSize:'12px'}}>削除</button>
                 </div>
               </div>
               {editingId === m.id && (
-                <div style={{ marginTop: '10px', padding: '15px', background: '#f9f9f9', borderRadius: '8px', border:'1px solid #ddd' }}>
-                  <label style={{fontSize:'11px', color:'#666'}}>タイトル修正</label>
+                <div style={{ marginTop: '10px', padding: '12px', background: '#f9f9f9', borderRadius: '8px', border:'1px solid #ddd' }}>
+                  <label style={{fontSize:'11px', color:'#666'}}>タイトル</label>
                   <input value={editForm.title} onChange={e => setEditForm({...editForm, title: e.target.value})} style={s.inp} />
 
-                  <label style={{fontSize:'11px', color:'#666'}}>判定基準修正</label>
+                  <label style={{fontSize:'11px', color:'#666'}}>判定基準</label>
                   <textarea value={editForm.description} onChange={e => setEditForm({...editForm, description: e.target.value})} style={{...s.inp, height:'60px'}} />
 
-                  {/* ▼▼▼ 追加箇所：ここから ▼▼▼ */}
-                  <label style={{fontSize:'11px', color:'#666'}}>カテゴリ修正</label>
+                  <label style={{fontSize:'11px', color:'#666'}}>参考記事 URL</label>
+                  <input value={editForm.source_url ?? ''} onChange={e => setEditForm({...editForm, source_url: e.target.value})} placeholder="https://..." style={s.inp} />
+
+                  <label style={{fontSize:'11px', color:'#666'}}>カテゴリ</label>
                   <select value={editForm.category} onChange={e => setEditForm({...editForm, category: e.target.value})} style={s.inp}>
                     {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                   </select>
-                  {/* ▲▲▲ 追加箇所：ここまで ▲▲▲ */}
 
-                  <label style={{fontSize:'11px', color:'#666'}}>締切日時修正</label>
+                  <label style={{fontSize:'11px', color:'#666'}}>締切日時</label>
                   <input type="datetime-local" value={editForm.end_date} onChange={e => setEditForm({...editForm, end_date: e.target.value})} style={s.inp} />
 
                   <label style={{fontSize:'11px', color:'#666'}}>画像</label>
@@ -534,21 +546,27 @@ export default function Admin() {
                   </button>
                   <div style={{marginBottom:'10px'}}><label style={{fontSize:'12px', color:'#666'}}>または画像ファイルをアップロード</label><br/><input type="file" onChange={e => uploadImage(e, true)} /></div>
 
-                  <label style={{fontSize:'11px', color:'#666'}}>選択肢名の修正</label>
+                  <label style={{fontSize:'11px', color:'#666'}}>選択肢</label>
                   {editForm.market_options.map((opt: any, idx: number) => (
                     <input key={opt.id} value={opt.name} onChange={e => { const newOpts = [...editForm.market_options]; newOpts[idx].name = e.target.value; setEditForm({ ...editForm, market_options: newOpts }) }} style={s.inp} />
                   ))}
                   <input placeholder="+ 選択肢追加" value={newOptionName} onChange={e => setNewOptionName(e.target.value)} style={{ ...s.inp, border: '1px solid #3b82f6' }} />
 
-                  <button onClick={handleUpdateMarket} style={{...s.btn, width:'100%', background:'#10b981'}}>更新内容を保存</button>
-                  <button onClick={() => setEditingId(null)} style={{...s.btn, width:'100%', background:'#9ca3af', marginTop:'10px'}}>キャンセル</button>
-                </div>
-              )}
-              {!m.is_resolved && (
-                <div style={{marginTop:'10px', display:'flex', flexWrap:'wrap', gap:'5px'}}>
-                  {m.market_options.map((opt: any) => (
-                    <button key={opt.id} onClick={() => handleResolve(m.id, opt.id, opt.name)} style={{fontSize:'11px', padding:'6px 12px', borderRadius:'6px', border:'1px solid #ef4444', color:'#ef4444', background:'#fff'}}>「{opt.name}」で確定</button>
-                  ))}
+                  {!m.is_resolved && (
+                    <div style={{ marginBottom: '12px' }}>
+                      <label style={{fontSize:'11px', color:'#ef4444', display:'block', marginBottom:'6px'}}>結果確定</label>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                        {m.market_options.map((opt: any) => (
+                          <button key={opt.id} onClick={() => handleResolve(m.id, opt.id, opt.name)} style={{fontSize:'12px', padding:'6px 14px', borderRadius:'6px', border:'1px solid #ef4444', color:'#ef4444', background:'#fff', cursor:'pointer'}}>
+                            {opt.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <button onClick={handleUpdateMarket} style={{...s.btn, width:'100%', background:'#10b981'}}>保存</button>
+                  <button onClick={() => setEditingId(null)} style={{...s.btn, width:'100%', background:'#9ca3af', marginTop:'8px'}}>キャンセル</button>
                 </div>
               )}
             </div>
