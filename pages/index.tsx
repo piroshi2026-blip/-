@@ -213,9 +213,9 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key`}
                   })}
                 </div>
 
-                {/* 判定基準（折りたたみ風に小さく） */}
-                <div style={{fontSize:'10px', color:'#94a3b8', marginBottom: m.source_url ? '6px' : '10px', lineHeight:1.4}}>
-                  判定: {m.description?.slice(0, 60)}{(m.description?.length ?? 0) > 60 ? '…' : ''}
+                {/* 判定基準 */}
+                <div style={{fontSize:'10px', color:'#94a3b8', marginBottom: m.source_url ? '6px' : '10px', lineHeight:1.5}}>
+                  判定: {m.description}
                 </div>
 
                 {m.source_url && (

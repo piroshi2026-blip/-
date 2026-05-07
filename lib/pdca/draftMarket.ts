@@ -210,7 +210,7 @@ async function callClaudeForDraft(userContent: string): Promise<Partial<DraftMar
   const model = process.env.CLAUDE_DRAFT_MODEL ?? 'claude-haiku-4-5-20251001'
   const msg = await client.messages.create({
     model,
-    max_tokens: 600,
+    max_tokens: 1024,
     system: CLAUDE_JSON_SYSTEM,
     messages: [{ role: 'user', content: userContent }],
   })
