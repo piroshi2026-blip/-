@@ -308,6 +308,7 @@ export default function Admin() {
   const [refreshImageLoading, setRefreshImageLoading] = useState(false)
   const [fillUrlLoading, setFillUrlLoading] = useState(false)
   const [fillUrlResult, setFillUrlResult] = useState<{ updated: number; remaining: number } | null>(null)
+  const [findSingleUrlLoading, setFindSingleUrlLoading] = useState(false)
 
   async function handleBatchAddImages() {
     if (!confirm('画像なしの問いに自動で画像を追加します（最大20件ずつ）。続けますか？')) return
@@ -331,6 +332,27 @@ export default function Admin() {
       setBatchImageResult({ error: e instanceof Error ? e.message : String(e) })
     }
     setBatchImageLoading(false)
+  }
+
+  async function handleFindSingleUrl() {
+    if (!editingId || !editForm.title) return
+    setFindSingleUrlLoading(true)
+    try {
+      const res = await fetch('/api/admin/find-source-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminPassword: ADMIN_PASSWORD, marketId: editingId, title: editForm.title }),
+      })
+      const data = await res.json()
+      if (data.url) {
+        setEditForm((f: any) => ({ ...f, source_url: data.url }))
+      } else {
+        alert('記事が見つかりませんでした。手動で入力してください。')
+      }
+    } catch (e) {
+      alert('エラー: ' + (e instanceof Error ? e.message : String(e)))
+    }
+    setFindSingleUrlLoading(false)
   }
 
   async function handleFillSourceUrls() {
@@ -549,13 +571,21 @@ export default function Admin() {
                   <label style={{fontSize:'11px', color:'#666'}}>参考記事 URL</label>
                   <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '10px' }}>
                     <input value={editForm.source_url ?? ''} onChange={e => setEditForm({...editForm, source_url: e.target.value})} placeholder="https://..." style={{ ...s.inp, marginBottom: 0, flex: 1 }} />
+                    <button
+                      type="button"
+                      disabled={findSingleUrlLoading}
+                      onClick={handleFindSingleUrl}
+                      style={{ ...s.btn, background: findSingleUrlLoading ? '#9ca3af' : '#7c3aed', padding: '8px 12px', fontSize: '12px', whiteSpace: 'nowrap', flexShrink: 0 }}
+                    >
+                      {findSingleUrlLoading ? '検索中…' : '🔄 自動補完'}
+                    </button>
                     <a
                       href={`https://news.google.com/search?q=${encodeURIComponent(editForm.title ?? '')}&hl=ja`}
                       target="_blank"
                       rel="noopener noreferrer"
                       style={{ ...s.btn, background: '#1a73e8', padding: '8px 12px', fontSize: '12px', textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}
                     >
-                      🔍 記事を探す
+                      🔍 検索
                     </a>
                   </div>
 

@@ -2,13 +2,12 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import Parser from 'rss-parser'
 import { getServiceSupabase } from '../../../lib/pdca/supabaseAdmin'
 
-export const maxDuration = 60
+export const maxDuration = 30
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'yosoru_admin'
 const rssParser = new Parser({ timeout: 6000 })
 
 async function findArticleUrl(title: string): Promise<string | null> {
-  // 1. Google ニュース RSS（APIキー不要）
   try {
     const q = encodeURIComponent(title)
     const feedUrl = `https://news.google.com/rss/search?q=${q}&hl=ja&gl=JP&ceid=JP:ja`
@@ -17,7 +16,6 @@ async function findArticleUrl(title: string): Promise<string | null> {
     if (link) return link
   } catch { /* fallthrough */ }
 
-  // 2. Tavily（キーがある場合のみ）
   const tavilyKey = process.env.TAVILY_API_KEY?.trim()
   if (tavilyKey) {
     try {
@@ -47,42 +45,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { adminPassword, limit = 15 } = req.body as { adminPassword?: string; limit?: number }
+  const { adminPassword, marketId, title } = req.body as { adminPassword?: string; marketId?: number; title?: string }
   if (!adminPassword || adminPassword !== ADMIN_PASSWORD) {
     return res.status(401).json({ error: 'パスワードが違います' })
   }
-
-  const sb = getServiceSupabase()
-
-  const { data: markets, error } = await sb
-    .from('markets')
-    .select('id, title')
-    .is('source_url', null)
-    .order('created_at', { ascending: false })
-    .limit(Math.min(20, Number(limit) || 15))
-
-  if (error) return res.status(500).json({ error: error.message })
-  if (!markets || markets.length === 0) {
-    return res.status(200).json({ updated: 0, remaining: 0 })
+  if (!title) {
+    return res.status(400).json({ error: 'title が必要です' })
   }
 
-  // 並列で記事 URL を検索・更新（見つからない場合も '' でマークして次回対象から除外）
-  const results = await Promise.allSettled(
-    markets.map(async (m) => {
-      const url = await findArticleUrl(m.title)
-      await sb.from('markets').update({ source_url: url ?? '' }).eq('id', m.id)
-      return { id: m.id, url }
-    })
-  )
+  const url = await findArticleUrl(title)
 
-  const updated = results.filter(
-    r => r.status === 'fulfilled' && (r as PromiseFulfilledResult<any>).value?.url
-  ).length
+  if (marketId) {
+    const sb = getServiceSupabase()
+    await sb.from('markets').update({ source_url: url ?? '' }).eq('id', marketId)
+  }
 
-  const { count } = await sb
-    .from('markets')
-    .select('id', { count: 'exact', head: true })
-    .is('source_url', null)
-
-  return res.status(200).json({ updated, remaining: count ?? 0 })
+  return res.status(200).json({ url })
 }
