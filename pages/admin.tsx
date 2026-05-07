@@ -258,7 +258,7 @@ export default function Admin() {
       const res = await fetch('/api/admin/generate-drafts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adminPassword: pdcaPassword, count: 5, hint: gachaHint }),
+        body: JSON.stringify({ adminPassword: pdcaPassword, count: 10, hint: gachaHint }),
       })
       const data = await res.json()
       if (!res.ok) {
