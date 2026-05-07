@@ -312,7 +312,7 @@ export default function Admin() {
   const [batchImageResult, setBatchImageResult] = useState<unknown>(null)
   const [refreshImageLoading, setRefreshImageLoading] = useState(false)
   const [fillUrlLoading, setFillUrlLoading] = useState(false)
-  const [fillUrlResult, setFillUrlResult] = useState<{ updated: number; remaining: number } | null>(null)
+  const [fillUrlResult, setFillUrlResult] = useState<{ updated: number; remaining: number; emptyCount?: number } | null>(null)
   const [findSingleUrlLoading, setFindSingleUrlLoading] = useState(false)
   const [urlCandidates, setUrlCandidates] = useState<string[]>([])
   const [urlCandidateIndex, setUrlCandidateIndex] = useState(0)
@@ -375,23 +375,21 @@ export default function Admin() {
     setFindSingleUrlLoading(false)
   }
 
-  async function handleFillSourceUrls() {
-    if (!confirm('参考URLがない問いに Tavily で自動補完します（15件ずつ）。続けますか？')) return
+  async function handleFillSourceUrls(includeEmpty = false) {
+    const msg = includeEmpty
+      ? '検索で見つからなかった記事も含めて再試行します（30件ずつ）。続けますか？'
+      : '参考URLがない問いを自動補完します（30件ずつ）。続けますか？'
+    if (!confirm(msg)) return
     setFillUrlLoading(true)
     setFillUrlResult(null)
     try {
       const res = await fetch('/api/admin/fill-source-urls', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adminPassword: ADMIN_PASSWORD }),
+        body: JSON.stringify({ adminPassword: ADMIN_PASSWORD, includeEmpty }),
       })
       const data = await res.json()
       setFillUrlResult(data)
-      if ((data.remaining ?? 0) > 0) {
-        alert(`${data.updated}件補完。残り${data.remaining}件。もう一度押してください。`)
-      } else {
-        alert(`完了：${data.updated}件補完しました。`)
-      }
       fetchData()
     } catch (e) {
       alert('エラー: ' + (e instanceof Error ? e.message : String(e)))
@@ -532,23 +530,41 @@ export default function Admin() {
               {batchImageLoading ? '処理中…' : '🖼 画像なし問いに一括追加（20件ずつ）'}
             </button>
             <button
-              onClick={handleFillSourceUrls}
+              onClick={() => handleFillSourceUrls(false)}
               disabled={fillUrlLoading}
               style={{ ...s.btn, background: fillUrlLoading ? '#9ca3af' : '#7c3aed', padding: '8px 16px', fontSize: '13px' }}
             >
-              {fillUrlLoading ? '検索中…' : '🔗 参考URL一括補完（30件ずつ）'}
+              {fillUrlLoading ? '検索中…' : '🔗 参考URL補完（未処理分）'}
+            </button>
+            <button
+              onClick={() => handleFillSourceUrls(true)}
+              disabled={fillUrlLoading}
+              style={{ ...s.btn, background: fillUrlLoading ? '#9ca3af' : '#dc2626', padding: '8px 16px', fontSize: '13px' }}
+            >
+              {fillUrlLoading ? '検索中…' : '🔄 URL未取得を全て再試行'}
             </button>
             {batchImageResult != null && (
               <span style={{ fontSize: '12px', color: '#64748b' }}>{JSON.stringify(batchImageResult)}</span>
             )}
             {fillUrlResult != null && (
-              <span style={{ fontSize: '12px', color: '#64748b' }}>参考URL: {fillUrlResult.updated}件補完、残り{fillUrlResult.remaining}件
-                {fillUrlResult.updated === 0 && fillUrlResult.remaining > 0 && (
-                  <span style={{ color: '#b45309', marginLeft: '6px' }}>
-                    ※自動検索で記事が見つかりません。Vercel環境変数に <code>TAVILY_API_KEY</code> を追加すると改善する場合があります。残りは手動入力してください。
+              <div style={{ fontSize: '12px', color: '#64748b', width: '100%' }}>
+                参考URL: {fillUrlResult.updated}件補完
+                {(fillUrlResult.emptyCount ?? 0) > 0 && (
+                  <span style={{ color: '#b45309', marginLeft: '8px' }}>
+                    ／自動検索で見つからない問い: {fillUrlResult.emptyCount}件
+                    （「🔄 URL未取得を全て再試行」で再検索できます。
+                    <a
+                      href="https://vercel.com/dashboard"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: '#7c3aed', marginLeft: '4px' }}
+                    >
+                      Vercel環境変数にTAVILY_API_KEYを追加
+                    </a>
+                    すると精度が上がります）
                   </span>
                 )}
-              </span>
+              </div>
             )}
           </div>
 

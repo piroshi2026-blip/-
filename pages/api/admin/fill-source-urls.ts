@@ -61,20 +61,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { adminPassword, limit = 15 } = req.body as { adminPassword?: string; limit?: number }
+  const { adminPassword, limit = 15, includeEmpty = false } = req.body as { adminPassword?: string; limit?: number; includeEmpty?: boolean }
   if (!adminPassword || adminPassword !== ADMIN_PASSWORD) {
     return res.status(401).json({ error: 'パスワードが違います' })
   }
 
   const sb = getServiceSupabase()
 
-  // NULL（未処理）のみ対象。''（試したが見つからず）は手動補完待ちとして除外
-  const { data: markets, error } = await sb
+  const query = sb
     .from('markets')
     .select('id, title')
-    .is('source_url', null)
     .order('created_at', { ascending: false })
     .limit(Math.min(50, Number(limit) || 30))
+
+  const { data: markets, error } = includeEmpty
+    ? await query.or('source_url.is.null,source_url.eq.')
+    : await query.is('source_url', null)
 
   if (error) return res.status(500).json({ error: error.message })
   if (!markets || markets.length === 0) {
@@ -94,10 +96,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     r => r.status === 'fulfilled' && (r as PromiseFulfilledResult<any>).value?.url
   ).length
 
-  const { count } = await sb
-    .from('markets')
-    .select('id', { count: 'exact', head: true })
-    .is('source_url', null)
+  const [{ count: remaining }, { count: emptyCount }] = await Promise.all([
+    sb.from('markets').select('id', { count: 'exact', head: true }).is('source_url', null),
+    sb.from('markets').select('id', { count: 'exact', head: true }).eq('source_url', ''),
+  ])
 
-  return res.status(200).json({ updated, remaining: count ?? 0 })
+  return res.status(200).json({ updated, remaining: remaining ?? 0, emptyCount: emptyCount ?? 0 })
 }
