@@ -19,13 +19,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { adminPassword, draft, headline, kind, imageUrl, sourceLink } = req.body as {
+  const { adminPassword, draft, headline, kind, imageUrl, sourceLink, sourceTitle } = req.body as {
     adminPassword?: string
     draft?: DraftMarket
     headline?: string
     kind?: 'mlb' | 'general'
     imageUrl?: string | null
     sourceLink?: string | null
+    sourceTitle?: string | null
   }
 
   if (!adminPassword || adminPassword !== ADMIN_PASSWORD) {
@@ -53,7 +54,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const marketId = await resolveNewMarketId(sb, draft.title)
 
   if (marketId && sourceLink) {
-    await sb.from('markets').update({ source_url: sourceLink }).eq('id', marketId)
+    const updateData: Record<string, string> = { source_url: sourceLink }
+    if (sourceTitle) updateData.source_title = sourceTitle
+    await sb.from('markets').update(updateData).eq('id', marketId)
   }
 
   const baseUrl = getPublicBaseUrl()

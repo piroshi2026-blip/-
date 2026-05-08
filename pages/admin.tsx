@@ -51,6 +51,19 @@ export default function Admin() {
   const [gachaHint, setGachaHint] = useState('')
   const [aiTestResult, setAiTestResult] = useState<unknown>(null)
   const [aiTestLoading, setAiTestLoading] = useState(false)
+  const [xPostStatus, setXPostStatus] = useState<{ enabled: boolean; hasCredentials: boolean; disabledByEnv: boolean; message: string } | null>(null)
+
+  async function fetchXPostStatus() {
+    try {
+      const res = await fetch('/api/admin/x-post-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminPassword: ADMIN_PASSWORD }),
+      })
+      const data = await res.json()
+      setXPostStatus(data)
+    } catch { /* ignore */ }
+  }
 
   useEffect(() => {
     const authStatus = localStorage.getItem('yosoru_admin_auth')
@@ -89,7 +102,7 @@ export default function Admin() {
     setIsLoading(false)
   }, [isAuthenticated])
 
-  useEffect(() => { fetchData() }, [fetchData])
+  useEffect(() => { fetchData(); fetchXPostStatus() }, [fetchData])
 
   useEffect(() => {
     setUrlCandidates([])
@@ -298,7 +311,7 @@ export default function Admin() {
       const res = await fetch('/api/admin/post-draft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adminPassword: pdcaPassword, draft, headline: card.headline, kind: card.kind, imageUrl: card.imageUrl, sourceLink: card.sourceLink }),
+        body: JSON.stringify({ adminPassword: pdcaPassword, draft, headline: card.headline, kind: card.kind, imageUrl: card.imageUrl, sourceLink: card.sourceLink, sourceTitle: card.sourceSnippet }),
       })
       const data = await res.json()
       setGachaPostResults(prev => ({ ...prev, [idx]: data }))
@@ -592,7 +605,8 @@ export default function Admin() {
                     <span>{m.category}</span>
                     <span>{new Date(m.end_date).toLocaleDateString()}</span>
                     {m.is_resolved && <span style={{ color: '#10b981', fontWeight: 'bold' }}>✓確定済</span>}
-                    {m.source_url && <a href={m.source_url} target="_blank" rel="noopener noreferrer" style={{ color: '#0284c7', textDecoration: 'none' }}>🔗参考</a>}
+                    {m.source_url && <a href={m.source_url} target="_blank" rel="noopener noreferrer" style={{ color: '#0284c7', textDecoration: 'none' }}>🔗{(() => { try { const h = new URL(m.source_url).hostname.replace(/^www\./, ''); return h.includes('news.google.com') ? 'Google ニュース' : h.length > 25 ? h.slice(0, 22) + '…' : h } catch { return '参考' } })()}</a>}
+                    {m.source_url && m.source_title && <span style={{ fontSize: '10px', color: '#64748b' }}>({m.source_title.length > 30 ? m.source_title.slice(0, 27) + '…' : m.source_title})</span>}
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
@@ -866,9 +880,10 @@ export default function Admin() {
                       </div>
 
                       {posted ? (
-                        <div style={{ color: '#10b981', fontSize: '13px', fontWeight: 'bold' }}>
-                          ✅ 投稿済み（market ID: {(postResult as any).marketId}）
-                          {(postResult as any).tweetError && <span style={{ color: '#f59e0b', marginLeft: '8px' }}>X投稿エラー: {(postResult as any).tweetError}</span>}
+                        <div style={{ fontSize: '13px', fontWeight: 'bold' }}>
+                          <span style={{ color: '#10b981' }}>✅ 問い投稿済み（ID: {(postResult as any).marketId}）</span>
+                          {(postResult as any).tweetId && <span style={{ color: '#0284c7', marginLeft: '8px' }}>𝕏投稿OK</span>}
+                          {(postResult as any).tweetError && <div style={{ color: '#dc2626', fontSize: '11px', marginTop: '4px', fontWeight: 'normal', background: '#fef2f2', padding: '4px 8px', borderRadius: '6px' }}>⚠️ X投稿エラー: {(postResult as any).tweetError}</div>}
                         </div>
                       ) : (
                         <button
@@ -891,6 +906,29 @@ export default function Admin() {
       {activeTab === 'pdca' && (
         <section style={{ background: '#f8fafc', padding: '24px', borderRadius: '16px' }}>
           <h3 style={{ marginTop: 0 }}>🤖 自動投稿（毎時 JST 9〜23時）</h3>
+
+          {/* X 投稿ステータス */}
+          <div style={{ padding: '16px', background: xPostStatus?.enabled ? '#f0fdf4' : '#fef2f2', border: `1px solid ${xPostStatus?.enabled ? '#86efac' : '#fca5a5'}`, borderRadius: '10px', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <strong style={{ fontSize: '14px', color: xPostStatus?.enabled ? '#166534' : '#991b1b' }}>
+                𝕏 自動投稿: {xPostStatus?.enabled ? '✅ 有効' : '❌ 無効'}
+              </strong>
+              <button
+                onClick={fetchXPostStatus}
+                style={{ ...s.btn, background: '#64748b', padding: '4px 12px', fontSize: '11px' }}
+              >
+                🔄 更新
+              </button>
+            </div>
+            <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 8px', lineHeight: 1.6 }}>
+              {xPostStatus?.message || '確認中…'}
+            </p>
+            <div style={{ fontSize: '11px', color: '#64748b', lineHeight: 1.8 }}>
+              <strong>切り替え方法：</strong><br />
+              ・<strong>無効にする</strong>：Vercel / .env.local に <code style={{ background: '#fee2e2', padding: '1px 5px', borderRadius: '3px' }}>DISABLE_X_POST=true</code> を追加<br />
+              ・<strong>有効にする</strong>：<code>DISABLE_X_POST</code> を削除、かつ TWITTER_API_* 4つを設定
+            </div>
+          </div>
 
           {/* cron-job.org 設定手順 */}
           <div style={{ padding: '16px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '10px', marginBottom: '20px', fontSize: '13px', lineHeight: 1.8 }}>

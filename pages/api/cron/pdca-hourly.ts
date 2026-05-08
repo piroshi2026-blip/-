@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { assertCronAuthorized } from '../../../lib/pdca/cronGuard'
 import { createQuickMarket, type QuickMarketResult } from '../../../lib/pdca/quickMarket'
 import { preloadDraftData } from '../../../lib/pdca/generateDraft'
+import { isAutoPostEnabled } from '../../../lib/pdca/postX'
 
 /**
  * JST 9:00〜23:00 毎時実行（cron-job.org から呼ばれる）。
@@ -15,10 +16,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
   if (!assertCronAuthorized(req, res)) return
 
+  const xEnabled = isAutoPostEnabled()
   const preloaded = await preloadDraftData()
 
   const [r1, r2] = await Promise.allSettled([
-    createQuickMarket(preloaded, true),   // skipImage=true で10秒以内に収める
+    createQuickMarket(preloaded, true),
     createQuickMarket(preloaded, true),
   ])
 
@@ -27,5 +29,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       ? r.value
       : { error: (r.reason as Error)?.message ?? String(r.reason) }
 
-  return res.status(200).json({ market1: toResult(r1), market2: toResult(r2) })
+  return res.status(200).json({
+    market1: toResult(r1),
+    market2: toResult(r2),
+    xAutoPostEnabled: xEnabled,
+  })
 }

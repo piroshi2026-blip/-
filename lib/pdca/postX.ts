@@ -5,14 +5,28 @@ import { TwitterApi } from 'twitter-api-v2'
  * TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_SECRET が必要です。
  * （メッセージで途切れていた「Xの情報」はここに設定してください）
  */
+
+export function isAutoPostEnabled(): boolean {
+  if (process.env.DISABLE_X_POST === 'true') return false
+  const appKey = process.env.TWITTER_API_KEY?.trim()
+  const appSecret = process.env.TWITTER_API_SECRET?.trim()
+  const accessToken = process.env.TWITTER_ACCESS_TOKEN?.trim()
+  const accessSecret = process.env.TWITTER_ACCESS_SECRET?.trim()
+  return Boolean(appKey && appSecret && accessToken && accessSecret)
+}
+
 export async function postPromotionTweet(text: string): Promise<{ id: string }> {
+  if (process.env.DISABLE_X_POST === 'true') {
+    throw new Error('X 自動投稿は管理者により無効化されています（DISABLE_X_POST=true）')
+  }
+
   const appKey = process.env.TWITTER_API_KEY?.trim()
   const appSecret = process.env.TWITTER_API_SECRET?.trim()
   const accessToken = process.env.TWITTER_ACCESS_TOKEN?.trim()
   const accessSecret = process.env.TWITTER_ACCESS_SECRET?.trim()
 
   if (!appKey || !appSecret || !accessToken || !accessSecret) {
-    throw new Error('X 投稿用の TWITTER_API_* / TWITTER_ACCESS_* が未設定です')
+    throw new Error('X 投稿用の TWITTER_API_* / TWITTER_ACCESS_* が未設定です。Vercel の環境変数に設定してください。')
   }
 
   const client = new TwitterApi({
