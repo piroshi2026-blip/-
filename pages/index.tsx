@@ -220,9 +220,10 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key`}
 
                 {m.source_url && (
                   <div style={{marginBottom:'10px'}}>
-                    <a href={m.source_url} target="_blank" rel="noopener noreferrer" style={{fontSize:'10px', color:'#0284c7', textDecoration:'none', display:'inline-flex', alignItems:'center', gap:'3px', background:'#f0f9ff', padding:'3px 8px', borderRadius:'20px', border:'1px solid #bae6fd'}}>
-                      🔗 参考記事
+                    <a href={m.source_url} target="_blank" rel="noopener noreferrer" style={{fontSize:'10px', color:'#0284c7', textDecoration:'none', display:'inline-flex', alignItems:'center', gap:'3px', background:'#f0f9ff', padding:'3px 8px', borderRadius:'20px', border:'1px solid #bae6fd', maxWidth:'100%'}}>
+                      🔗 {(() => { try { const h = new URL(m.source_url).hostname.replace(/^www\./, ''); return h.includes('news.google.com') ? 'Google ニュース' : h.length > 30 ? h.slice(0, 27) + '…' : h } catch { return '参考記事' } })()}
                     </a>
+                    {m.source_title && <span style={{fontSize:'10px', color:'#64748b', marginLeft:'6px', display:'inline'}}>{m.source_title.length > 40 ? m.source_title.slice(0, 37) + '…' : m.source_title}</span>}
                   </div>
                 )}
 

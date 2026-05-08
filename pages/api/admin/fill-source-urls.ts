@@ -7,8 +7,7 @@ export const maxDuration = 60
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'yosoru_admin'
 const rssParser = new Parser({ timeout: 6000 })
 
-async function findArticleUrl(title: string): Promise<string | null> {
-  // 句読点・疑問符を除いた短縮クエリ（30文字以内）
+async function findArticleUrl(title: string): Promise<{ url: string | null; articleTitle: string | null }> {
   const short = title.replace(/[？?。、「」【】『』〈〉]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 30).trim()
 
   // 1a. フルタイトルで Google ニュース RSS（JP ロケール）
@@ -16,8 +15,8 @@ async function findArticleUrl(title: string): Promise<string | null> {
     const feed = await rssParser.parseURL(
       `https://news.google.com/rss/search?q=${encodeURIComponent(title)}&hl=ja&gl=JP&ceid=JP:ja`
     )
-    const link = feed.items?.[0]?.link
-    if (link) return link
+    const item = feed.items?.[0]
+    if (item?.link) return { url: item.link, articleTitle: item.title || null }
   } catch { /* fallthrough */ }
 
   // 1b. 短縮クエリで Google ニュース RSS（JP ロケール）
@@ -26,8 +25,8 @@ async function findArticleUrl(title: string): Promise<string | null> {
       const feed = await rssParser.parseURL(
         `https://news.google.com/rss/search?q=${encodeURIComponent(short)}&hl=ja&gl=JP&ceid=JP:ja`
       )
-      const link = feed.items?.[0]?.link
-      if (link) return link
+      const item = feed.items?.[0]
+      if (item?.link) return { url: item.link, articleTitle: item.title || null }
     } catch { /* fallthrough */ }
   }
 
@@ -45,14 +44,14 @@ async function findArticleUrl(title: string): Promise<string | null> {
       })
       clearTimeout(timer)
       if (res.ok) {
-        const data = await res.json() as { results?: { url?: string }[] }
-        const url = data.results?.[0]?.url
-        if (url) return url
+        const data = await res.json() as { results?: { url?: string; title?: string }[] }
+        const r = data.results?.[0]
+        if (r?.url) return { url: r.url, articleTitle: r.title || null }
       }
     } catch { /* fallthrough */ }
   }
 
-  return null
+  return { url: null, articleTitle: null }
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -86,9 +85,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // 並列で記事 URL を検索・更新（見つからない場合も '' で保存）
   const results = await Promise.allSettled(
     markets.map(async (m) => {
-      const url = await findArticleUrl(m.title)
-      await sb.from('markets').update({ source_url: url ?? '' }).eq('id', m.id)
-      return { id: m.id, url }
+      const { url, articleTitle } = await findArticleUrl(m.title)
+      const updateData: Record<string, string | null> = { source_url: url ?? '' }
+      if (articleTitle) updateData.source_title = articleTitle
+      await sb.from('markets').update(updateData).eq('id', m.id)
+      return { id: m.id, url, articleTitle }
     })
   )
 
