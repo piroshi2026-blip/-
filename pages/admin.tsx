@@ -489,7 +489,7 @@ export default function Admin() {
   }
 
   return (
-    <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '20px', fontFamily: 'sans-serif' }}>
+    <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '12px', fontFamily: 'sans-serif' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h1 style={{fontWeight:'900'}}>🛠 管理パネル</h1>
         <div style={{ display: 'flex', gap: '10px' }}>
@@ -589,7 +589,7 @@ export default function Admin() {
             )}
           </div>
 
-          <section style={{ background: '#f4f4f4', padding: '20px', borderRadius: '12px', marginBottom: '30px' }}>
+          <section style={{ background: '#f4f4f4', padding: '14px', borderRadius: '12px', marginBottom: '16px' }}>
             <h3>🆕 新規問い作成</h3>
             <input placeholder="タイトル" value={newMarket.title} onChange={e => setNewMarket({...newMarket, title: e.target.value})} style={s.inp} />
             <textarea placeholder="判定基準" value={newMarket.description} onChange={e => setNewMarket({...newMarket, description: e.target.value})} style={{...s.inp, height:'60px'}} />

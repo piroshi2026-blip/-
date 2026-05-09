@@ -4,6 +4,10 @@ const globalStyles = `
   * { box-sizing: border-box; padding: 0; margin: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background-color: #f3f4f6; color: #1f2937; }
   button { cursor: pointer; }
+  .yosoru-btn { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+  .yosoru-btn:active { transform: scale(0.95) !important; }
+  .yosoru-btn:hover { transform: scale(1.02); }
+  @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
 `
 
 export default function App({ Component, pageProps }: AppProps) {

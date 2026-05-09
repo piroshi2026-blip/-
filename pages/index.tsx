@@ -17,8 +17,8 @@ export default function Home() {
   const [newUsername, setNewUsername] = useState(''); const [isEditingName, setIsEditingName] = useState(false)
   const [activeCategory, setActiveCategory] = useState('すべて')
 
-  // 初期表示を新着順に設定
-  const [sortBy, setSortBy] = useState<'new' | 'deadline' | 'popular'>('new')
+  const [sortBy, setSortBy] = useState<'new' | 'deadline' | 'popular' | 'judging' | 'random'>('new')
+  const [shakeTitle, setShakeTitle] = useState(false)
 
   const [voteAmount, setVoteAmount] = useState(100)
   const [selectedMarketId, setSelectedMarketId] = useState<number | null>(null)
@@ -33,16 +33,23 @@ export default function Home() {
 
   const fetchMarkets = useCallback(async () => {
     let query = supabase.from('markets').select('*, market_options(*)')
-    if (sortBy === 'new') query = query.order('created_at', { ascending: false })
+    if (sortBy === 'new' || sortBy === 'random') query = query.order('created_at', { ascending: false })
     else if (sortBy === 'deadline') query = query.order('end_date', { ascending: true })
     else if (sortBy === 'popular') query = query.order('total_pool', { ascending: false })
+    else if (sortBy === 'judging') query = query.order('end_date', { ascending: true })
     const { data } = await query
     if (data) {
-      // 確定済みを後ろに回すソート
-      const sortedData = data.sort((a, b) => {
-        if (a.is_resolved === b.is_resolved) return 0;
-        return a.is_resolved ? 1 : -1;
-      });
+      let sortedData = data
+      if (sortBy === 'judging') {
+        sortedData = data.filter(m => !m.is_resolved && new Date(m.end_date) <= new Date())
+      } else if (sortBy === 'random') {
+        sortedData = [...data].sort(() => Math.random() - 0.5)
+      } else {
+        sortedData = data.sort((a, b) => {
+          if (a.is_resolved === b.is_resolved) return 0;
+          return a.is_resolved ? 1 : -1;
+        })
+      }
       setMarkets(sortedData.map((m: any) => ({ ...m, market_options: m.market_options.sort((a: any, b: any) => a.id - b.id) })))
     }
   }, [sortBy])
@@ -140,12 +147,18 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key`}
       {showAuthModal && <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:'20px'}}><div style={{background:'white', padding:'24px', borderRadius:'20px', width:'100%', maxWidth:'380px', textAlign:'center'}}><h2 style={{fontSize:'20px', fontWeight:'900', marginBottom:'15px'}}>ヨソるを開始</h2><button onClick={() => supabase.auth.signInWithOAuth({provider:'google'})} style={{width:'100%', padding:'12px', marginBottom:'10px', borderRadius:'8px', border:'1px solid #ddd', background:'#fff', fontWeight:'bold', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'}}><img src="https://www.google.com/favicon.ico" alt="Google icon" width="16"/>Googleでつづける</button><div style={{margin:'15px 0', color:'#999', fontSize:'12px'}}>またはメールアドレスで</div><input type="email" placeholder="メール" value={email} onChange={e => setEmail(e.target.value)} style={{width:'100%', padding:'10px', marginBottom:'8px', borderRadius:'8px', border:'1px solid #eee'}} /><input type="password" placeholder="パス" value={password} onChange={e => setPassword(e.target.value)} style={{width:'100%', padding:'10px', marginBottom:'16px', borderRadius:'8px', border:'1px solid #eee'}} /><div style={{display:'flex', gap:'8px'}}><button onClick={() => supabase.auth.signInWithPassword({email, password}).then(()=>setShowAuthModal(false))} style={{flex:1, padding:'12px', background:'#3b82f6', color:'#fff', border:'none', borderRadius:'8px'}}>ログイン</button><button onClick={() => supabase.auth.signUp({email, password}).then(()=>setShowAuthModal(false))} style={{flex:1, padding:'12px', background:'#1f2937', color:'#fff', border:'none', borderRadius:'8px'}}>新規登録</button></div><button onClick={() => supabase.auth.signInAnonymously().then(()=>setShowAuthModal(false))} style={{background:'none', border:'none', color:'#999', fontSize:'12px', marginTop:'15px'}}>ゲスト利用（匿名）</button></div></div>}
 
       <header>
-        <h1 style={{fontSize:'28px', fontWeight:'900', textAlign:'center', background:'linear-gradient(to right, #2563eb, #9333ea)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', margin:'10px 0 5px'}}>{config.site_title}</h1>
-        <div style={{ textAlign: 'center', fontSize: '11px', color: '#999', marginBottom: '8px' }}>{config.site_description}</div>
+        <div onClick={() => { setShakeTitle(true); setTimeout(() => setShakeTitle(false), 600) }} style={{cursor:'pointer', textAlign:'center', margin:'10px 0 5px', position:'relative'}}>
+          <h1 style={{fontSize:'30px', fontWeight:'900', background:'linear-gradient(135deg, #2563eb, #9333ea, #ec4899)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', margin:0, display:'inline-block', animation: shakeTitle ? 'bounce 0.5s ease' : 'none'}}>🔮 {config.site_title}</h1>
+          <div style={{fontSize:'10px', color:'#a78bfa', fontWeight:'bold', letterSpacing:'2px'}}>未来をヨソって楽しもう！</div>
+        </div>
+        <style>{`@keyframes bounce { 0%,100%{transform:translateY(0)} 30%{transform:translateY(-8px) rotate(-2deg)} 60%{transform:translateY(-3px) rotate(1deg)} }`}</style>
+        <div style={{ textAlign: 'center', fontSize: '11px', color: '#999', marginBottom: '6px' }}>{config.site_description}</div>
         {activeTab === 'home' && (
-          <><div style={{fontSize:'11px', background:'#fff', padding:'8px', borderRadius:'8px', textAlign:'center', border:'1px solid #e2e8f0', color:'#64748b', marginBottom:'10px'}}>{config.admin_message}</div>
-            <div style={{display:'grid', gridTemplateColumns:'repeat(6, 1fr)', gap:'4px', margin:'10px 0'}}>{dbCategories.map(c => <button key={c.name} onClick={() => setActiveCategory(c.name)} style={{padding:'6px 0', fontSize:'9px', fontWeight:'bold', background:activeCategory===c.name?'#1f2937':'#fff', color:activeCategory===c.name?'#fff':'#64748b', border:'1px solid #e2e8f0', borderRadius:'6px'}}>{c.name}</button>)}</div>
-            <div style={{display:'flex', justifyContent:'center', gap:'8px'}}>{['new', 'deadline', 'popular'].map(t => <button key={t} onClick={() => setSortBy(t as any)} style={{padding:'6px 16px', borderRadius:'20px', border:'none', background:sortBy===t?'#3b82f6':'#e2e8f0', color:sortBy===t?'#fff':'#64748b', fontSize:'11px', fontWeight:'bold'}}>{t==='new'?'✨新着':t==='deadline'?'⏰締切':t==='popular'?'🔥人気':''}</button>)}</div></>
+          <>{config.admin_message && <div style={{fontSize:'11px', background:'#fff', padding:'6px 8px', borderRadius:'8px', textAlign:'center', border:'1px solid #e2e8f0', color:'#64748b', marginBottom:'8px'}}>{config.admin_message}</div>}
+            <div style={{display:'grid', gridTemplateColumns:'repeat(6, 1fr)', gap:'3px', margin:'8px 0'}}>{dbCategories.map(c => <button key={c.name} onClick={() => setActiveCategory(c.name)} style={{padding:'5px 0', fontSize:'9px', fontWeight:'bold', background:activeCategory===c.name?'#1f2937':'#fff', color:activeCategory===c.name?'#fff':'#64748b', border:'1px solid #e2e8f0', borderRadius:'6px'}}>{c.name}</button>)}</div>
+            <div style={{display:'flex', justifyContent:'center', gap:'6px', flexWrap:'wrap'}}>{[
+              {k:'new',l:'✨新着'},{k:'deadline',l:'⏰締切'},{k:'popular',l:'🔥人気'},{k:'judging',l:'⚖️判定中'},{k:'random',l:'🎲ガチャ'}
+            ].map(({k,l}) => <button key={k} onClick={() => { setSortBy(k as any); if(k==='random') fetchMarkets() }} style={{padding:'5px 12px', borderRadius:'20px', border:'none', background:sortBy===k?'#3b82f6':'#e2e8f0', color:sortBy===k?'#fff':'#64748b', fontSize:'11px', fontWeight:'bold', transition:'all 0.2s', transform: sortBy===k ? 'scale(1.05)' : 'scale(1)'}}>{l}</button>)}</div></>
         )}
       </header>
 
@@ -185,13 +198,13 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key`}
                 </div>
               </div>
 
-              <div style={{padding:'12px 14px'}}>
-                {/* 最多票オプションをPolymarket風に大きく表示 */}
+              <div style={{padding:'10px 12px'}}>
+                {/* 最多票オプション */}
                 {!m.is_resolved && topOpt && m.total_pool > 0 && (
-                  <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'10px', padding:'8px 10px', background:'#f8fafc', borderRadius:'10px'}}>
-                    <div style={{fontSize:'26px', fontWeight:'900', color:catColor, lineHeight:1}}>{topPct}%</div>
-                    <div style={{fontSize:'12px', color:'#475569', lineHeight:1.3}}>「{topOpt.name}」に<br/>票が集まっています</div>
-                    <div style={{marginLeft:'auto', fontSize:'11px', color:'#94a3b8', textAlign:'right'}}>{m.total_pool.toLocaleString()}pt<br/>の予想</div>
+                  <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'8px', padding:'7px 10px', background:'#f8fafc', borderRadius:'10px', border:'1px solid #f1f5f9'}}>
+                    <div style={{fontSize:'22px', fontWeight:'900', color:catColor, lineHeight:1, flexShrink:0}}>{topPct}%</div>
+                    <div style={{fontSize:'11px', color:'#475569', lineHeight:1.3, flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>「{topOpt.name}」に票集中</div>
+                    <div style={{fontSize:'10px', color:'#94a3b8', textAlign:'right', flexShrink:0, whiteSpace:'nowrap'}}>{m.total_pool.toLocaleString()}pt</div>
                   </div>
                 )}
 
@@ -245,10 +258,10 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key`}
                         <input type="number" value={voteAmount} onChange={e => setVoteAmount(Number(e.target.value))} style={{width:'70px', border:'1px solid #cbd5e1', borderRadius:'8px', padding:'5px', fontSize:'13px', textAlign:'center'}} />
                         <span style={{fontSize:'12px', color:'#64748b'}}>pt</span>
                       </div>
-                      <button onClick={handleVote} style={{width:'100%', padding:'12px', background:'#1f2937', color:'#fff', borderRadius:'12px', fontWeight:'bold', border:'none', fontSize:'14px'}}>ヨソりを確定する</button>
+                      <button onClick={handleVote} style={{width:'100%', padding:'14px', background:'linear-gradient(135deg, #1f2937, #374151)', color:'#fff', borderRadius:'12px', fontWeight:'bold', border:'none', fontSize:'15px', boxShadow:'0 4px 12px rgba(0,0,0,0.3)', letterSpacing:'1px'}}>🎯 ヨソりを確定！</button>
                     </div>
                   ) : (
-                    <button onClick={()=>setSelectedMarketId(m.id)} style={{width:'100%', padding:'11px', background:`linear-gradient(135deg, ${catColor}, ${catColor}cc)`, color:'#fff', borderRadius:'12px', fontWeight:'bold', border:'none', fontSize:'14px', boxShadow:`0 4px 12px ${catColor}44`}}>ヨソる →</button>
+                    <button onClick={()=>setSelectedMarketId(m.id)} className="yosoru-btn" style={{width:'100%', padding:'12px', background:`linear-gradient(135deg, ${catColor}, ${catColor}cc)`, color:'#fff', borderRadius:'12px', fontWeight:'bold', border:'none', fontSize:'15px', boxShadow:`0 4px 14px ${catColor}55`, position:'relative', overflow:'hidden'}}>🔮 ヨソる</button>
                   )
                 ) : (
                   <div style={{textAlign:'center', fontSize:'12px', color: m.is_resolved ? '#10b981' : '#94a3b8', padding:'8px', background: m.is_resolved ? '#ecfdf5' : '#f1f5f9', borderRadius:'8px', fontWeight: m.is_resolved ? 'bold' : 'normal'}}>
