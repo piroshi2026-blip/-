@@ -42,7 +42,7 @@ export default function Admin() {
     sourceSnippet?: string | null
     error?: string
   }
-  type EditCard = { title: string; options: string[]; endDays: number }
+  type EditCard = { title: string; options: string[]; endDays: number; resolutionDays: number }
   const [gachaCards, setGachaCards] = useState<GachaCard[]>([])
   const [gachaEdits, setGachaEdits] = useState<EditCard[]>([])
   const [gachaLoading, setGachaLoading] = useState(false)
@@ -293,6 +293,7 @@ export default function Admin() {
           title: c.draft?.title ?? '',
           options: c.draft?.options ?? ['', '', ''],
           endDays: c.draft?.endDays ?? 7,
+          resolutionDays: (c.draft?.endDays ?? 7) + 1,
         })))
       }
     } catch (e) {
@@ -311,7 +312,7 @@ export default function Admin() {
       const res = await fetch('/api/admin/post-draft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adminPassword: pdcaPassword, draft, headline: card.headline, kind: card.kind, imageUrl: card.imageUrl, sourceLink: card.sourceLink, sourceTitle: card.sourceSnippet }),
+        body: JSON.stringify({ adminPassword: pdcaPassword, draft, headline: card.headline, kind: card.kind, imageUrl: card.imageUrl, sourceLink: card.sourceLink, sourceTitle: card.sourceSnippet, resolutionDays: edit.resolutionDays }),
       })
       const data = await res.json()
       setGachaPostResults(prev => ({ ...prev, [idx]: data }))
@@ -431,14 +432,21 @@ export default function Admin() {
   }
 
   async function handleUpdateMarket() {
-    await supabase.from('markets').update({
+    const updateData: any = {
       title: editForm.title,
       description: editForm.description,
       category: editForm.category,
       end_date: new Date(editForm.end_date).toISOString(),
       image_url: editForm.image_url,
       source_url: editForm.source_url || null,
-    }).eq('id', editingId);
+      auto_resolve: editForm.auto_resolve || false,
+    }
+    if (editForm.resolution_date) {
+      updateData.resolution_date = new Date(editForm.resolution_date).toISOString()
+    } else {
+      updateData.resolution_date = null
+    }
+    await supabase.from('markets').update(updateData).eq('id', editingId);
 
     for (const opt of editForm.market_options) { 
       await supabase.from('market_options').update({ name: opt.name }).eq('id', opt.id) 
@@ -605,12 +613,12 @@ export default function Admin() {
                     <span>{m.category}</span>
                     <span>{new Date(m.end_date).toLocaleDateString()}</span>
                     {m.is_resolved && <span style={{ color: '#10b981', fontWeight: 'bold' }}>✓確定済</span>}
-                    {m.source_url && <a href={m.source_url} target="_blank" rel="noopener noreferrer" style={{ color: '#0284c7', textDecoration: 'none' }}>🔗{(() => { try { const h = new URL(m.source_url).hostname.replace(/^www\./, ''); return h.includes('news.google.com') ? 'Google ニュース' : h.length > 25 ? h.slice(0, 22) + '…' : h } catch { return '参考' } })()}</a>}
-                    {m.source_url && m.source_title && <span style={{ fontSize: '10px', color: '#64748b' }}>({m.source_title.length > 30 ? m.source_title.slice(0, 27) + '…' : m.source_title})</span>}
+                    {m.source_url && <a href={m.source_url} target="_blank" rel="noopener noreferrer" style={{ color: '#0284c7', textDecoration: 'none', fontSize: '11px' }}>🔗{(() => { try { const h = new URL(m.source_url).hostname.replace(/^www\./, ''); return h.includes('news.google.com') ? 'ニュース' : h.length > 20 ? h.slice(0, 17) + '…' : h } catch { return '参考' } })()}</a>}
+                    {m.source_url && m.source_title && <span style={{ fontSize: '10px', color: '#64748b' }}>{m.source_title.length > 60 ? m.source_title.slice(0, 57) + '…' : m.source_title}</span>}
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
-                  <button onClick={() => { setEditingId(editingId === m.id ? null : m.id); setEditForm({...m, end_date: new Date(m.end_date).toISOString().slice(0,16), source_url: m.source_url ?? ''}); }} style={{...s.btn, background: editingId === m.id ? '#64748b' : '#3b82f6', padding:'5px 10px', fontSize:'12px'}}>
+                  <button onClick={() => { setEditingId(editingId === m.id ? null : m.id); setEditForm({...m, end_date: new Date(m.end_date).toISOString().slice(0,16), resolution_date: m.resolution_date ? new Date(m.resolution_date).toISOString().slice(0,16) : '', source_url: m.source_url ?? '', auto_resolve: m.auto_resolve || false}); }} style={{...s.btn, background: editingId === m.id ? '#64748b' : '#3b82f6', padding:'5px 10px', fontSize:'12px'}}>
                     {editingId === m.id ? '閉じる' : '編集'}
                   </button>
                   <button onClick={() => handleDeleteMarket(m.id, m.title)} style={{...s.btn, background:'#ef4444', padding:'5px 10px', fontSize:'12px'}}>削除</button>
@@ -654,8 +662,18 @@ export default function Admin() {
                     {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                   </select>
 
-                  <label style={{fontSize:'11px', color:'#666'}}>締切日時</label>
+                  <label style={{fontSize:'11px', color:'#666'}}>締切日時（ベット受付終了）</label>
                   <input type="datetime-local" value={editForm.end_date} onChange={e => setEditForm({...editForm, end_date: e.target.value})} style={s.inp} />
+
+                  <label style={{fontSize:'11px', color:'#666'}}>判定日（結果確定予定日）</label>
+                  <input type="datetime-local" value={editForm.resolution_date || ''} onChange={e => setEditForm({...editForm, resolution_date: e.target.value})} style={s.inp} />
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                    <label style={{ fontSize: '11px', color: '#666', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <input type="checkbox" checked={editForm.auto_resolve || false} onChange={e => setEditForm({...editForm, auto_resolve: e.target.checked})} />
+                      アンケート型（締切時に最多票を自動で正解にする）
+                    </label>
+                  </div>
 
                   <label style={{fontSize:'11px', color:'#666'}}>画像</label>
                   {editForm.image_url && <img src={editForm.image_url} alt="" style={{width:'100%', maxHeight:'120px', objectFit:'cover', borderRadius:'6px', marginBottom:'8px'}} />}
@@ -867,7 +885,7 @@ export default function Admin() {
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <label style={{ fontSize: '11px', color: '#666' }}>締切</label>
                         <select
@@ -875,7 +893,17 @@ export default function Admin() {
                           onChange={e => setGachaEdits(prev => prev.map((ed, i) => i === idx ? { ...ed, endDays: Number(e.target.value) } : ed))}
                           style={{ padding: '6px 8px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '13px' }}
                         >
-                          {[3, 5, 7, 10, 14].map(d => <option key={d} value={d}>{d}日後</option>)}
+                          {[{d:3,l:'3日後'},{d:7,l:'1週間'},{d:14,l:'2週間'},{d:30,l:'1ヶ月'},{d:90,l:'3ヶ月'},{d:180,l:'6ヶ月'},{d:270,l:'9ヶ月'},{d:365,l:'12ヶ月'}].map(({d,l}) => <option key={d} value={d}>{l}</option>)}
+                        </select>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <label style={{ fontSize: '11px', color: '#6366f1' }}>判定日</label>
+                        <select
+                          value={edit.resolutionDays}
+                          onChange={e => setGachaEdits(prev => prev.map((ed, i) => i === idx ? { ...ed, resolutionDays: Number(e.target.value) } : ed))}
+                          style={{ padding: '6px 8px', border: '1px solid #c7d2fe', borderRadius: '6px', fontSize: '13px' }}
+                        >
+                          {[{d:3,l:'3日後'},{d:7,l:'1週間'},{d:14,l:'2週間'},{d:30,l:'1ヶ月'},{d:90,l:'3ヶ月'},{d:180,l:'6ヶ月'},{d:270,l:'9ヶ月'},{d:365,l:'12ヶ月'}].map(({d,l}) => <option key={d} value={d}>{l}</option>)}
                         </select>
                       </div>
 
@@ -973,6 +1001,35 @@ export default function Admin() {
               </pre>
             </div>
           )}
+
+          {/* 自動判定 */}
+          <div style={{ padding: '16px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', marginTop: '20px' }}>
+            <strong style={{ fontSize: '14px' }}>📊 アンケート型 自動判定</strong>
+            <p style={{ fontSize: '12px', color: '#64748b', margin: '6px 0 12px' }}>
+              アンケート型（auto_resolve=true）かつ締切を過ぎた問いを、最多票の選択肢で自動確定します。
+            </p>
+            <button
+              onClick={async () => {
+                setPdcaRunning(true); setPdcaResult(null)
+                try {
+                  const res = await fetch('/api/admin/auto-resolve', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ adminPassword: pdcaPassword || ADMIN_PASSWORD }),
+                  })
+                  const data = await res.json()
+                  setPdcaResult(data)
+                  if (data.resolved > 0) { alert(`${data.resolved}件を自動判定しました`); fetchData() }
+                  else alert(data.message || '自動判定対象なし')
+                } catch (e) { setPdcaResult({ error: e instanceof Error ? e.message : String(e) }) }
+                setPdcaRunning(false)
+              }}
+              disabled={pdcaRunning}
+              style={{ ...s.btn, background: pdcaRunning ? '#9ca3af' : '#6366f1' }}
+            >
+              {pdcaRunning ? '⏳ 処理中…' : '📊 今すぐ自動判定を実行'}
+            </button>
+          </div>
 
           <div style={{ marginTop: '16px', padding: '12px', background: '#fef9c3', borderRadius: '8px', fontSize: '12px', color: '#854d0e' }}>
             <strong>X 投稿が 402 エラーになる場合：</strong><br />

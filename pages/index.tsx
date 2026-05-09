@@ -153,6 +153,8 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key`}
         <div style={{marginTop:'15px'}}>{markets.filter(m => activeCategory === 'すべて' || m.category === activeCategory).map(m => {
           const active = !m.is_resolved && new Date(m.end_date) > new Date()
           const days = Math.ceil((new Date(m.end_date).getTime() - new Date().getTime()) / 86400000)
+          const resDate = m.resolution_date ? new Date(m.resolution_date) : null
+          const resDays = resDate ? Math.ceil((resDate.getTime() - new Date().getTime()) / 86400000) : null
           const isPopular = m.total_pool > 1000
           const isUrgent = active && days <= 2
           const catColor = categoryMeta[m.category]?.color || '#374151'
@@ -216,14 +218,16 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key`}
                 {/* 判定基準 */}
                 <div style={{fontSize:'10px', color:'#94a3b8', marginBottom: m.source_url ? '6px' : '10px', lineHeight:1.5}}>
                   判定: {m.description}
+                  {resDate && <span style={{marginLeft:'8px', color:'#6366f1', fontWeight:'bold'}}>📅判定日: {resDate.toLocaleDateString()}{resDays != null && resDays > 0 ? ` (${resDays}日後)` : ''}</span>}
+                  {m.auto_resolve && <span style={{marginLeft:'6px', background:'#ede9fe', color:'#6366f1', padding:'1px 6px', borderRadius:'10px', fontSize:'9px', fontWeight:'bold'}}>アンケート型</span>}
                 </div>
 
                 {m.source_url && (
-                  <div style={{marginBottom:'10px'}}>
-                    <a href={m.source_url} target="_blank" rel="noopener noreferrer" style={{fontSize:'10px', color:'#0284c7', textDecoration:'none', display:'inline-flex', alignItems:'center', gap:'3px', background:'#f0f9ff', padding:'3px 8px', borderRadius:'20px', border:'1px solid #bae6fd', maxWidth:'100%'}}>
-                      🔗 {(() => { try { const h = new URL(m.source_url).hostname.replace(/^www\./, ''); return h.includes('news.google.com') ? 'Google ニュース' : h.length > 30 ? h.slice(0, 27) + '…' : h } catch { return '参考記事' } })()}
+                  <div style={{marginBottom:'10px', display:'flex', alignItems:'flex-start', gap:'6px', flexWrap:'wrap'}}>
+                    <a href={m.source_url} target="_blank" rel="noopener noreferrer" style={{fontSize:'10px', color:'#0284c7', textDecoration:'none', display:'inline-flex', alignItems:'center', gap:'3px', background:'#f0f9ff', padding:'3px 8px', borderRadius:'20px', border:'1px solid #bae6fd', flexShrink:0}}>
+                      🔗 {(() => { try { const h = new URL(m.source_url).hostname.replace(/^www\./, ''); return h.includes('news.google.com') ? 'ニュース' : h.length > 20 ? h.slice(0, 17) + '…' : h } catch { return '参考' } })()}
                     </a>
-                    {m.source_title && <span style={{fontSize:'10px', color:'#64748b', marginLeft:'6px', display:'inline'}}>{m.source_title.length > 40 ? m.source_title.slice(0, 37) + '…' : m.source_title}</span>}
+                    {m.source_title && <span style={{fontSize:'10px', color:'#64748b', lineHeight:1.4}}>{m.source_title.length > 80 ? m.source_title.slice(0, 77) + '…' : m.source_title}</span>}
                   </div>
                 )}
 
@@ -390,7 +394,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key`}
                     {[
                       { days: 3, label: '3日後' }, { days: 7, label: '1週間後' }, { days: 14, label: '2週間後' },
                       { days: 30, label: '1ヶ月後' }, { days: 90, label: '3ヶ月後' }, { days: 180, label: '6ヶ月後' },
-                      { days: 240, label: '8ヶ月後' }, { days: 365, label: '1年後' },
+                      { days: 270, label: '9ヶ月後' }, { days: 365, label: '1年後' },
                     ].map(({ days, label }) => <option key={days} value={days}>{label}</option>)}
                   </select>
                 </div>

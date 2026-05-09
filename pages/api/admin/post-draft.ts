@@ -19,7 +19,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { adminPassword, draft, headline, kind, imageUrl, sourceLink, sourceTitle } = req.body as {
+  const { adminPassword, draft, headline, kind, imageUrl, sourceLink, sourceTitle, resolutionDays } = req.body as {
     adminPassword?: string
     draft?: DraftMarket
     headline?: string
@@ -27,6 +27,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     imageUrl?: string | null
     sourceLink?: string | null
     sourceTitle?: string | null
+    resolutionDays?: number
   }
 
   if (!adminPassword || adminPassword !== ADMIN_PASSWORD) {
@@ -53,10 +54,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const sb = getServiceSupabase()
   const marketId = await resolveNewMarketId(sb, draft.title)
 
-  if (marketId && sourceLink) {
-    const updateData: Record<string, string> = { source_url: sourceLink }
+  if (marketId) {
+    const updateData: Record<string, any> = {}
+    if (sourceLink) updateData.source_url = sourceLink
     if (sourceTitle) updateData.source_title = sourceTitle
-    await sb.from('markets').update(updateData).eq('id', marketId)
+    if (resolutionDays && resolutionDays > 0) {
+      const resDate = new Date()
+      resDate.setDate(resDate.getDate() + resolutionDays)
+      updateData.resolution_date = resDate.toISOString()
+    }
+    if (Object.keys(updateData).length > 0) {
+      await sb.from('markets').update(updateData).eq('id', marketId)
+    }
   }
 
   const baseUrl = getPublicBaseUrl()
