@@ -5,7 +5,7 @@ name: PDCA scheduled
 
 on:
   schedule:
-    - cron: "5 0,2,4,6,8,14,23 * * *"
+    - cron: "5 0,2,4,6,8,10,12,14,22,23 * * *"
 
 jobs:
   trigger:
@@ -27,8 +27,20 @@ jobs:
             06) SUFFIX="/api/cron/pdca-slot/3" ;;
             08) SUFFIX="/api/cron/pdca-slot/4" ;;
             14) SUFFIX="/api/cron/pdca-analyze" ;;
-            *) echo "No PDCA action for UTC hour $H"; exit 0 ;;
+            *) echo "No PDCA action for UTC hour $H" ;;
           esac
-          URL="${SITE_CRON_BASE}${SUFFIX}"
-          echo "POST $URL"
-          curl -sS -f -H "Authorization: Bearer $CRON_SECRET" -X POST "$URL"
+          if [ -n "$SUFFIX" ]; then
+            URL="${SITE_CRON_BASE}${SUFFIX}"
+            echo "POST $URL"
+            curl -sS -f -H "Authorization: Bearer $CRON_SECRET" -X POST "$URL"
+          fi
+
+      - name: X Marketing post
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SITE_CRON_BASE: ${{ secrets.SITE_CRON_BASE }}
+        run: |
+          test -n "$CRON_SECRET" && test -n "$SITE_CRON_BASE"
+          URL="${SITE_CRON_BASE}/api/cron/x-marketing"
+          echo "POST $URL (X marketing)"
+          curl -sS -f -H "Authorization: Bearer $CRON_SECRET" -X POST "$URL" || echo "X marketing skipped or failed (non-fatal)"

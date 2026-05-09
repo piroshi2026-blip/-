@@ -1050,6 +1050,44 @@ export default function Admin() {
             </button>
           </div>
 
+          {/* X マーケティング自動投稿 */}
+          <div style={{ padding: '16px', background: '#fff', border: '1px solid #e0e7ff', borderRadius: '10px', marginTop: '20px' }}>
+            <strong style={{ fontSize: '14px', color: '#4338ca' }}>📣 X マーケティング投稿（AI生成）</strong>
+            <p style={{ fontSize: '12px', color: '#64748b', margin: '6px 0 12px', lineHeight: 1.6 }}>
+              Claude AI がバズるツイートを自動生成して投稿します。<br/>
+              Cronで毎時実行：7時教育 / 9,13,17,21時新問い / 11時エンゲージ / 15時トレンド / 19時結果発表 / 23時教育
+            </p>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              {[
+                { type: 'new_market', label: '📢 新問い告知', color: '#3b82f6' },
+                { type: 'result_announce', label: '🎯 結果発表', color: '#10b981' },
+                { type: 'education', label: '📖 仕組み紹介', color: '#8b5cf6' },
+                { type: 'trend_hook', label: '🔥 トレンド便乗', color: '#f59e0b' },
+                { type: 'engagement', label: '💬 投票呼びかけ', color: '#ec4899' },
+              ].map(({ type, label, color }) => (
+                <button
+                  key={type}
+                  disabled={pdcaRunning}
+                  onClick={async () => {
+                    setPdcaRunning(true); setPdcaResult(null)
+                    try {
+                      const res = await fetch('/api/admin/x-marketing', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ adminPassword: pdcaPassword || ADMIN_PASSWORD, type }),
+                      })
+                      setPdcaResult(await res.json())
+                    } catch (e) { setPdcaResult({ error: e instanceof Error ? e.message : String(e) }) }
+                    setPdcaRunning(false)
+                  }}
+                  style={{ ...s.btn, background: pdcaRunning ? '#9ca3af' : color, padding: '8px 14px', fontSize: '12px' }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div style={{ marginTop: '16px', padding: '12px', background: '#fef9c3', borderRadius: '8px', fontSize: '12px', color: '#854d0e' }}>
             <strong>X 投稿が 402 エラーになる場合：</strong><br />
             developer.twitter.com → Products でクレジット残高を確認・チャージしてください。
