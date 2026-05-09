@@ -4,8 +4,8 @@ import { getServiceSupabase } from '../../../lib/pdca/supabaseAdmin'
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'yosoru_admin'
 
 /**
- * サクラ投票: 指定した問いの全選択肢にランダム量のptを均等に分配投票する。
- * RPC place_bet ではなくDB直接更新（管理者専用）。
+ * サクラ投票: 全選択肢に傾斜付きランダムで計150ptを配分。
+ * 1番人気そう（既に最多票 or 先頭）を多めに配分して自然な分布に。
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -13,7 +13,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { adminPassword, marketId, totalAmount = 1000 } = req.body as {
+  const { adminPassword, marketId, totalAmount = 150 } = req.body as {
     adminPassword?: string
     marketId?: number
     totalAmount?: number
@@ -28,22 +28,42 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const { data: options, error } = await sb
     .from('market_options')
-    .select('id, pool')
+    .select('id, name, pool')
     .eq('market_id', marketId)
+    .order('id', { ascending: true })
 
   if (error) return res.status(500).json({ error: error.message })
   if (!options || options.length === 0) return res.status(400).json({ error: '選択肢がありません' })
 
-  const perOption = Math.floor(totalAmount / options.length)
-  const results: { optionId: number; added: number }[] = []
+  const n = options.length
+  const weights: number[] = []
+  let totalWeight = 0
 
-  for (const opt of options) {
-    const jitter = Math.floor(Math.random() * perOption * 0.4) - Math.floor(perOption * 0.2)
-    const amount = Math.max(10, perOption + jitter)
-    const newPool = (opt.pool || 0) + amount
+  for (let i = 0; i < n; i++) {
+    const baseWeight = n - i
+    const popularityBonus = options[i].pool > 0 ? Math.log2(options[i].pool + 1) : 0
+    const w = baseWeight + popularityBonus + Math.random() * 2
+    weights.push(w)
+    totalWeight += w
+  }
 
-    await sb.from('market_options').update({ pool: newPool }).eq('id', opt.id)
-    results.push({ optionId: opt.id, added: amount })
+  const maxIdx = weights.indexOf(Math.max(...weights))
+  weights[maxIdx] *= 1.5
+  totalWeight = weights.reduce((s, w) => s + w, 0)
+
+  const results: { optionId: number; name: string; added: number }[] = []
+  let remaining = totalAmount
+
+  for (let i = 0; i < n; i++) {
+    const isLast = i === n - 1
+    const share = isLast ? remaining : Math.max(5, Math.round((weights[i] / totalWeight) * totalAmount))
+    const jitter = isLast ? 0 : Math.floor(Math.random() * 6) - 3
+    const amount = Math.max(5, Math.min(remaining, share + jitter))
+    remaining -= amount
+
+    const newPool = (options[i].pool || 0) + amount
+    await sb.from('market_options').update({ pool: newPool }).eq('id', options[i].id)
+    results.push({ optionId: options[i].id, name: options[i].name, added: amount })
   }
 
   const totalAdded = results.reduce((s, r) => s + r.added, 0)
