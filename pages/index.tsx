@@ -142,23 +142,34 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key`}
 
   return (
     <div style={{ maxWidth: '500px', margin: '0 auto', padding: '10px 10px 80px', fontFamily: 'sans-serif', background: '#f8fafc', minHeight: '100vh' }}>
-      {justVoted && <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.8)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:'20px'}}><div style={{background:'white', padding:'24px', borderRadius:'24px', textAlign:'center', width:'100%', maxWidth:'320px'}}><div style={{fontSize:'40px', marginBottom:'10px'}}>🎯</div><h3 style={{margin:'0 0 10px', fontSize:'20px', fontWeight:'900'}}>ヨソりました！</h3><button onClick={() => { const text = config.share_text_base.replace('{title}', justVoted.title).replace('{option}', justVoted.option); window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(window.location.origin)}`, '_blank') }} style={{background:'#000', color:'#fff', padding:'14px', borderRadius:'12px', width:'100%', fontWeight:'bold', border:'none'}}>𝕏に投稿する</button><button onClick={() => setJustVoted(null)} style={{background:'none', border:'none', color:'#999', fontSize:'13px', marginTop:'10px'}}>閉じる</button></div></div>}
+      {justVoted && <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.85)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:'20px', animation:'fadeIn 0.3s ease'}}>
+        <div style={{background:'linear-gradient(135deg, #ffffff, #f0f9ff)', padding:'30px', borderRadius:'28px', textAlign:'center', width:'100%', maxWidth:'340px', boxShadow:'0 20px 60px rgba(0,0,0,0.3)', animation:'popIn 0.4s cubic-bezier(0.68,-0.55,0.27,1.55)'}}>
+          <div style={{fontSize:'60px', marginBottom:'10px', animation:'bounceEmoji 0.6s ease'}}>🎯</div>
+          <h3 style={{margin:'0 0 5px', fontSize:'24px', fontWeight:'900', background:'linear-gradient(135deg, #2563eb, #9333ea)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent'}}>ヨソり完了！</h3>
+          <p style={{fontSize:'13px', color:'#64748b', margin:'0 0 8px'}}>「{justVoted.option}」に予想しました</p>
+          <div style={{fontSize:'11px', color:'#94a3b8', marginBottom:'20px'}}>結果発表をお楽しみに 🔮✨</div>
+          <button onClick={() => { const text = config.share_text_base.replace('{title}', justVoted.title).replace('{option}', justVoted.option); window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(window.location.origin)}`, '_blank') }} style={{background:'linear-gradient(135deg, #1f2937, #374151)', color:'#fff', padding:'14px', borderRadius:'12px', width:'100%', fontWeight:'bold', border:'none', fontSize:'14px', marginBottom:'8px'}}>𝕏 で友達に自慢する</button>
+          <button onClick={() => setJustVoted(null)} style={{background:'none', border:'none', color:'#94a3b8', fontSize:'13px', padding:'8px'}}>閉じる</button>
+        </div>
+        <style>{`@keyframes fadeIn{from{opacity:0}to{opacity:1}} @keyframes popIn{from{transform:scale(0.5);opacity:0}to{transform:scale(1);opacity:1}} @keyframes bounceEmoji{0%,100%{transform:scale(1)}50%{transform:scale(1.3)}}`}</style>
+      </div>}
 
       {showAuthModal && <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:'20px'}}><div style={{background:'white', padding:'24px', borderRadius:'20px', width:'100%', maxWidth:'380px', textAlign:'center'}}><h2 style={{fontSize:'20px', fontWeight:'900', marginBottom:'15px'}}>ヨソるを開始</h2><button onClick={() => supabase.auth.signInWithOAuth({provider:'google'})} style={{width:'100%', padding:'12px', marginBottom:'10px', borderRadius:'8px', border:'1px solid #ddd', background:'#fff', fontWeight:'bold', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'}}><img src="https://www.google.com/favicon.ico" alt="Google icon" width="16"/>Googleでつづける</button><div style={{margin:'15px 0', color:'#999', fontSize:'12px'}}>またはメールアドレスで</div><input type="email" placeholder="メール" value={email} onChange={e => setEmail(e.target.value)} style={{width:'100%', padding:'10px', marginBottom:'8px', borderRadius:'8px', border:'1px solid #eee'}} /><input type="password" placeholder="パス" value={password} onChange={e => setPassword(e.target.value)} style={{width:'100%', padding:'10px', marginBottom:'16px', borderRadius:'8px', border:'1px solid #eee'}} /><div style={{display:'flex', gap:'8px'}}><button onClick={() => supabase.auth.signInWithPassword({email, password}).then(()=>setShowAuthModal(false))} style={{flex:1, padding:'12px', background:'#3b82f6', color:'#fff', border:'none', borderRadius:'8px'}}>ログイン</button><button onClick={() => supabase.auth.signUp({email, password}).then(()=>setShowAuthModal(false))} style={{flex:1, padding:'12px', background:'#1f2937', color:'#fff', border:'none', borderRadius:'8px'}}>新規登録</button></div><button onClick={() => supabase.auth.signInAnonymously().then(()=>setShowAuthModal(false))} style={{background:'none', border:'none', color:'#999', fontSize:'12px', marginTop:'15px'}}>ゲスト利用（匿名）</button></div></div>}
 
       <header>
-        <div onClick={() => { setShakeTitle(true); setTimeout(() => setShakeTitle(false), 600) }} style={{cursor:'pointer', textAlign:'center', margin:'10px 0 5px', position:'relative'}}>
-          <h1 style={{fontSize:'30px', fontWeight:'900', background:'linear-gradient(135deg, #2563eb, #9333ea, #ec4899)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', margin:0, display:'inline-block', animation: shakeTitle ? 'bounce 0.5s ease' : 'none'}}>🔮 {config.site_title}</h1>
-          <div style={{fontSize:'10px', color:'#a78bfa', fontWeight:'bold', letterSpacing:'2px'}}>未来をヨソって楽しもう！</div>
+        <div onClick={() => { setShakeTitle(true); setTimeout(() => setShakeTitle(false), 800) }} style={{cursor:'pointer', textAlign:'center', margin:'6px 0 4px', position:'relative', padding:'8px 0'}}>
+          <div style={{position:'absolute', top:0, left:'50%', transform:'translateX(-50)', width:'200px', height:'100%', background:'radial-gradient(circle, rgba(139,92,246,0.1) 0%, transparent 70%)', pointerEvents:'none'}} />
+          <h1 style={{fontSize:'32px', fontWeight:'900', background:'linear-gradient(135deg, #2563eb, #7c3aed, #ec4899, #f59e0b)', backgroundSize:'200% 200%', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', margin:0, display:'inline-block', animation: shakeTitle ? 'bounce 0.6s ease' : 'gradientShift 4s ease infinite'}}>🔮 {config.site_title}</h1>
+          <div style={{fontSize:'11px', color:'#a78bfa', fontWeight:'bold', letterSpacing:'1px', marginTop:'2px'}}>✨ 未来をヨソって楽しもう！ ✨</div>
         </div>
-        <style>{`@keyframes bounce { 0%,100%{transform:translateY(0)} 30%{transform:translateY(-8px) rotate(-2deg)} 60%{transform:translateY(-3px) rotate(1deg)} }`}</style>
+        <style>{`@keyframes bounce{0%,100%{transform:translateY(0) scale(1)}25%{transform:translateY(-10px) scale(1.1) rotate(-3deg)}50%{transform:translateY(-5px) scale(1.05) rotate(2deg)}75%{transform:translateY(-2px) scale(1.02)}} @keyframes gradientShift{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}`}</style>
         <div style={{ textAlign: 'center', fontSize: '11px', color: '#999', marginBottom: '6px' }}>{config.site_description}</div>
         {activeTab === 'home' && (
           <>{config.admin_message && <div style={{fontSize:'11px', background:'#fff', padding:'6px 8px', borderRadius:'8px', textAlign:'center', border:'1px solid #e2e8f0', color:'#64748b', marginBottom:'8px'}}>{config.admin_message}</div>}
             <div style={{display:'grid', gridTemplateColumns:'repeat(6, 1fr)', gap:'3px', margin:'8px 0'}}>{dbCategories.map(c => <button key={c.name} onClick={() => setActiveCategory(c.name)} style={{padding:'5px 0', fontSize:'9px', fontWeight:'bold', background:activeCategory===c.name?'#1f2937':'#fff', color:activeCategory===c.name?'#fff':'#64748b', border:'1px solid #e2e8f0', borderRadius:'6px'}}>{c.name}</button>)}</div>
-            <div style={{display:'flex', justifyContent:'center', gap:'6px', flexWrap:'wrap'}}>{[
+            <div style={{display:'flex', justifyContent:'center', gap:'5px', overflowX:'auto', whiteSpace:'nowrap', padding:'2px 0'}}>{[
               {k:'new',l:'✨新着'},{k:'deadline',l:'⏰締切'},{k:'popular',l:'🔥人気'},{k:'judging',l:'⚖️判定中'},{k:'random',l:'🎲ガチャ'}
-            ].map(({k,l}) => <button key={k} onClick={() => { setSortBy(k as any); if(k==='random') fetchMarkets() }} style={{padding:'5px 12px', borderRadius:'20px', border:'none', background:sortBy===k?'#3b82f6':'#e2e8f0', color:sortBy===k?'#fff':'#64748b', fontSize:'11px', fontWeight:'bold', transition:'all 0.2s', transform: sortBy===k ? 'scale(1.05)' : 'scale(1)'}}>{l}</button>)}</div></>
+            ].map(({k,l}) => <button key={k} onClick={() => { setSortBy(k as any); if(k==='random') fetchMarkets() }} style={{padding:'5px 10px', borderRadius:'20px', border:'none', background:sortBy===k?'#3b82f6':'#e2e8f0', color:sortBy===k?'#fff':'#64748b', fontSize:'11px', fontWeight:'bold', transition:'all 0.15s', flexShrink:0}}>{l}</button>)}</div></>
         )}
       </header>
 
@@ -201,10 +212,12 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key`}
               <div style={{padding:'10px 12px'}}>
                 {/* 最多票オプション */}
                 {!m.is_resolved && topOpt && m.total_pool > 0 && (
-                  <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'8px', padding:'7px 10px', background:'#f8fafc', borderRadius:'10px', border:'1px solid #f1f5f9'}}>
-                    <div style={{fontSize:'22px', fontWeight:'900', color:catColor, lineHeight:1, flexShrink:0}}>{topPct}%</div>
-                    <div style={{fontSize:'11px', color:'#475569', lineHeight:1.3, flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>「{topOpt.name}」に票集中</div>
-                    <div style={{fontSize:'10px', color:'#94a3b8', textAlign:'right', flexShrink:0, whiteSpace:'nowrap'}}>{m.total_pool.toLocaleString()}pt</div>
+                  <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'8px', padding:'8px 10px', background:'linear-gradient(135deg, #f8fafc, #eff6ff)', borderRadius:'10px', border:'1px solid #e0e7ff'}}>
+                    <div style={{fontSize:'24px', fontWeight:'900', color:catColor, lineHeight:1, flexShrink:0}}>{topPct}%</div>
+                    <div style={{fontSize:'11px', color:'#475569', lineHeight:1.4, flex:1, minWidth:0}}>
+                      <span style={{fontWeight:'bold'}}>「{topOpt.name}」</span>に<br/>票が集まっています
+                    </div>
+                    <div style={{fontSize:'10px', color:'#94a3b8', textAlign:'right', flexShrink:0, whiteSpace:'nowrap'}}>{m.total_pool.toLocaleString()}pt<br/>の予想</div>
                   </div>
                 )}
 
@@ -275,14 +288,20 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key`}
       )}
 
       {activeTab === 'ranking' && (
-        <div style={{ border: '1px solid #e2e8f0', borderRadius: '16px', overflow: 'hidden', background:'#fff' }}>
+        <div>
+          <h2 style={{textAlign:'center', fontSize:'20px', fontWeight:'900', margin:'10px 0 15px', background:'linear-gradient(135deg, #d97706, #f59e0b)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent'}}>🏆 予想師ランキング</h2>
+          <div style={{ border: '1px solid #e2e8f0', borderRadius: '16px', overflow: 'hidden', background:'#fff' }}>
           {ranking.map((u, i) => (
-            <div key={u.id} style={{ display: 'flex', alignItems: 'center', padding: '16px', borderBottom: '1px solid #f1f5f9', background: u.id === profile?.id ? '#fffbeb' : '#fff' }}>
-              <div style={{ width: '45px', fontSize: '20px', textAlign: 'center' }}>{i === 0 ? '👑' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}</div>
-              <div style={{ flex: 1, marginLeft: '10px' }}><strong>{u.username || '名無しさん'}</strong>{u.id === profile?.id && <span style={{fontSize:'10px', marginLeft:'5px', color:'#3b82f6'}}>(あなた)</span>}</div>
-              <div style={{ fontWeight: '900', color: i === 0 ? '#d97706' : '#475569' }}>{u.point_balance.toLocaleString()} pt</div>
+            <div key={u.id} style={{ display: 'flex', alignItems: 'center', padding: i < 3 ? '18px 16px' : '12px 16px', borderBottom: '1px solid #f1f5f9', background: i === 0 ? 'linear-gradient(135deg, #fffbeb, #fef3c7)' : i === 1 ? '#fefce8' : i === 2 ? '#fffbf0' : u.id === profile?.id ? '#eff6ff' : '#fff' }}>
+              <div style={{ width: '45px', fontSize: i < 3 ? '28px' : '16px', textAlign: 'center', fontWeight:'bold', color: i >= 3 ? '#94a3b8' : undefined }}>{i === 0 ? '👑' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}`}</div>
+              <div style={{ flex: 1, marginLeft: '10px' }}>
+                <strong style={{fontSize: i < 3 ? '15px' : '13px'}}>{u.username || '名無しさん'}</strong>
+                {u.id === profile?.id && <span style={{fontSize:'10px', marginLeft:'5px', color:'#3b82f6', fontWeight:'bold'}}>(あなた)</span>}
+              </div>
+              <div style={{ fontWeight: '900', fontSize: i < 3 ? '16px' : '14px', color: i === 0 ? '#d97706' : i === 1 ? '#6b7280' : i === 2 ? '#92400e' : '#475569' }}>{u.point_balance.toLocaleString()} <span style={{fontSize:'11px', fontWeight:'normal'}}>pt</span></div>
             </div>
           ))}
+          </div>
         </div>
       )}
 
@@ -304,6 +323,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key`}
               )}
               <div style={{fontSize:'36px', fontWeight:'900', marginTop:'15px'}}>{profile?.point_balance?.toLocaleString()} <span style={{fontSize:'16px', opacity:0.8}}>pt</span></div>
               <div style={{fontSize:'11px', opacity:0.7, marginTop:'5px'}}>保有スコア</div>
+              {session?.user?.email && <div style={{fontSize:'10px', opacity:0.6, marginTop:'8px'}}>📧 {session.user.email}</div>}
             </div>
 
             <h3 style={{fontSize:'16px', fontWeight:'800', margin:'0 0 15px'}}>📜 ヨソり履歴</h3>
@@ -326,8 +346,8 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key`}
                       )}
                     </div>
                     <div style={{textAlign:'right'}}>
-                      <div style={{fontSize:'12px', fontWeight:'bold', color: b.markets.is_resolved ? (isWin ? '#10b981' : '#ef4444') : '#666'}}>
-                        {b.markets.is_resolved ? (isWin ? '🎯 的中！' : '不的中') : '判定中'}
+                      <div style={{fontSize: isWin ? '14px' : '12px', fontWeight:'bold', color: b.markets.is_resolved ? (isWin ? '#10b981' : '#ef4444') : '#666'}}>
+                        {b.markets.is_resolved ? (isWin ? '🎉🎯 的中！' : '😢 不的中') : '⏳ 判定中'}
                       </div>
                       {isWin && (
                         <button 

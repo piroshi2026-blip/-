@@ -718,6 +718,22 @@ export default function Admin() {
                   )}
 
                   <button onClick={handleUpdateMarket} style={{...s.btn, width:'100%', background:'#10b981'}}>保存</button>
+                  <button
+                    onClick={async () => {
+                      if (!confirm('この問いの全選択肢に均等にサクラ投票（計1000pt）しますか？')) return
+                      try {
+                        const res = await fetch('/api/admin/sakura-vote', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ adminPassword: ADMIN_PASSWORD, marketId: editingId, totalAmount: 1000 }),
+                        })
+                        const data = await res.json()
+                        if (data.ok) { alert(`サクラ投票完了: 計${data.totalAdded}pt分配`); fetchData() }
+                        else alert('エラー: ' + (data.error || '不明'))
+                      } catch (e) { alert('エラー: ' + (e instanceof Error ? e.message : String(e))) }
+                    }}
+                    style={{...s.btn, width:'100%', background:'#ec4899', marginTop:'8px', fontSize:'12px'}}
+                  >🌸 サクラ投票（全選択肢に均等1000pt）</button>
                   <button onClick={() => setEditingId(null)} style={{...s.btn, width:'100%', background:'#9ca3af', marginTop:'8px'}}>キャンセル</button>
                 </div>
               )}
