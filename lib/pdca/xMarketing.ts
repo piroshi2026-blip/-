@@ -47,8 +47,8 @@ async function callClaude(prompt: string): Promise<string> {
 }
 
 export async function generateNewMarketTweet(title: string, category: string): Promise<string> {
-  const prompt = `あなたはX(Twitter)のバズるツイートを書くプロです。
-以下の予測市場の新しい「問い」を宣伝する投稿を1つ書いてください。
+  const prompt = `あなたは予測市場アプリ「ヨソる」の公式Xアカウントの中の人です。
+新しい「問い」を公開したことを告知する投稿を1つ書いてください。
 
 問い: 「${title}」
 カテゴリ: ${category}
@@ -56,12 +56,13 @@ export async function generateNewMarketTweet(title: string, category: string): P
 
 ルール:
 - 280文字以内（厳守）
-- 思わず意見を言いたくなるような煽り・問いかけ口調
+- 公式の中の人として「新しい問い出しました！」的なテンション
+- フォロワーに意見を求める問いかけ口調
 - そのカテゴリのコミュニティに刺さるハッシュタグを2-3個
 - #ヨソる は必ず入れる
 - 🔮 をどこかに入れる
 - サイトURLを末尾に入れる
-- 機械的・テンプレ的にならず、生きた言葉で
+- 機械的・テンプレ的にならず、中の人の人格が見える言葉で
 
 投稿文のみ出力（説明不要）:`
 
@@ -74,8 +75,8 @@ export async function generateResultTweet(
   topPredictors: string[],
   odds: number
 ): Promise<string> {
-  const prompt = `あなたはX(Twitter)のバズるツイートを書くプロです。
-予測市場の結果発表ツイートを1つ書いてください。
+  const prompt = `あなたは予測市場アプリ「ヨソる」の公式Xアカウントの中の人です。
+問いの結果が確定したので発表ツイートを書いてください。
 
 問い: 「${title}」
 正解: 「${winnerOption}」
@@ -86,8 +87,8 @@ export async function generateResultTweet(
 ルール:
 - 280文字以内
 - 🎯🎉 など祝福感を出す
-- 的中者を称える（すごい！さすが！的な）
-- 次の問いへの誘導「次はあなたもヨソってみない？」的な
+- 的中した人を称える（「当てた方おめでとう！」的な）
+- 公式として「次の問いも出てるよ〜」と誘導
 - #ヨソる #予測市場 + カテゴリ関連タグ
 - URLを末尾に
 
@@ -99,20 +100,20 @@ export async function generateResultTweet(
 export async function generateEducationTweet(): Promise<string> {
   const topic = EDUCATION_TOPICS[Math.floor(Math.random() * EDUCATION_TOPICS.length)]
 
-  const prompt = `あなたはX(Twitter)で人気のある教育系アカウントです。
-予測市場アプリ「ヨソる」の魅力や仕組みについて、以下のトピックで投稿を1つ書いてください。
+  const prompt = `あなたは予測市場アプリ「ヨソる」の公式Xアカウントの中の人です。
+以下のトピックについて投稿を1つ書いてください。
 
 トピック: ${topic}
 サイト: ${SITE_URL}
 
 ルール:
 - 280文字以内
-- 親しみやすい口調（硬くならない）
+- 公式アカウントとして親しみやすい「中の人」口調
+- 運営側の視点で語る（「うちのアプリ」「ヨソるでは〜」等）
 - 「へぇ〜」「なるほど」と思わせる切り口
 - 具体例を1つ入れる
 - #ヨソる は必ず入れる
 - URLを末尾に入れる
-- スレッド形式ではなく1投稿で完結
 
 投稿文のみ出力:`
 
@@ -124,8 +125,8 @@ export async function generateTrendHookTweet(trendKeyword: string, relatedMarket
     ? `関連する問い: 「${relatedMarketTitle}」`
     : '（関連する問いは省略可）'
 
-  const prompt = `あなたはXのトレンドに乗るのが得意なアカウントです。
-今トレンドの話題に絡めて「ヨソる」を宣伝する投稿を書いてください。
+  const prompt = `あなたは予測市場アプリ「ヨソる」の公式Xアカウントの中の人です。
+今話題のトレンドに絡めて「ヨソる」を紹介する投稿を書いてください。
 
 トレンドワード: ${trendKeyword}
 ${marketLine}
@@ -133,11 +134,11 @@ ${marketLine}
 
 ルール:
 - 280文字以内
+- 公式として「うちでもこの話題出してます！」的なスタンス
 - トレンドの話題に自然に絡める（無理やり感NG）
-- 「これ、ヨソってみない？」的な自然な誘導
+- 「みなさんもヨソってみてください」的な誘導
 - そのトレンド関連のハッシュタグ + #ヨソる
 - URL末尾
-- 予測・未来志向のアングルで切る
 
 投稿文のみ出力:`
 
@@ -147,8 +148,8 @@ ${marketLine}
 export async function generateEngagementTweet(markets: { title: string; topOption: string; topPct: number }[]): Promise<string> {
   const marketList = markets.slice(0, 3).map(m => `• ${m.title}（現在${m.topPct}%が「${m.topOption}」）`).join('\n')
 
-  const prompt = `あなたはXでフォロワーとの交流が上手いアカウントです。
-予測市場「ヨソる」の現在の注目問いについて、リプライや引用RTを誘発する投稿を書いてください。
+  const prompt = `あなたは予測市場アプリ「ヨソる」の公式Xアカウントの中の人です。
+現在盛り上がっている問いについて、フォロワーに投票を呼びかける投稿を書いてください。
 
 現在の注目問い:
 ${marketList}
@@ -157,10 +158,10 @@ ${marketList}
 
 ルール:
 - 280文字以内
-- 「あなたはどう思う？」的な問いかけで返信を誘う
+- 公式として「今この問い盛り上がってます！」的なテンション
+- 「みなさんはどう思います？」と返信を誘う
 - 意見が割れそうなポイントを突く
 - #ヨソる を入れる
-- 選択肢を見せて「みんなで投票しよう」感
 - URLを末尾に
 
 投稿文のみ出力:`
