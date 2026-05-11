@@ -523,14 +523,14 @@ export default function Admin() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: '2px', marginBottom: '20px', borderRadius:'10px', overflow:'hidden' }}>
-        <button onClick={() => setActiveTab('markets')} style={s.tab(activeTab === 'markets')}>問い管理</button>
-        <button onClick={() => setActiveTab('gacha')} style={{...s.tab(activeTab === 'gacha'), background: activeTab === 'gacha' ? '#f59e0b' : '#fef3c7', color: activeTab === 'gacha' ? '#fff' : '#92400e'}}>🎰 ガチャ投稿</button>
-        <button onClick={() => setActiveTab('categories')} style={s.tab(activeTab === 'categories')}>カテゴリ</button>
-        <button onClick={() => setActiveTab('users')} style={s.tab(activeTab === 'users')}>ユーザー</button>
-        <button onClick={() => setActiveTab('config')} style={s.tab(activeTab === 'config')}>サイト設定</button>
-        <button onClick={() => setActiveTab('pdca')} style={s.tab(activeTab === 'pdca')}>🤖 PDCA</button>
-        <button onClick={() => { setActiveTab('proposals'); fetchProposals() }} style={s.tab(activeTab === 'proposals')}>✏️ 投稿提案</button>
+      <div style={{ display: 'flex', gap: '2px', marginBottom: '20px', borderRadius:'10px', overflowX: 'auto', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
+        <button onClick={() => setActiveTab('markets')} style={{...s.tab(activeTab === 'markets'), flex: '1 0 auto'}}>問い管理</button>
+        <button onClick={() => setActiveTab('gacha')} style={{...s.tab(activeTab === 'gacha'), flex: '1 0 auto', background: activeTab === 'gacha' ? '#f59e0b' : '#fef3c7', color: activeTab === 'gacha' ? '#fff' : '#92400e'}}>🎰 ガチャ</button>
+        <button onClick={() => setActiveTab('categories')} style={{...s.tab(activeTab === 'categories'), flex: '1 0 auto'}}>カテゴリ</button>
+        <button onClick={() => setActiveTab('users')} style={{...s.tab(activeTab === 'users'), flex: '1 0 auto'}}>ユーザー</button>
+        <button onClick={() => setActiveTab('config')} style={{...s.tab(activeTab === 'config'), flex: '1 0 auto'}}>設定</button>
+        <button onClick={() => setActiveTab('pdca')} style={{...s.tab(activeTab === 'pdca'), flex: '1 0 auto'}}>🤖 PDCA</button>
+        <button onClick={() => { setActiveTab('proposals'); fetchProposals() }} style={{...s.tab(activeTab === 'proposals'), flex: '1 0 auto'}}>✏️ 提案</button>
       </div>
 
       {activeTab === 'markets' && (
