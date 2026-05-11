@@ -3,6 +3,7 @@ import { assertCronAuthorized } from '../../../lib/pdca/cronGuard'
 import { createQuickMarket, type QuickMarketResult } from '../../../lib/pdca/quickMarket'
 import { preloadDraftData } from '../../../lib/pdca/generateDraft'
 import { isAutoPostEnabled } from '../../../lib/pdca/postX'
+import { logPdcaPayload } from '../../../lib/pdca/pdcaHelpers'
 
 export const maxDuration = 60
 
@@ -19,7 +20,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!assertCronAuthorized(req, res)) return
 
   const xEnabled = isAutoPostEnabled()
-  const preloaded = await preloadDraftData()
+
+  let preloaded: Awaited<ReturnType<typeof preloadDraftData>>
+  try {
+    preloaded = await preloadDraftData()
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    await logPdcaPayload('pdca_hourly', { stage: 'preload', error: msg, xAutoPostEnabled: xEnabled }, false)
+    return res.status(200).json({ error: msg, stage: 'preload', xAutoPostEnabled: xEnabled })
+  }
 
   const [r1, r2] = await Promise.allSettled([
     createQuickMarket(preloaded, true),
@@ -31,9 +40,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       ? r.value
       : { error: (r.reason as Error)?.message ?? String(r.reason) }
 
-  return res.status(200).json({
-    market1: toResult(r1),
-    market2: toResult(r2),
-    xAutoPostEnabled: xEnabled,
-  })
+  const market1 = toResult(r1)
+  const market2 = toResult(r2)
+  const ok = !(market1 as any).error && !(market2 as any).error
+
+  await logPdcaPayload('pdca_hourly', { market1, market2, xAutoPostEnabled: xEnabled }, ok)
+
+  return res.status(200).json({ market1, market2, xAutoPostEnabled: xEnabled })
 }
