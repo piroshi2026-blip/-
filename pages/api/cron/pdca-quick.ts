@@ -2,6 +2,8 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { assertCronAuthorized } from '../../../lib/pdca/cronGuard'
 import { createQuickMarket } from '../../../lib/pdca/quickMarket'
 
+export const maxDuration = 60
+
 /** テスト用：スロット管理なしで毎回新しい問いを生成・公開・X 投稿する。 */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET' && req.method !== 'POST') {

@@ -4,6 +4,8 @@ import { createQuickMarket, type QuickMarketResult } from '../../../lib/pdca/qui
 import { preloadDraftData } from '../../../lib/pdca/generateDraft'
 import { isAutoPostEnabled } from '../../../lib/pdca/postX'
 
+export const maxDuration = 60
+
 /**
  * JST 9:00〜23:00 毎時実行（cron-job.org から呼ばれる）。
  * RSS/worldCtx を1回プリロードし、2問を並列生成・公開・X投稿。

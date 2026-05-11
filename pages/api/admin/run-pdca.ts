@@ -2,6 +2,8 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { executePdcaSlot } from '../../../lib/pdca/executeSlot'
 import { createQuickMarket } from '../../../lib/pdca/quickMarket'
 
+export const maxDuration = 60
+
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'yosoru_admin'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {

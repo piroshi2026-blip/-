@@ -2,6 +2,8 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { assertCronAuthorized } from '../../../lib/pdca/cronGuard'
 import { planDailySlots } from '../../../lib/pdca/planDailySlots'
 
+export const maxDuration = 60
+
 /** ①調査 → 当日5枠の種を保存（JST 8時台推奨・UTC 23時） */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET' && req.method !== 'POST') {

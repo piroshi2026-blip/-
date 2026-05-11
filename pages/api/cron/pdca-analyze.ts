@@ -2,6 +2,8 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { assertCronAuthorized } from '../../../lib/pdca/cronGuard'
 import { analyzePdcaPreviousDay } from '../../../lib/pdca/analyzeDay'
 
+export const maxDuration = 60
+
 /** ⑤前日 JST の集計・改善メモ（夜間推奨） */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET' && req.method !== 'POST') {
