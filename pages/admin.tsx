@@ -175,6 +175,28 @@ export default function Admin() {
     setPdcaRunning(false)
   }
 
+  async function fetchPdcaRuns() {
+    setPdcaRunsLoading(true)
+    setPdcaRunsError(null)
+    try {
+      const res = await fetch('/api/admin/get-pdca-runs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminPassword: ADMIN_PASSWORD }),
+      })
+      const data = await res.json()
+      if (data.tableError) {
+        setPdcaRunsError('pdca_runs テーブルが存在しません: ' + data.tableError)
+        setPdcaRuns(null)
+      } else {
+        setPdcaRuns(data.runs ?? [])
+      }
+    } catch (e) {
+      setPdcaRunsError(e instanceof Error ? e.message : String(e))
+    }
+    setPdcaRunsLoading(false)
+  }
+
   async function handleRunHourly() {
     setPdcaRunning(true)
     setPdcaResult(null)
@@ -327,6 +349,9 @@ export default function Admin() {
   const [refreshImageLoading, setRefreshImageLoading] = useState(false)
   const [fillUrlLoading, setFillUrlLoading] = useState(false)
   const [fillUrlResult, setFillUrlResult] = useState<{ updated: number; remaining: number; emptyCount?: number } | null>(null)
+  const [pdcaRunsLoading, setPdcaRunsLoading] = useState(false)
+  const [pdcaRuns, setPdcaRuns] = useState<any[] | null>(null)
+  const [pdcaRunsError, setPdcaRunsError] = useState<string | null>(null)
   const [findSingleUrlLoading, setFindSingleUrlLoading] = useState(false)
   const [urlCandidates, setUrlCandidates] = useState<string[]>([])
   const [urlCandidateIndex, setUrlCandidateIndex] = useState(0)
@@ -1086,6 +1111,65 @@ export default function Admin() {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* 実行ログ */}
+          <div style={{ padding: '16px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', marginTop: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <strong style={{ fontSize: '14px' }}>📋 自動投稿ログ（直近20件）</strong>
+              <button
+                onClick={fetchPdcaRuns}
+                disabled={pdcaRunsLoading}
+                style={{ ...s.btn, background: pdcaRunsLoading ? '#9ca3af' : '#475569', padding: '5px 14px', fontSize: '12px' }}
+              >
+                {pdcaRunsLoading ? '読込中…' : '🔄 ログ取得'}
+              </button>
+            </div>
+            {pdcaRunsError && (
+              <div style={{ fontSize: '12px', color: '#dc2626', background: '#fef2f2', padding: '8px 12px', borderRadius: '6px', marginBottom: '8px' }}>
+                {pdcaRunsError}
+              </div>
+            )}
+            {pdcaRuns === null && !pdcaRunsError && (
+              <p style={{ fontSize: '12px', color: '#94a3b8' }}>「ログ取得」を押すと実行履歴を確認できます。</p>
+            )}
+            {pdcaRuns !== null && pdcaRuns.length === 0 && (
+              <p style={{ fontSize: '12px', color: '#94a3b8' }}>ログがありません（pdca_runs テーブルが空です）。</p>
+            )}
+            {pdcaRuns !== null && pdcaRuns.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '400px', overflowY: 'auto' }}>
+                {pdcaRuns.map((run: any) => {
+                  const jst = new Date(run.created_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })
+                  const payload = run.payload ?? {}
+                  const hasError = !run.ok || payload.error || payload.market1?.error || payload.market2?.error
+                  return (
+                    <div key={run.id} style={{ padding: '8px 12px', borderRadius: '8px', background: hasError ? '#fef2f2' : '#f0fdf4', border: `1px solid ${hasError ? '#fca5a5' : '#86efac'}`, fontSize: '12px' }}>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '4px' }}>
+                        <span>{run.ok ? '✅' : '❌'}</span>
+                        <span style={{ color: '#475569', fontWeight: 'bold' }}>{jst}</span>
+                        {payload.xAutoPostEnabled === false && <span style={{ color: '#b45309', fontSize: '11px' }}>X投稿OFF</span>}
+                      </div>
+                      {hasError && (
+                        <pre style={{ margin: '4px 0 0', fontSize: '11px', color: '#991b1b', whiteSpace: 'pre-wrap', wordBreak: 'break-all', background: 'transparent', padding: 0 }}>
+                          {JSON.stringify(
+                            payload.error
+                              ? { error: payload.error }
+                              : { market1: payload.market1?.error ?? '✅', market2: payload.market2?.error ?? '✅' },
+                            null, 2
+                          )}
+                        </pre>
+                      )}
+                      {!hasError && payload.market1 && (
+                        <div style={{ color: '#166534', fontSize: '11px' }}>
+                          問い1: marketId={payload.market1?.marketId} ／ 問い2: marketId={payload.market2?.marketId}
+                          {payload.market1?.tweetId && ' ／ X投稿済み'}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
 
           <div style={{ marginTop: '16px', padding: '12px', background: '#fef9c3', borderRadius: '8px', fontSize: '12px', color: '#854d0e' }}>
