@@ -210,6 +210,12 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key`}
               </div>
 
               <div style={{padding:'10px 12px'}}>
+                {/* アンケート型バッジ */}
+                {m.auto_resolve && (
+                  <div style={{display:'inline-flex', alignItems:'center', gap:'4px', background:'linear-gradient(135deg, #7c3aed, #a855f7)', color:'#fff', padding:'4px 12px', borderRadius:'20px', fontSize:'12px', fontWeight:'bold', marginBottom:'8px', boxShadow:'0 2px 6px rgba(124,58,237,0.35)'}}>
+                    🗳️ みんなの意見
+                  </div>
+                )}
                 {/* 最多票オプション */}
                 {!m.is_resolved && topOpt && m.total_pool > 0 && (
                   <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'8px', padding:'8px 10px', background:'linear-gradient(135deg, #f8fafc, #eff6ff)', borderRadius:'10px', border:'1px solid #e0e7ff'}}>
@@ -245,7 +251,6 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key`}
                 <div style={{fontSize:'10px', color:'#94a3b8', marginBottom: m.source_url ? '6px' : '10px', lineHeight:1.5}}>
                   判定: {m.description}
                   {resDate && <span style={{marginLeft:'8px', color:'#6366f1', fontWeight:'bold'}}>📅判定日: {resDate.toLocaleDateString()}{resDays != null && resDays > 0 ? ` (${resDays}日後)` : ''}</span>}
-                  {m.auto_resolve && <span style={{marginLeft:'6px', background:'#ede9fe', color:'#6366f1', padding:'1px 6px', borderRadius:'10px', fontSize:'9px', fontWeight:'bold'}}>アンケート型</span>}
                 </div>
 
                 {m.source_url && (
