@@ -54,23 +54,38 @@ export async function createQuickMarket(preloaded?: PreloadedDraftData, skipImag
   if (ins.error) throw new Error(ins.error)
 
   const sb = getServiceSupabase()
-  const marketId = await resolveNewMarketId(sb, draft.title)
+
+  // タイトルで検索して実際に挿入されたか確認
+  const { data: byTitle } = await sb
+    .from('markets')
+    .select('id')
+    .eq('title', draft.title)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  const insertOk = byTitle?.id != null
+  const marketId = insertOk
+    ? Number(byTitle!.id)
+    : await resolveNewMarketId(sb, draft.title)
+
   const baseUrl = getPublicBaseUrl()
   const body = buildTweetBody(kind, draft.title, baseUrl)
 
   let tweetId: string | null = null
   let tweetError: string | null = null
-  try {
-    const { id } = await postPromotionTweet(body)
-    tweetId = id
-  } catch (e) {
-    tweetError = e instanceof Error ? e.message : String(e)
+  if (insertOk) {
+    try {
+      const { id } = await postPromotionTweet(body)
+      tweetId = id
+    } catch (e) {
+      tweetError = e instanceof Error ? e.message : String(e)
+    }
   }
 
   await logPdcaPayload(
     'pdca_quick',
-    { headline: item.title, title: draft.title, kind, marketId, tweetId, tweetError },
-    marketId != null
+    { headline: item.title, title: draft.title, kind, marketId, tweetId, tweetError, insertOk },
+    insertOk
   )
 
   return {

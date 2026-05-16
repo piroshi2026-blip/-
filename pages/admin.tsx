@@ -1157,6 +1157,8 @@ export default function Admin() {
                           {payload.title && <div>📝 {String(payload.title)}</div>}
                           <div style={{ display: 'flex', gap: '10px', marginTop: '2px', flexWrap: 'wrap' }}>
                             <span>marketId: <strong>{payload.marketId != null ? String(payload.marketId) : '―'}</strong></span>
+                            {payload.insertOk === false && <span style={{ color: '#dc2626', fontWeight: 'bold' }}>⚠️ DB挿入失敗</span>}
+                            {payload.insertOk === true && <span style={{ color: '#166534' }}>✅ DB挿入OK</span>}
                             {payload.tweetId && <span style={{ color: '#0284c7' }}>𝕏 投稿済み ({String(payload.tweetId).slice(0,8)}…)</span>}
                             {payload.tweetError && <span style={{ color: '#dc2626' }}>𝕏エラー: {String(payload.tweetError)}</span>}
                           </div>
