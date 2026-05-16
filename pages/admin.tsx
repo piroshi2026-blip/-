@@ -1151,22 +1151,22 @@ export default function Admin() {
                         <span style={{ fontSize: '10px', background: '#e2e8f0', color: '#475569', padding: '1px 6px', borderRadius: '10px' }}>{kind}</span>
                         {payload.xAutoPostEnabled === false && <span style={{ color: '#b45309', fontSize: '11px' }}>X投稿OFF</span>}
                       </div>
-                      {/* pdca_quick: 問いタイトル・marketId・X投稿状況 */}
-                      {kind === 'pdca_quick' && (
+                      {/* general/mlb = createQuickMarket のログ（kindフィールドが上書きされるため） */}
+                      {(kind === 'general' || kind === 'mlb') && (
                         <div style={{ fontSize: '11px', color: hasError ? '#991b1b' : '#166534', marginTop: '2px' }}>
-                          {payload.title && <div>📝 {payload.title}</div>}
+                          {payload.title && <div>📝 {String(payload.title)}</div>}
                           <div style={{ display: 'flex', gap: '10px', marginTop: '2px', flexWrap: 'wrap' }}>
-                            <span>marketId: {payload.marketId ?? '―'}</span>
-                            {payload.tweetId && <span>𝕏 投稿済み</span>}
-                            {payload.tweetError && <span style={{ color: '#dc2626' }}>𝕏エラー: {payload.tweetError}</span>}
+                            <span>marketId: <strong>{payload.marketId != null ? String(payload.marketId) : '―'}</strong></span>
+                            {payload.tweetId && <span style={{ color: '#0284c7' }}>𝕏 投稿済み ({String(payload.tweetId).slice(0,8)}…)</span>}
+                            {payload.tweetError && <span style={{ color: '#dc2626' }}>𝕏エラー: {String(payload.tweetError)}</span>}
                           </div>
                         </div>
                       )}
                       {/* pdca_hourly: 2問まとめ */}
-                      {kind === 'pdca_hourly' && payload.market1 && (
+                      {payload.market1 && (
                         <div style={{ fontSize: '11px', color: hasError ? '#991b1b' : '#166534', marginTop: '2px' }}>
-                          <div>問い1: {payload.market1?.title ?? '―'} (id={payload.market1?.marketId ?? '―'}) {payload.market1?.tweetId ? '𝕏✅' : payload.market1?.tweetError ? `𝕏❌${payload.market1.tweetError}` : ''}</div>
-                          <div>問い2: {payload.market2?.title ?? '―'} (id={payload.market2?.marketId ?? '―'}) {payload.market2?.tweetId ? '𝕏✅' : payload.market2?.tweetError ? `𝕏❌${payload.market2.tweetError}` : ''}</div>
+                          <div>問い1: {payload.market1?.title ?? '―'} (id={payload.market1?.marketId ?? '―'}) {payload.market1?.tweetId ? '𝕏✅' : payload.market1?.tweetError ? `𝕏❌ ${payload.market1.tweetError}` : ''}</div>
+                          <div>問い2: {payload.market2?.title ?? '―'} (id={payload.market2?.marketId ?? '―'}) {payload.market2?.tweetId ? '𝕏✅' : payload.market2?.tweetError ? `𝕏❌ ${payload.market2.tweetError}` : ''}</div>
                         </div>
                       )}
                       {/* エラー詳細 */}
