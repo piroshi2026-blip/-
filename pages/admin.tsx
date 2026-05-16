@@ -42,11 +42,13 @@ export default function Admin() {
     sourceSnippet?: string | null
     error?: string
   }
-  type EditCard = { title: string; options: string[]; endDays: number; resolutionDays: number }
+  type EditCard = { title: string; options: string[]; endDays: number; resolutionDays: number; sourceLink: string; sourceSnippet: string; imageHistory: (string | null)[]; imageIdx: number }
   const [gachaCards, setGachaCards] = useState<GachaCard[]>([])
   const [gachaEdits, setGachaEdits] = useState<EditCard[]>([])
   const [gachaLoading, setGachaLoading] = useState(false)
   const [gachaPosting, setGachaPosting] = useState<number | null>(null)
+  const [gachaImageLoading, setGachaImageLoading] = useState<Record<number, boolean>>({})
+  const [gachaSnippetLoading, setGachaSnippetLoading] = useState<Record<number, boolean>>({})
   const [gachaPostResults, setGachaPostResults] = useState<Record<number, unknown>>({})
   const [gachaHint, setGachaHint] = useState('')
   const [aiTestResult, setAiTestResult] = useState<unknown>(null)
@@ -315,7 +317,11 @@ export default function Admin() {
           title: c.draft?.title ?? '',
           options: c.draft?.options ?? ['', '', ''],
           endDays: c.draft?.endDays ?? 7,
-          resolutionDays: (c.draft?.endDays ?? 7) + 1,
+          resolutionDays: (c.draft?.endDays ?? 7) + 21,
+          sourceLink: c.sourceLink ?? '',
+          sourceSnippet: c.sourceSnippet ?? '',
+          imageHistory: [c.imageUrl ?? null],
+          imageIdx: 0,
         })))
       }
     } catch (e) {
@@ -334,7 +340,7 @@ export default function Admin() {
       const res = await fetch('/api/admin/post-draft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adminPassword: pdcaPassword, draft, headline: card.headline, kind: card.kind, imageUrl: card.imageUrl, sourceLink: card.sourceLink, sourceTitle: card.sourceSnippet, resolutionDays: edit.resolutionDays }),
+        body: JSON.stringify({ adminPassword: pdcaPassword, draft, headline: card.headline, kind: card.kind, imageUrl: edit.imageHistory[edit.imageIdx] ?? card.imageUrl, sourceLink: edit.sourceLink || card.sourceLink, sourceTitle: edit.sourceSnippet || card.sourceSnippet, resolutionDays: edit.resolutionDays }),
       })
       const data = await res.json()
       setGachaPostResults(prev => ({ ...prev, [idx]: data }))
@@ -342,6 +348,49 @@ export default function Admin() {
       setGachaPostResults(prev => ({ ...prev, [idx]: { error: e instanceof Error ? e.message : String(e) } }))
     }
     setGachaPosting(null)
+  }
+
+  async function handleGachaNextImage(idx: number) {
+    const card = gachaCards[idx]
+    const edit = gachaEdits[idx]
+    if (!card || !edit) return
+    if (edit.imageIdx < edit.imageHistory.length - 1) {
+      setGachaEdits(prev => prev.map((ed, i) => i === idx ? { ...ed, imageIdx: ed.imageIdx + 1 } : ed))
+      return
+    }
+    setGachaImageLoading(prev => ({ ...prev, [idx]: true }))
+    try {
+      const res = await fetch('/api/admin/gacha-next-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminPassword: pdcaPassword, title: edit.title, category: card.draft?.category, kind: card.kind, trendLink: edit.sourceLink || card.sourceLink }),
+      })
+      const data = await res.json()
+      setGachaEdits(prev => prev.map((ed, i) => {
+        if (i !== idx) return ed
+        const newHistory = [...ed.imageHistory, data.imageUrl ?? null]
+        return { ...ed, imageHistory: newHistory, imageIdx: newHistory.length - 1 }
+      }))
+    } catch { /* ignore */ }
+    setGachaImageLoading(prev => ({ ...prev, [idx]: false }))
+  }
+
+  async function handleGachaFetchSnippet(idx: number) {
+    const edit = gachaEdits[idx]
+    if (!edit?.sourceLink) return
+    setGachaSnippetLoading(prev => ({ ...prev, [idx]: true }))
+    try {
+      const res = await fetch('/api/admin/gacha-next-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminPassword: pdcaPassword, mode: 'snippet', url: edit.sourceLink }),
+      })
+      const data = await res.json()
+      if (data.snippet) {
+        setGachaEdits(prev => prev.map((ed, i) => i === idx ? { ...ed, sourceSnippet: data.snippet } : ed))
+      }
+    } catch { /* ignore */ }
+    setGachaSnippetLoading(prev => ({ ...prev, [idx]: false }))
   }
 
   const [batchImageLoading, setBatchImageLoading] = useState(false)
@@ -880,24 +929,48 @@ export default function Admin() {
                       <span style={{ fontSize: '11px', background: '#e0f2fe', color: '#0369a1', borderRadius: '20px', padding: '2px 10px', whiteSpace: 'nowrap' }}>{card.draft?.category}</span>
                     </div>
 
-                    {(card.sourceLink || card.sourceSnippet) && (() => {
-                      let domain = ''
-                      try { domain = card.sourceLink ? new URL(card.sourceLink).hostname.replace(/^www\./, '') : '' } catch { domain = (card.sourceLink ?? '').slice(0, 40) }
+                    {/* 画像 */}
+                    {edit && (() => {
+                      const currentImg = edit.imageHistory[edit.imageIdx]
                       return (
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'baseline', padding: '5px 10px', background: '#f0f9ff', borderRadius: '7px', fontSize: '11px', color: '#64748b', marginBottom: '10px', lineHeight: 1.5 }}>
-                          {domain && (
-                            <a href={card.sourceLink!} target="_blank" rel="noopener noreferrer" style={{ color: '#0284c7', whiteSpace: 'nowrap', fontWeight: 600, textDecoration: 'none', flexShrink: 0 }}>
-                              🔗 {domain}
-                            </a>
-                          )}
-                          {card.sourceSnippet && (
-                            <span style={{ overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' } as React.CSSProperties}>
-                              {card.sourceSnippet}
-                            </span>
-                          )}
+                        <div style={{ marginBottom: '10px' }}>
+                          {currentImg
+                            ? <img src={currentImg} alt="" style={{ width: '100%', maxHeight: '120px', objectFit: 'cover', borderRadius: '8px', marginBottom: '6px' }} />
+                            : <div style={{ width: '100%', height: '60px', background: '#f1f5f9', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: '#94a3b8', marginBottom: '6px' }}>画像なし</div>
+                          }
+                          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                            <button type="button" disabled={edit.imageIdx <= 0} onClick={() => setGachaEdits(prev => prev.map((ed, i) => i === idx ? { ...ed, imageIdx: ed.imageIdx - 1 } : ed))} style={{ ...s.btn, background: edit.imageIdx <= 0 ? '#e2e8f0' : '#64748b', padding: '5px 10px', fontSize: '11px' }}>◀ 前</button>
+                            <button type="button" disabled={!!gachaImageLoading[idx]} onClick={() => handleGachaNextImage(idx)} style={{ ...s.btn, background: gachaImageLoading[idx] ? '#9ca3af' : '#0891b2', padding: '5px 10px', fontSize: '11px', flex: 1 }}>{gachaImageLoading[idx] ? '取得中…' : '🔄 次の画像'}</button>
+                            <span style={{ fontSize: '10px', color: '#94a3b8', whiteSpace: 'nowrap' }}>{edit.imageIdx + 1}/{edit.imageHistory.length}</span>
+                          </div>
                         </div>
                       )
                     })()}
+
+                    {/* 参考記事 URL・引用 */}
+                    {edit && (
+                      <div style={{ marginBottom: '10px' }}>
+                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '4px' }}>
+                          <input
+                            value={edit.sourceLink}
+                            onChange={e => setGachaEdits(prev => prev.map((ed, i) => i === idx ? { ...ed, sourceLink: e.target.value } : ed))}
+                            placeholder="参考記事URL (https://...)"
+                            style={{ ...s.inp, marginBottom: 0, flex: 1, fontSize: '11px' }}
+                          />
+                          <button type="button" disabled={!!gachaSnippetLoading[idx] || !edit.sourceLink} onClick={() => handleGachaFetchSnippet(idx)} style={{ ...s.btn, background: gachaSnippetLoading[idx] ? '#9ca3af' : '#7c3aed', padding: '5px 10px', fontSize: '11px', whiteSpace: 'nowrap' }}>{gachaSnippetLoading[idx] ? '取得中…' : '📰 引用取得'}</button>
+                        </div>
+                        {edit.sourceSnippet && (
+                          <div style={{ padding: '5px 10px', background: '#f0f9ff', borderRadius: '7px', fontSize: '11px', color: '#64748b', lineHeight: 1.5 }}>
+                            <textarea
+                              value={edit.sourceSnippet}
+                              onChange={e => setGachaEdits(prev => prev.map((ed, i) => i === idx ? { ...ed, sourceSnippet: e.target.value } : ed))}
+                              rows={2}
+                              style={{ width: '100%', border: 'none', background: 'transparent', fontSize: '11px', color: '#64748b', resize: 'vertical', padding: 0, outline: 'none', boxSizing: 'border-box' }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     <div style={{ marginBottom: '10px' }}>
                       <label style={{ fontSize: '11px', color: '#666', display: 'block', marginBottom: '4px' }}>タイトル（編集可）</label>

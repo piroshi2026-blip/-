@@ -17,7 +17,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.setHeader('Allow', 'GET, POST')
     return res.status(405).json({ error: 'Method not allowed' })
   }
-  if (!assertCronAuthorized(req, res)) return
+  await logPdcaPayload('pdca_hourly_start', { stage: 'auth_check' }, true)
+  if (!assertCronAuthorized(req, res)) {
+    await logPdcaPayload('pdca_hourly_start', { stage: 'auth_failed' }, false)
+    return
+  }
 
   const xEnabled = isAutoPostEnabled()
   await logPdcaPayload('pdca_hourly_start', { stage: 'start', xAutoPostEnabled: xEnabled }, true)
@@ -34,8 +38,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   await logPdcaPayload('pdca_hourly_start', { stage: 'preloaded' }, true)
 
   const [r1, r2] = await Promise.allSettled([
-    createQuickMarket(preloaded, true),
-    createQuickMarket(preloaded, true),
+    createQuickMarket(preloaded, false),
+    createQuickMarket(preloaded, false),
   ])
 
   const toResult = (r: PromiseSettledResult<QuickMarketResult>) =>

@@ -68,6 +68,19 @@ export async function createQuickMarket(preloaded?: PreloadedDraftData, skipImag
     ? Number(byTitle!.id)
     : await resolveNewMarketId(sb, draft.title)
 
+  // source_url / source_title / resolution_date を保存
+  if (insertOk && marketId) {
+    const endDate = new Date()
+    endDate.setDate(endDate.getDate() + draft.endDays)
+    const resolutionDate = new Date(endDate)
+    resolutionDate.setDate(resolutionDate.getDate() + 21)
+    await sb.from('markets').update({
+      source_url: item.link ?? null,
+      source_title: item.title ?? null,
+      resolution_date: resolutionDate.toISOString(),
+    }).eq('id', marketId).catch(() => {})
+  }
+
   const baseUrl = getPublicBaseUrl()
   const body = buildTweetBody(kind, draft.title, baseUrl)
 

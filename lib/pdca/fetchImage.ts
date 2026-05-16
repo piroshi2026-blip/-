@@ -107,25 +107,26 @@ async function fetchOgpImage(articleUrl: string): Promise<string | null> {
 }
 
 /**
- * 優先順位: Unsplash API（キーあり）→ 記事OGP（trendLink）→ Tavily 検索画像 → null
+ * 優先順位: 記事OGP（trendLink）→ Unsplash API（キーあり）→ Tavily 検索画像 → null
+ * OGPを最優先にすることでトピックと無関係な画像を防ぐ
  */
 export async function fetchMarketImage(
   draft: Pick<DraftMarket, 'title' | 'category'>,
   flavor: 'mlb' | 'general',
   trendLink?: string
 ): Promise<string | null> {
+  // 記事OGP（最もトピックに関連性が高い）
+  if (trendLink) {
+    const ogp = await fetchOgpImage(trendLink)
+    if (ogp) return ogp
+  }
+
   // Unsplash API（キーあり時）
   const unsplashKey = process.env.UNSPLASH_ACCESS_KEY?.trim()
   if (unsplashKey) {
     const kw = flavor === 'mlb' ? 'baseball MLB stadium action' : (CATEGORY_KEYWORDS[draft.category] ?? 'news event')
     const url = await searchUnsplash(kw, unsplashKey)
     if (url) return url
-  }
-
-  // 記事OGP（元URLがある場合）
-  if (trendLink) {
-    const ogp = await fetchOgpImage(trendLink)
-    if (ogp) return ogp
   }
 
   // Tavily 検索で関連画像取得
