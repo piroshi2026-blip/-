@@ -32,7 +32,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { adminPassword, mode, title, category, kind, trendLink, url } = req.body as {
+  const { adminPassword, mode, title, category, kind, trendLink, url, excludeUrls } = req.body as {
     adminPassword?: string
     mode?: string
     title?: string
@@ -40,6 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     kind?: string
     trendLink?: string
     url?: string
+    excludeUrls?: string[]
   }
 
   if (!adminPassword || adminPassword !== ADMIN_PASSWORD) {
@@ -55,6 +56,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!title || !category) return res.status(400).json({ error: 'title と category が必要です' })
   const draft = { title, category } as Pick<DraftMarket, 'title' | 'category'>
   const flavor: 'mlb' | 'general' = kind === 'mlb' ? 'mlb' : 'general'
-  const imageUrl = await fetchMarketImage(draft, flavor, trendLink || undefined).catch(() => null)
+  const imageUrl = await fetchMarketImage(draft, flavor, trendLink || undefined, excludeUrls).catch(() => null)
   return res.status(200).json({ imageUrl })
 }

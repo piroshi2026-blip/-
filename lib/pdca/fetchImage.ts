@@ -16,9 +16,10 @@ const CATEGORY_KEYWORDS: Record<string, string> = {
 }
 
 /** Tavily で検索して画像URLを取得（include_images=true） */
-export async function fetchImageViaSearch(query: string): Promise<string | null> {
+export async function fetchImageViaSearch(query: string, excludeUrls?: string[]): Promise<string | null> {
   const key = process.env.TAVILY_API_KEY?.trim()
   if (!key) return null
+  const exclude = new Set(excludeUrls ?? [])
   try {
     const controller = new AbortController()
     setTimeout(() => controller.abort(), 5000)
@@ -32,7 +33,7 @@ export async function fetchImageViaSearch(query: string): Promise<string | null>
         search_depth: 'basic',
         include_answer: false,
         include_images: true,
-        max_results: 3,
+        max_results: 5,
       }),
     })
     if (!res.ok) return null
@@ -40,10 +41,8 @@ export async function fetchImageViaSearch(query: string): Promise<string | null>
       images?: string[]
       results?: { url?: string }[]
     }
-    // images フィールドに直接URLが入っている場合
-    const direct = (data.images ?? []).find((u) => typeof u === 'string' && u.startsWith('http'))
+    const direct = (data.images ?? []).find((u) => typeof u === 'string' && u.startsWith('http') && !exclude.has(u))
     if (direct) return direct
-    // フォールバック: 最初の記事URLから OGP 取得
     const firstUrl = data.results?.[0]?.url
     if (firstUrl) return fetchOgpImage(firstUrl)
   } catch { /* fall through */ }
@@ -113,22 +112,27 @@ async function fetchOgpImage(articleUrl: string): Promise<string | null> {
 export async function fetchMarketImage(
   draft: Pick<DraftMarket, 'title' | 'category'>,
   flavor: 'mlb' | 'general',
-  trendLink?: string
+  trendLink?: string,
+  excludeUrls?: string[]
 ): Promise<string | null> {
+  const exclude = new Set(excludeUrls ?? [])
+
   // 記事OGP（最もトピックに関連性が高い）
   if (trendLink) {
     const ogp = await fetchOgpImage(trendLink)
-    if (ogp) return ogp
+    if (ogp && !exclude.has(ogp)) return ogp
   }
 
-  // Unsplash API（キーあり時）
+  // Unsplash API（キーあり時・ランダム選択なので毎回違う画像）
   const unsplashKey = process.env.UNSPLASH_ACCESS_KEY?.trim()
   if (unsplashKey) {
     const kw = flavor === 'mlb' ? 'baseball MLB stadium action' : (CATEGORY_KEYWORDS[draft.category] ?? 'news event')
-    const url = await searchUnsplash(kw, unsplashKey)
-    if (url) return url
+    for (let i = 0; i < 3; i++) {
+      const url = await searchUnsplash(kw, unsplashKey)
+      if (url && !exclude.has(url)) return url
+    }
   }
 
-  // Tavily 検索で関連画像取得
-  return fetchImageViaSearch(draft.title)
+  // Tavily 検索で関連画像取得（既出URLを除外）
+  return fetchImageViaSearch(draft.title, excludeUrls)
 }

@@ -396,6 +396,10 @@ export default function Admin() {
   const [batchImageLoading, setBatchImageLoading] = useState(false)
   const [batchImageResult, setBatchImageResult] = useState<unknown>(null)
   const [refreshImageLoading, setRefreshImageLoading] = useState(false)
+  const [imageCandidates, setImageCandidates] = useState<string[]>([])
+  const [imageCandidateIdx, setImageCandidateIdx] = useState(0)
+  const [urlSnippet, setUrlSnippet] = useState('')
+  const [urlSnippetLoading, setUrlSnippetLoading] = useState(false)
   const [fillUrlLoading, setFillUrlLoading] = useState(false)
   const [fillUrlResult, setFillUrlResult] = useState<{ updated: number; remaining: number; emptyCount?: number } | null>(null)
   const [pdcaRunsLoading, setPdcaRunsLoading] = useState(false)
@@ -429,6 +433,21 @@ export default function Admin() {
     setBatchImageLoading(false)
   }
 
+  async function fetchSnippetForUrl(url: string) {
+    if (!url) return
+    setUrlSnippetLoading(true)
+    try {
+      const res = await fetch('/api/admin/gacha-next-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminPassword: ADMIN_PASSWORD, mode: 'snippet', url }),
+      })
+      const data = await res.json()
+      if (data.snippet) setUrlSnippet(data.snippet)
+    } catch { /* ignore */ }
+    setUrlSnippetLoading(false)
+  }
+
   async function handleFindSingleUrl() {
     if (!editForm.title) return
 
@@ -437,6 +456,7 @@ export default function Admin() {
       const next = (urlCandidateIndex + 1) % urlCandidates.length
       setUrlCandidateIndex(next)
       setEditForm((f: any) => ({ ...f, source_url: urlCandidates[next] }))
+      fetchSnippetForUrl(urlCandidates[next])
       return
     }
 
@@ -454,6 +474,7 @@ export default function Admin() {
         setUrlCandidates(urls)
         setUrlCandidateIndex(0)
         setEditForm((f: any) => ({ ...f, source_url: urls[0] }))
+        fetchSnippetForUrl(urls[0])
       } else {
         alert('記事が見つかりませんでした。手動で入力してください。')
       }
@@ -692,7 +713,7 @@ export default function Admin() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
-                  <button onClick={() => { setEditingId(editingId === m.id ? null : m.id); setEditForm({...m, end_date: new Date(m.end_date).toISOString().slice(0,16), resolution_date: m.resolution_date ? new Date(m.resolution_date).toISOString().slice(0,16) : '', source_url: m.source_url ?? '', auto_resolve: m.auto_resolve || false}); }} style={{...s.btn, background: editingId === m.id ? '#64748b' : '#3b82f6', padding:'5px 10px', fontSize:'12px'}}>
+                  <button onClick={() => { const opening = editingId !== m.id; setEditingId(opening ? m.id : null); setEditForm({...m, end_date: new Date(m.end_date).toISOString().slice(0,16), resolution_date: m.resolution_date ? new Date(m.resolution_date).toISOString().slice(0,16) : '', source_url: m.source_url ?? '', auto_resolve: m.auto_resolve || false}); if (opening) { setImageCandidates(m.image_url ? [m.image_url] : []); setImageCandidateIdx(0); setUrlSnippet(m.source_title ?? ''); setUrlCandidates([]); setUrlCandidateIndex(0); } }} style={{...s.btn, background: editingId === m.id ? '#64748b' : '#3b82f6', padding:'5px 10px', fontSize:'12px'}}>
                     {editingId === m.id ? '閉じる' : '編集'}
                   </button>
                   <button onClick={() => handleDeleteMarket(m.id, m.title)} style={{...s.btn, background:'#ef4444', padding:'5px 10px', fontSize:'12px'}}>削除</button>
@@ -707,13 +728,13 @@ export default function Admin() {
                   <textarea value={editForm.description} onChange={e => setEditForm({...editForm, description: e.target.value})} style={{...s.inp, height:'60px'}} />
 
                   <label style={{fontSize:'11px', color:'#666'}}>参考記事 URL</label>
-                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '10px' }}>
-                    <input value={editForm.source_url ?? ''} onChange={e => setEditForm({...editForm, source_url: e.target.value})} placeholder="https://..." style={{ ...s.inp, marginBottom: 0, flex: 1 }} />
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '4px' }}>
+                    <input value={editForm.source_url ?? ''} onChange={e => { setEditForm({...editForm, source_url: e.target.value}); setUrlSnippet('') }} placeholder="https://..." style={{ ...s.inp, marginBottom: 0, flex: 1 }} />
                     <button
                       type="button"
                       disabled={findSingleUrlLoading}
                       onClick={handleFindSingleUrl}
-                      style={{ ...s.btn, background: findSingleUrlLoading ? '#9ca3af' : '#7c3aed', padding: '8px 12px', fontSize: '12px', whiteSpace: 'nowrap', flexShrink: 0 }}
+                      style={{ ...s.btn, background: findSingleUrlLoading ? '#9ca3af' : '#7c3aed', padding: '8px 10px', fontSize: '12px', whiteSpace: 'nowrap', flexShrink: 0 }}
                     >
                       {findSingleUrlLoading
                         ? '検索中…'
@@ -721,15 +742,29 @@ export default function Admin() {
                           ? `🔄 次の候補 (${urlCandidateIndex + 1}/${urlCandidates.length})`
                           : '🔄 自動補完'}
                     </button>
+                    <button
+                      type="button"
+                      disabled={urlSnippetLoading || !editForm.source_url}
+                      onClick={() => fetchSnippetForUrl(editForm.source_url ?? '')}
+                      style={{ ...s.btn, background: urlSnippetLoading ? '#9ca3af' : '#0284c7', padding: '8px 10px', fontSize: '12px', whiteSpace: 'nowrap', flexShrink: 0 }}
+                    >
+                      {urlSnippetLoading ? '取得中…' : '📰 引用'}
+                    </button>
                     <a
                       href={`https://news.google.com/search?q=${encodeURIComponent(editForm.title ?? '')}&hl=ja`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      style={{ ...s.btn, background: '#1a73e8', padding: '8px 12px', fontSize: '12px', textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}
+                      style={{ ...s.btn, background: '#1a73e8', padding: '8px 10px', fontSize: '12px', textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}
                     >
-                      🔍 検索
+                      🔍
                     </a>
                   </div>
+                  {urlSnippet && (
+                    <div style={{ padding: '6px 10px', background: '#f0f9ff', borderRadius: '6px', fontSize: '11px', color: '#475569', lineHeight: 1.5, marginBottom: '10px', border: '1px solid #bae6fd' }}>
+                      💬 {urlSnippet}
+                    </div>
+                  )}
+                  {!urlSnippet && <div style={{ marginBottom: '10px' }} />}
 
                   <label style={{fontSize:'11px', color:'#666'}}>カテゴリ</label>
                   <select value={editForm.category} onChange={e => setEditForm({...editForm, category: e.target.value})} style={s.inp}>
@@ -750,26 +785,31 @@ export default function Admin() {
                   </div>
 
                   <label style={{fontSize:'11px', color:'#666'}}>画像</label>
-                  {editForm.image_url && <img src={editForm.image_url} alt="" style={{width:'100%', maxHeight:'120px', objectFit:'cover', borderRadius:'6px', marginBottom:'8px'}} />}
-                  <button type="button" disabled={refreshImageLoading} onClick={async () => {
-                    setRefreshImageLoading(true)
-                    try {
-                      const res = await fetch('/api/admin/refresh-image', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ adminPassword: ADMIN_PASSWORD, marketId: editingId }) })
-                      const data = await res.json()
-                      if (data.imageUrl) {
-                        setEditForm((f: any) => ({ ...f, image_url: data.imageUrl }))
-                        await fetchData()
-                        alert(`画像を更新しました！\nキーワード: ${data.keywords}\nURL: ${data.imageUrl}`)
-                      } else {
-                        alert('画像取得失敗: ' + (data.error ?? JSON.stringify(data)))
-                      }
-                    } catch (e) {
-                      alert('通信エラー: ' + (e instanceof Error ? e.message : String(e)))
-                    }
-                    setRefreshImageLoading(false)
-                  }} style={{...s.btn, background: refreshImageLoading ? '#9ca3af' : '#0891b2', padding:'8px 14px', fontSize:'12px', marginBottom:'8px', width:'100%'}}>
-                    {refreshImageLoading ? 'AI処理中…（数秒かかります）' : '🔄 AIで画像を再取得'}
-                  </button>
+                  {editForm.image_url
+                    ? <img src={editForm.image_url} alt="" style={{width:'100%', maxHeight:'120px', objectFit:'cover', borderRadius:'6px', marginBottom:'6px'}} />
+                    : <div style={{width:'100%', height:'60px', background:'#f1f5f9', borderRadius:'6px', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'11px', color:'#94a3b8', marginBottom:'6px'}}>画像なし</div>
+                  }
+                  <div style={{display:'flex', gap:'6px', marginBottom:'8px', alignItems:'center'}}>
+                    <button type="button" disabled={imageCandidateIdx <= 0} onClick={() => { const i = imageCandidateIdx - 1; setImageCandidateIdx(i); setEditForm((f: any) => ({ ...f, image_url: imageCandidates[i] })) }} style={{...s.btn, background: imageCandidateIdx <= 0 ? '#e2e8f0' : '#64748b', padding:'6px 10px', fontSize:'12px', flexShrink:0}}>◀ 前</button>
+                    <button type="button" disabled={refreshImageLoading} onClick={async () => {
+                      setRefreshImageLoading(true)
+                      try {
+                        const market = markets.find((m: any) => m.id === editingId)
+                        const res = await fetch('/api/admin/gacha-next-image', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ adminPassword: ADMIN_PASSWORD, title: editForm.title, category: editForm.category, kind: 'general', trendLink: editForm.source_url, excludeUrls: imageCandidates.filter(Boolean) }) })
+                        const data = await res.json()
+                        if (data.imageUrl) {
+                          const next = [...imageCandidates, data.imageUrl]
+                          setImageCandidates(next)
+                          setImageCandidateIdx(next.length - 1)
+                          setEditForm((f: any) => ({ ...f, image_url: data.imageUrl }))
+                        }
+                      } catch { /* ignore */ }
+                      setRefreshImageLoading(false)
+                    }} style={{...s.btn, background: refreshImageLoading ? '#9ca3af' : '#0891b2', padding:'6px 10px', fontSize:'12px', flex:1}}>
+                      {refreshImageLoading ? '取得中…' : '🔄 次の画像'}
+                    </button>
+                    <span style={{fontSize:'10px', color:'#94a3b8', whiteSpace:'nowrap', flexShrink:0}}>{imageCandidates.length > 0 ? `${imageCandidateIdx + 1}/${imageCandidates.length}` : '—'}</span>
+                  </div>
                   <div style={{marginBottom:'10px'}}><label style={{fontSize:'12px', color:'#666'}}>または画像ファイルをアップロード</label><br/><input type="file" onChange={e => uploadImage(e, true)} /></div>
 
                   <label style={{fontSize:'11px', color:'#666'}}>選択肢</label>
