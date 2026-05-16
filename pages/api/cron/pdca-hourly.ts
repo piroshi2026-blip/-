@@ -20,6 +20,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!assertCronAuthorized(req, res)) return
 
   const xEnabled = isAutoPostEnabled()
+  await logPdcaPayload('pdca_hourly_start', { stage: 'start', xAutoPostEnabled: xEnabled }, true)
 
   let preloaded: Awaited<ReturnType<typeof preloadDraftData>>
   try {
@@ -29,6 +30,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await logPdcaPayload('pdca_hourly', { stage: 'preload', error: msg, xAutoPostEnabled: xEnabled }, false)
     return res.status(200).json({ error: msg, stage: 'preload', xAutoPostEnabled: xEnabled })
   }
+
+  await logPdcaPayload('pdca_hourly_start', { stage: 'preloaded' }, true)
 
   const [r1, r2] = await Promise.allSettled([
     createQuickMarket(preloaded, true),
