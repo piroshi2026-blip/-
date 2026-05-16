@@ -13,6 +13,26 @@ import { getServiceSupabase } from './supabaseAdmin'
 import { formatWorldContextForPrompt } from './fetchContext'
 import { preloadDraftData, type PreloadedDraftData } from './generateDraft'
 
+/**
+ * タイトルに「YYYY年」が含まれ、かつその年が現在〜1年後の範囲なら
+ * 翌年1月30日を判定日とする（例：「2026年までに…」→ 2027-01-30）。
+ * それ以外は締切日 + 21日。
+ */
+function resolveResolutionDate(title: string, endDate: Date): Date {
+  const now = new Date()
+  const currentYear = now.getFullYear()
+  const m = title.match(/(20\d{2})年/)
+  if (m) {
+    const year = parseInt(m[1])
+    if (year >= currentYear && year <= currentYear + 1) {
+      return new Date(`${year + 1}-01-30T00:00:00.000Z`)
+    }
+  }
+  const res = new Date(endDate)
+  res.setDate(res.getDate() + 21)
+  return res
+}
+
 export type QuickMarketResult = {
   headline: string
   title: string
@@ -72,8 +92,7 @@ export async function createQuickMarket(preloaded?: PreloadedDraftData, skipImag
   if (insertOk && marketId) {
     const endDate = new Date()
     endDate.setDate(endDate.getDate() + draft.endDays)
-    const resolutionDate = new Date(endDate)
-    resolutionDate.setDate(resolutionDate.getDate() + 21)
+    const resolutionDate = resolveResolutionDate(draft.title, endDate)
     try {
       await sb.from('markets').update({
         source_url: item.link ?? null,
