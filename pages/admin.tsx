@@ -1137,33 +1137,43 @@ export default function Admin() {
               <p style={{ fontSize: '12px', color: '#94a3b8' }}>ログがありません（pdca_runs テーブルが空です）。</p>
             )}
             {pdcaRuns !== null && pdcaRuns.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '400px', overflowY: 'auto' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '500px', overflowY: 'auto' }}>
                 {pdcaRuns.map((run: any) => {
                   const jst = new Date(run.created_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })
                   const payload = run.payload ?? {}
+                  const kind = payload.kind ?? '不明'
                   const hasError = !run.ok || payload.error || payload.market1?.error || payload.market2?.error
                   return (
                     <div key={run.id} style={{ padding: '8px 12px', borderRadius: '8px', background: hasError ? '#fef2f2' : '#f0fdf4', border: `1px solid ${hasError ? '#fca5a5' : '#86efac'}`, fontSize: '12px' }}>
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '4px' }}>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '4px', flexWrap: 'wrap' }}>
                         <span>{run.ok ? '✅' : '❌'}</span>
                         <span style={{ color: '#475569', fontWeight: 'bold' }}>{jst}</span>
+                        <span style={{ fontSize: '10px', background: '#e2e8f0', color: '#475569', padding: '1px 6px', borderRadius: '10px' }}>{kind}</span>
                         {payload.xAutoPostEnabled === false && <span style={{ color: '#b45309', fontSize: '11px' }}>X投稿OFF</span>}
                       </div>
-                      {hasError && (
-                        <pre style={{ margin: '4px 0 0', fontSize: '11px', color: '#991b1b', whiteSpace: 'pre-wrap', wordBreak: 'break-all', background: 'transparent', padding: 0 }}>
-                          {JSON.stringify(
-                            payload.error
-                              ? { error: payload.error }
-                              : { market1: payload.market1?.error ?? '✅', market2: payload.market2?.error ?? '✅' },
-                            null, 2
-                          )}
-                        </pre>
-                      )}
-                      {!hasError && payload.market1 && (
-                        <div style={{ color: '#166534', fontSize: '11px' }}>
-                          問い1: marketId={payload.market1?.marketId} ／ 問い2: marketId={payload.market2?.marketId}
-                          {payload.market1?.tweetId && ' ／ X投稿済み'}
+                      {/* pdca_quick: 問いタイトル・marketId・X投稿状況 */}
+                      {kind === 'pdca_quick' && (
+                        <div style={{ fontSize: '11px', color: hasError ? '#991b1b' : '#166534', marginTop: '2px' }}>
+                          {payload.title && <div>📝 {payload.title}</div>}
+                          <div style={{ display: 'flex', gap: '10px', marginTop: '2px', flexWrap: 'wrap' }}>
+                            <span>marketId: {payload.marketId ?? '―'}</span>
+                            {payload.tweetId && <span>𝕏 投稿済み</span>}
+                            {payload.tweetError && <span style={{ color: '#dc2626' }}>𝕏エラー: {payload.tweetError}</span>}
+                          </div>
                         </div>
+                      )}
+                      {/* pdca_hourly: 2問まとめ */}
+                      {kind === 'pdca_hourly' && payload.market1 && (
+                        <div style={{ fontSize: '11px', color: hasError ? '#991b1b' : '#166534', marginTop: '2px' }}>
+                          <div>問い1: {payload.market1?.title ?? '―'} (id={payload.market1?.marketId ?? '―'}) {payload.market1?.tweetId ? '𝕏✅' : payload.market1?.tweetError ? `𝕏❌${payload.market1.tweetError}` : ''}</div>
+                          <div>問い2: {payload.market2?.title ?? '―'} (id={payload.market2?.marketId ?? '―'}) {payload.market2?.tweetId ? '𝕏✅' : payload.market2?.tweetError ? `𝕏❌${payload.market2.tweetError}` : ''}</div>
+                        </div>
+                      )}
+                      {/* エラー詳細 */}
+                      {hasError && payload.error && (
+                        <pre style={{ margin: '4px 0 0', fontSize: '11px', color: '#991b1b', whiteSpace: 'pre-wrap', wordBreak: 'break-all', background: 'transparent', padding: 0 }}>
+                          {payload.error}
+                        </pre>
                       )}
                     </div>
                   )
