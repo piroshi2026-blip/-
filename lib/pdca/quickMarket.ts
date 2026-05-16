@@ -74,11 +74,13 @@ export async function createQuickMarket(preloaded?: PreloadedDraftData, skipImag
     endDate.setDate(endDate.getDate() + draft.endDays)
     const resolutionDate = new Date(endDate)
     resolutionDate.setDate(resolutionDate.getDate() + 21)
-    await sb.from('markets').update({
-      source_url: item.link ?? null,
-      source_title: item.title ?? null,
-      resolution_date: resolutionDate.toISOString(),
-    }).eq('id', marketId).catch(() => {})
+    try {
+      await sb.from('markets').update({
+        source_url: item.link ?? null,
+        source_title: item.title ?? null,
+        resolution_date: resolutionDate.toISOString(),
+      }).eq('id', marketId)
+    } catch { /* ignore */ }
   }
 
   const baseUrl = getPublicBaseUrl()
