@@ -12,6 +12,7 @@ import {
 import { getServiceSupabase } from './supabaseAdmin'
 import { formatWorldContextForPrompt } from './fetchContext'
 import { preloadDraftData, type PreloadedDraftData } from './generateDraft'
+import { generateNewMarketTweet } from './xMarketing'
 
 /**
  * タイトルに「YYYY年」が含まれ、かつその年が現在〜1年後の範囲なら
@@ -70,7 +71,11 @@ export async function createQuickMarket(preloaded?: PreloadedDraftData, skipImag
 
   const imageUrl = skipImage ? null : await fetchMarketImage(draft, kind, item.link).catch(() => null)
 
-  const ins = await insertMarket(draft, imageUrl)
+  // 挿入とツイート文生成を並列実行（Claude API待ちをSupabase挿入と重ねて時間短縮）
+  const [ins, tweetBody] = await Promise.all([
+    insertMarket(draft, imageUrl),
+    generateNewMarketTweet(draft.title, draft.category).catch(() => null),
+  ])
   if (ins.error) throw new Error(ins.error)
 
   const sb = getServiceSupabase()
@@ -102,8 +107,9 @@ export async function createQuickMarket(preloaded?: PreloadedDraftData, skipImag
     } catch { /* ignore */ }
   }
 
+  // Claude生成ツイート文、失敗時はテンプレにフォールバック
   const baseUrl = getPublicBaseUrl()
-  const body = buildTweetBody(kind, draft.title, baseUrl)
+  const body = tweetBody ?? buildTweetBody(kind, draft.title, baseUrl)
 
   let tweetId: string | null = null
   let tweetError: string | null = null

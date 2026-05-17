@@ -228,7 +228,6 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key`}
                     <div style={{fontSize:'11px', color:'#475569', lineHeight:1.4, flex:1, minWidth:0}}>
                       <span style={{fontWeight:'bold'}}>「{topOpt.name}」</span>に<br/>票が集まっています
                     </div>
-                    <div style={{fontSize:'10px', color:'#94a3b8', textAlign:'right', flexShrink:0, whiteSpace:'nowrap'}}>{m.total_pool.toLocaleString()}pt<br/>の予想</div>
                   </div>
                 )}
 

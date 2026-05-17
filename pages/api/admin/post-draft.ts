@@ -10,6 +10,7 @@ import {
 import { postPromotionTweet } from '../../../lib/pdca/postX'
 import { getServiceSupabase } from '../../../lib/pdca/supabaseAdmin'
 import { fetchMarketImage } from '../../../lib/pdca/fetchImage'
+import { generateNewMarketTweet } from '../../../lib/pdca/xMarketing'
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'yosoru_admin'
 
@@ -69,7 +70,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const baseUrl = getPublicBaseUrl()
-  const body = buildTweetBody(kind ?? 'general', draft.title, baseUrl)
+  const generatedBody = await generateNewMarketTweet(draft.title, draft.category ?? 'その他').catch(() => null)
+  const body = generatedBody ?? buildTweetBody(kind ?? 'general', draft.title, baseUrl)
 
   let tweetId: string | null = null
   let tweetError: string | null = null
