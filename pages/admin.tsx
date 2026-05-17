@@ -507,6 +507,23 @@ export default function Admin() {
   }
 
   async function handleUpdateConfig() { await supabase.from('site_config').update(siteConfig).eq('id', siteConfig.id); alert('保存完了'); }
+
+  async function handleBulkSakura() {
+    if (!confirm('投票数0の問い全件にサクラ投票（各150pt）を即時適用します。よろしいですか？')) return
+    const res = await fetch('/api/admin/bulk-sakura', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminPassword: ADMIN_PASSWORD }),
+    })
+    const data = await res.json()
+    if (data.ok) {
+      alert(`🌸 完了: ${data.applied}件の問いにサクラ投票しました`)
+      fetchData()
+    } else {
+      alert('エラー: ' + (data.error || '不明'))
+    }
+  }
+
   async function handleUpdateCategory(id: number, updates: any) { await supabase.from('categories').update(updates).eq('id', id); fetchData(); }
   async function handleAddCategory() { if (!newCategory.name) return; await supabase.from('categories').insert([newCategory]); setNewCategory({ name: '', icon: '', display_order: 0 }); fetchData(); }
 
@@ -1420,6 +1437,10 @@ CREATE POLICY "select_own" ON user_proposals FOR SELECT TO authenticated USING (
             <textarea value={siteConfig.share_text_base} onChange={e => setSiteConfig({...siteConfig, share_text_base: e.target.value})} placeholder="𝕏投稿文" style={{...s.inp, height:'80px'}} />
           </div>
           <button onClick={handleUpdateConfig} style={{...s.btn, background: '#10b981', width:'100%'}}>サイト設定を保存</button>
+          <hr style={{margin:'20px 0', border:'none', borderTop:'1px solid #e2e8f0'}} />
+          <h4 style={{margin:'0 0 8px', fontSize:'14px'}}>🌸 サクラ投票</h4>
+          <p style={{fontSize:'12px', color:'#666', margin:'0 0 10px'}}>投票数0の問い全件に今すぐサクラ投票（各150pt）を適用します。通常は問い作成から30〜90分後に自動適用されます。</p>
+          <button onClick={handleBulkSakura} style={{...s.btn, background: '#ec4899', width:'100%'}}>🌸 未投票の問いに一括サクラ投票</button>
         </section>
       )}
     </div>

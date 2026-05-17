@@ -39,27 +39,30 @@ export async function applySakura(marketId: number, totalAmount = 150): Promise<
 }
 
 /**
- * 投票未発生の問いに対して遅延付きサクラ投票を適用する。
- * - 各市場IDから30〜89分の擬似ランダム遅延を算出
- * - 作成から遅延時刻を過ぎていれば適用
- * - 作成から90分以上経過している場合は即時適用（キャッチアップ）
+ * 投票未発生の問いに対してサクラ投票を適用する。
+ * force=false（デフォルト）: IDから30〜89分の遅延を算出し、時刻を過ぎた問いのみ適用。
+ * force=true: 遅延・経過時間を無視して未投票の問い全件に即時適用。
  */
-export async function applyPendingSakura(): Promise<{ applied: number }> {
+export async function applyPendingSakura(force = false): Promise<{ applied: number }> {
   const sb = getServiceSupabase()
   const now = Date.now()
 
-  // 作成から30分以上経過 & まだ誰も投票していない問いを取得
-  const { data: candidates } = await sb
+  const query = sb
     .from('markets')
     .select('id, created_at')
     .eq('total_pool', 0)
     .eq('is_resolved', false)
-    .lte('created_at', new Date(now - 30 * 60 * 1000).toISOString())
+
+  // 通常モードは作成から30分以上経過した問いのみ対象
+  if (!force) {
+    query.lte('created_at', new Date(now - 30 * 60 * 1000).toISOString())
+  }
+
+  const { data: candidates } = await query
 
   if (!candidates || candidates.length === 0) return { applied: 0 }
 
-  // IDから決定論的に30〜89分の遅延を算出して対象を絞る
-  const targets = candidates.filter(m => {
+  const targets = force ? candidates : candidates.filter(m => {
     const id = Number(m.id)
     const delayMs = (30 + (id * 7 % 60)) * 60 * 1000
     const createdAt = new Date(m.created_at).getTime()
