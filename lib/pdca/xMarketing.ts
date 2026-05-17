@@ -28,6 +28,34 @@ const EDUCATION_TOPICS = [
   'アンケート型の問い（みんなの意見がそのまま結果に）',
   '長期予測のロマン（半年後を今ヨソる楽しさ）',
   'カテゴリの多様性（スポーツからAIまで何でもヨソれる）',
+  '予測することで世界の見え方が変わる（認知を深めるツール）',
+  '社会の縮図としての予測市場（今、世の中はどこに向かっているか）',
+  '未来は自分でつくる（予測への参加が主体性を育てる）',
+  '現在と未来をつなぐ問い（今の選択が未来を形成する）',
+  '集合知が照らす社会の潮流（みんなの予想が"今"を映す鏡）',
+  '世界を自らに投影する（問いを立てることで思考が深まる）',
+  '予測市場と社会課題（世の中の本質を問うことの意味）',
+]
+
+const PHILOSOPHY_ANGLES = [
+  '未来は自分でつくるという前提への問いかけ',
+  '予測市場が世の中の縮図であるという視点',
+  '現在と未来をつなぐ架け橋としての予測',
+  '認知を深め、世界を理解するためのツールとして',
+  '社会の潮流・トレンドを読む力を育てる手段として',
+  '集合知が照らす世界の本質',
+  '世の中はどこに向かっているか、という根源的な問い',
+  '自分の考えを持つことが世界への理解につながるという哲学',
+]
+
+const TWEET_STYLES = [
+  '短い詩的な一文から始めて、深みのある問いかけで締める',
+  '「〜って考えたことある？」という共感を誘う問いかけスタイル',
+  '社会の動きを一言で切り取り、予測市場との接点を示すスタイル',
+  'ふと気づきを与える格言調で始め、具体的な問いに着地するスタイル',
+  '「今日の世界」「今の瞬間」をキーワードに現在と未来を結ぶスタイル',
+  'データや数字（〇%、〇人など）を使って現実感を出すスタイル',
+  '「もし〜だったら？」という仮定で想像力を刺激するスタイル',
 ]
 
 async function callClaude(prompt: string): Promise<string> {
@@ -47,6 +75,9 @@ async function callClaude(prompt: string): Promise<string> {
 }
 
 export async function generateNewMarketTweet(title: string, category: string): Promise<string> {
+  const angle = PHILOSOPHY_ANGLES[Math.floor(Math.random() * PHILOSOPHY_ANGLES.length)]
+  const style = TWEET_STYLES[Math.floor(Math.random() * TWEET_STYLES.length)]
+
   const prompt = `あなたは予測市場アプリ「ヨソる」の公式Xアカウントの中の人です。
 新しい「問い」を公開したことを告知する投稿を1つ書いてください。
 
@@ -54,17 +85,21 @@ export async function generateNewMarketTweet(title: string, category: string): P
 カテゴリ: ${category}
 サイト: ${SITE_URL}
 
+今回の投稿の切り口: ${angle}
+文体スタイル: ${style}
+
 ルール:
 - 280文字以内（厳守）
-- 公式の中の人として「新しい問い出しました！」的なテンション
-- フォロワーに意見を求める問いかけ口調
-- そのカテゴリのコミュニティに刺さるハッシュタグを2-3個
+- 毎回まったく違う切り口・表現で書く。テンプレ的な定型文は絶対NG
+- 予測市場が「世界を理解するツール」「社会の縮図」「認知を深める手段」であるというニュアンスを自然にどこかに織り込む
+- 「この問いを考えることで、世の中の流れや本質が見えてくる」という視点を入れる
 - #ヨソる は必ず入れる
-- 🔮 をどこかに入れる
-- サイトURLを末尾に入れる
-- 機械的・テンプレ的にならず、中の人の人格が見える言葉で
+- 関連ハッシュタグを1〜2個（カテゴリ・話題に合ったもの）
+- URLを末尾に
+- 🔮 など絵文字を1〜2個（毎回違うもの）
+- 人が思わず立ち止まって考えたくなるような言葉を選ぶ
 
-投稿文のみ出力（説明不要）:`
+投稿文のみ出力（説明・前置き不要）:`
 
   return callClaude(prompt)
 }
@@ -75,47 +110,59 @@ export async function generateResultTweet(
   topPredictors: string[],
   odds: number
 ): Promise<string> {
+  const angle = PHILOSOPHY_ANGLES[Math.floor(Math.random() * PHILOSOPHY_ANGLES.length)]
+  const style = TWEET_STYLES[Math.floor(Math.random() * TWEET_STYLES.length)]
+
   const prompt = `あなたは予測市場アプリ「ヨソる」の公式Xアカウントの中の人です。
-問いの結果が確定したので発表ツイートを書いてください。
+問いの結果が確定したので発表投稿を書いてください。
 
 問い: 「${title}」
-正解: 「${winnerOption}」
+結果: 「${winnerOption}」
 倍率: ${odds}倍
-的中者: ${topPredictors.length}人
 サイト: ${SITE_URL}
+
+今回の投稿の切り口: ${angle}
+文体スタイル: ${style}
 
 ルール:
 - 280文字以内
-- 🎯🎉 など祝福感を出す
-- 的中した人を称える（「当てた方おめでとう！」的な）
-- 公式として「次の問いも出てるよ〜」と誘導
-- #ヨソる #予測市場 + カテゴリ関連タグ
+- 毎回まったく違う切り口で書く。パターン化・テンプレ化NG
+- 結果発表だけでなく「この結果が示す社会の動き・世の中の流れ」への一言考察を自然に入れる
+- 「みんなの予測が集まって、世の中の縮図が見えた」という感覚を出す
+- 的中した人へのさりげない称賛
+- 次の問いへ誘導
+- #ヨソる + 関連タグ1〜2個
 - URLを末尾に
+- 絵文字は2個まで
 
-投稿文のみ出力:`
+投稿文のみ出力（説明不要）:`
 
   return callClaude(prompt)
 }
 
 export async function generateEducationTweet(): Promise<string> {
   const topic = EDUCATION_TOPICS[Math.floor(Math.random() * EDUCATION_TOPICS.length)]
+  const angle = PHILOSOPHY_ANGLES[Math.floor(Math.random() * PHILOSOPHY_ANGLES.length)]
+  const style = TWEET_STYLES[Math.floor(Math.random() * TWEET_STYLES.length)]
 
   const prompt = `あなたは予測市場アプリ「ヨソる」の公式Xアカウントの中の人です。
-以下のトピックについて投稿を1つ書いてください。
+以下のトピックについて、深みのある投稿を1つ書いてください。
 
 トピック: ${topic}
+哲学的視点: ${angle}
+文体スタイル: ${style}
 サイト: ${SITE_URL}
 
 ルール:
 - 280文字以内
-- 公式アカウントとして親しみやすい「中の人」口調
-- 運営側の視点で語る（「うちのアプリ」「ヨソるでは〜」等）
-- 「へぇ〜」「なるほど」と思わせる切り口
-- 具体例を1つ入れる
+- 毎回まったく違う表現・切り口で。同じパターンを繰り返さない
+- 単なるアプリ説明にせず、「予測市場は世界を理解するレンズ」「社会の鏡」「認知を深めるツール」という本質的な価値観を自然に織り込む
+- 「未来は自分でつくる」「今を問うことで世の中が見える」というメッセージをどこかに
+- 読んだ人が「ちょっと考えさせられる」「なるほど」と思う一言
 - #ヨソる は必ず入れる
-- URLを末尾に入れる
+- URLを末尾に
 
-投稿文のみ出力:`
+投稿文のみ出力（説明不要）:`
 
   return callClaude(prompt)
 }
@@ -123,48 +170,59 @@ export async function generateEducationTweet(): Promise<string> {
 export async function generateTrendHookTweet(trendKeyword: string, relatedMarketTitle?: string): Promise<string> {
   const marketLine = relatedMarketTitle
     ? `関連する問い: 「${relatedMarketTitle}」`
-    : '（関連する問いは省略可）'
+    : ''
+  const angle = PHILOSOPHY_ANGLES[Math.floor(Math.random() * PHILOSOPHY_ANGLES.length)]
+  const style = TWEET_STYLES[Math.floor(Math.random() * TWEET_STYLES.length)]
 
   const prompt = `あなたは予測市場アプリ「ヨソる」の公式Xアカウントの中の人です。
-今話題のトレンドに絡めて「ヨソる」を紹介する投稿を書いてください。
+今話題のトレンドを切り口に、社会の潮流を読む投稿を書いてください。
 
-トレンドワード: ${trendKeyword}
+トレンド・話題: ${trendKeyword}
 ${marketLine}
+哲学的視点: ${angle}
+文体スタイル: ${style}
 サイト: ${SITE_URL}
 
 ルール:
 - 280文字以内
-- 公式として「うちでもこの話題出してます！」的なスタンス
-- トレンドの話題に自然に絡める（無理やり感NG）
-- 「みなさんもヨソってみてください」的な誘導
-- そのトレンド関連のハッシュタグ + #ヨソる
-- URL末尾
+- 毎回まったく違う切り口で書く。定型的な紹介文NG
+- トレンドを「世の中の流れ・潮流」として捉え、「この動きはどこへ向かっているか」という問いを立てる
+- 「今この話題を予測することに意味がある」という緊張感・リアルタイム感を出す
+- 予測市場が社会の縮図であり、世界の本質を映す鏡であることを自然に示す
+- トレンド関連ハッシュタグ + #ヨソる
+- URLを末尾に
+- 絵文字は1〜2個（毎回変える）
 
-投稿文のみ出力:`
+投稿文のみ出力（説明不要）:`
 
   return callClaude(prompt)
 }
 
 export async function generateEngagementTweet(markets: { title: string; topOption: string; topPct: number }[]): Promise<string> {
-  const marketList = markets.slice(0, 3).map(m => `• ${m.title}（現在${m.topPct}%が「${m.topOption}」）`).join('\n')
+  const marketList = markets.slice(0, 3).map(m => `• ${m.title}（現在${m.topPct}%が「${m.topOption}」予想）`).join('\n')
+  const angle = PHILOSOPHY_ANGLES[Math.floor(Math.random() * PHILOSOPHY_ANGLES.length)]
+  const style = TWEET_STYLES[Math.floor(Math.random() * TWEET_STYLES.length)]
 
   const prompt = `あなたは予測市場アプリ「ヨソる」の公式Xアカウントの中の人です。
-現在盛り上がっている問いについて、フォロワーに投票を呼びかける投稿を書いてください。
+今の社会の関心が集まっている問いについて、深みのある投稿を書いてください。
 
-現在の注目問い:
+現在注目の問いと予測状況:
 ${marketList}
 
+哲学的視点: ${angle}
+文体スタイル: ${style}
 サイト: ${SITE_URL}
 
 ルール:
 - 280文字以内
-- 公式として「今この問い盛り上がってます！」的なテンション
-- 「みなさんはどう思います？」と返信を誘う
-- 意見が割れそうなポイントを突く
-- #ヨソる を入れる
+- 毎回まったく異なる表現で。お決まりの呼びかけ文NG
+- 「今これだけの人が〜と予測している」というデータから社会の空気感・集合知を読み取る視点を入れる
+- 「あなたはどう読む？」という個人の考えへの問いかけ
+- 自分の考えを持つことが世界理解につながる、というメッセージをさりげなく
+- #ヨソる + 関連タグ1〜2個
 - URLを末尾に
 
-投稿文のみ出力:`
+投稿文のみ出力（説明不要）:`
 
   return callClaude(prompt)
 }

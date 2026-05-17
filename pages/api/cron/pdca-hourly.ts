@@ -4,6 +4,7 @@ import { createQuickMarket, type QuickMarketResult } from '../../../lib/pdca/qui
 import { preloadDraftData } from '../../../lib/pdca/generateDraft'
 import { isAutoPostEnabled } from '../../../lib/pdca/postX'
 import { logPdcaPayload } from '../../../lib/pdca/pdcaHelpers'
+import { applyPendingSakura } from '../../../lib/pdca/sakuraVote'
 
 export const maxDuration = 60
 
@@ -53,5 +54,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   await logPdcaPayload('pdca_hourly', { market1, market2, xAutoPostEnabled: xEnabled }, ok)
 
-  return res.status(200).json({ market1, market2, xAutoPostEnabled: xEnabled })
+  // 遅延サクラ投票のフォールバック（auto-sakura cron が止まっていても毎時実行）
+  const sakura = await applyPendingSakura().catch(() => ({ applied: 0 }))
+
+  return res.status(200).json({ market1, market2, xAutoPostEnabled: xEnabled, sakuraApplied: sakura.applied })
 }

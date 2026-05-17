@@ -554,10 +554,10 @@ export default function Admin() {
   }
 
   const s: any = {
-    inp: { padding: '10px', border: '1px solid #ddd', borderRadius: '8px', width: '100%', boxSizing: 'border-box', marginBottom: '10px', fontSize:'14px' },
-    btn: { background: '#1f2937', color: 'white', padding: '12px 20px', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' },
-    tab: (active: boolean) => ({ flex: 1, padding: '14px', background: active ? '#1f2937' : '#eee', color: active ? 'white' : '#666', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize:'13px' }),
-    sortBtn: (active: boolean) => ({ padding: '6px 12px', borderRadius: '20px', border: active ? 'none' : '1px solid #ddd', background: active ? '#3b82f6' : '#fff', color: active ? '#fff' : '#666', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' })
+    inp: { padding: '7px 10px', border: '1px solid #ddd', borderRadius: '8px', width: '100%', boxSizing: 'border-box', marginBottom: '6px', fontSize:'13px' },
+    btn: { background: '#1f2937', color: 'white', padding: '8px 16px', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' },
+    tab: (active: boolean) => ({ flex: 1, padding: '10px', background: active ? '#1f2937' : '#eee', color: active ? 'white' : '#666', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize:'12px' }),
+    sortBtn: (active: boolean) => ({ padding: '5px 10px', borderRadius: '20px', border: active ? 'none' : '1px solid #ddd', background: active ? '#3b82f6' : '#fff', color: active ? '#fff' : '#666', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' })
   }
 
   if (!isSupabaseConfigured) {
@@ -585,15 +585,15 @@ export default function Admin() {
 
   return (
     <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '12px', fontFamily: 'sans-serif' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h1 style={{fontWeight:'900'}}>🛠 管理パネル</h1>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <Link href="/"><button style={{...s.btn, background: '#3b82f6', padding:'8px 15px'}}>🏠 アプリへ</button></Link>
-          <button onClick={handleLogout} style={{...s.btn, background: '#ef4444', padding:'8px 15px'}}>🚪 ログアウト</button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+        <h1 style={{fontWeight:'900', fontSize:'18px', margin:0}}>🛠 管理パネル</h1>
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <Link href="/"><button style={{...s.btn, background: '#3b82f6'}}>🏠 アプリへ</button></Link>
+          <button onClick={handleLogout} style={{...s.btn, background: '#ef4444'}}>🚪 ログアウト</button>
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: '2px', marginBottom: '20px', borderRadius:'10px', overflowX: 'auto', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
+      <div style={{ display: 'flex', gap: '2px', marginBottom: '10px', borderRadius:'10px', overflowX: 'auto', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
         <button onClick={() => setActiveTab('markets')} style={{...s.tab(activeTab === 'markets'), flex: '1 0 auto'}}>問い管理</button>
         <button onClick={() => setActiveTab('gacha')} style={{...s.tab(activeTab === 'gacha'), flex: '1 0 auto', background: activeTab === 'gacha' ? '#f59e0b' : '#fef3c7', color: activeTab === 'gacha' ? '#fff' : '#92400e'}}>🎰 ガチャ</button>
         <button onClick={() => setActiveTab('categories')} style={{...s.tab(activeTab === 'categories'), flex: '1 0 auto'}}>カテゴリ</button>
@@ -605,9 +605,9 @@ export default function Admin() {
 
       {activeTab === 'markets' && (
         <>
-          <div style={{ marginBottom: '20px' }}>
-            <span style={{ fontSize: '13px', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>カテゴリで表示</span>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+          <div style={{ marginBottom: '8px' }}>
+            <span style={{ fontSize: '12px', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>カテゴリで表示</span>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', alignItems: 'center' }}>
               <button
                 type="button"
                 onClick={() => setMarketCategoryFilter('')}
@@ -626,7 +626,7 @@ export default function Admin() {
                 </button>
               ))}
             </div>
-            <div style={{ display: 'flex', gap: '6px', marginTop: '10px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '5px', marginTop: '5px', alignItems: 'center' }}>
               <span style={{ fontSize: '11px', color: '#64748b', marginRight: '4px' }}>並び順:</span>
               {(['new', 'deadline', 'popular'] as const).map(v => (
                 <button key={v} type="button" onClick={() => setMarketSortBy(v)} style={s.sortBtn(marketSortBy === v)}>
@@ -637,7 +637,7 @@ export default function Admin() {
             </div>
           </div>
 
-          <div style={{ marginBottom: '16px', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ marginBottom: '8px', display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
             <button
               onClick={handleBatchAddImages}
               disabled={batchImageLoading}
@@ -684,10 +684,10 @@ export default function Admin() {
             )}
           </div>
 
-          <section style={{ background: '#f4f4f4', padding: '14px', borderRadius: '12px', marginBottom: '16px' }}>
-            <h3>🆕 新規問い作成</h3>
+          <section style={{ background: '#f4f4f4', padding: '10px', borderRadius: '12px', marginBottom: '10px' }}>
+            <h3 style={{margin:'0 0 6px', fontSize:'14px'}}>🆕 新規問い作成</h3>
             <input placeholder="タイトル" value={newMarket.title} onChange={e => setNewMarket({...newMarket, title: e.target.value})} style={s.inp} />
-            <textarea placeholder="判定基準" value={newMarket.description} onChange={e => setNewMarket({...newMarket, description: e.target.value})} style={{...s.inp, height:'60px'}} />
+            <textarea placeholder="判定基準" value={newMarket.description} onChange={e => setNewMarket({...newMarket, description: e.target.value})} style={{...s.inp, height:'50px'}} />
             <div style={{ display: 'flex', gap: '10px' }}>
               <select value={newMarket.category} onChange={e => setNewMarket({...newMarket, category: e.target.value})} style={s.inp}>
                 <option value="">カテゴリを選択</option>{categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
@@ -720,14 +720,14 @@ export default function Admin() {
                 </div>
               </div>
               {editingId === m.id && (
-                <div style={{ marginTop: '10px', padding: '12px', background: '#f9f9f9', borderRadius: '8px', border:'1px solid #ddd' }}>
-                  <label style={{fontSize:'11px', color:'#666'}}>タイトル</label>
+                <div style={{ marginTop: '6px', padding: '8px', background: '#f9f9f9', borderRadius: '8px', border:'1px solid #ddd' }}>
+                  <label style={{fontSize:'10px', color:'#666'}}>タイトル</label>
                   <input value={editForm.title} onChange={e => setEditForm({...editForm, title: e.target.value})} style={s.inp} />
 
-                  <label style={{fontSize:'11px', color:'#666'}}>判定基準</label>
-                  <textarea value={editForm.description} onChange={e => setEditForm({...editForm, description: e.target.value})} style={{...s.inp, height:'60px'}} />
+                  <label style={{fontSize:'10px', color:'#666'}}>判定基準</label>
+                  <textarea value={editForm.description} onChange={e => setEditForm({...editForm, description: e.target.value})} style={{...s.inp, height:'50px'}} />
 
-                  <label style={{fontSize:'11px', color:'#666'}}>参考記事 URL</label>
+                  <label style={{fontSize:'10px', color:'#666'}}>参考記事 URL</label>
                   <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '4px' }}>
                     <input value={editForm.source_url ?? ''} onChange={e => { setEditForm({...editForm, source_url: e.target.value}); setUrlSnippet('') }} placeholder="https://..." style={{ ...s.inp, marginBottom: 0, flex: 1 }} />
                     <button
@@ -760,34 +760,39 @@ export default function Admin() {
                     </a>
                   </div>
                   {urlSnippet && (
-                    <div style={{ padding: '6px 10px', background: '#f0f9ff', borderRadius: '6px', fontSize: '11px', color: '#475569', lineHeight: 1.5, marginBottom: '10px', border: '1px solid #bae6fd' }}>
+                    <div style={{ padding: '4px 8px', background: '#f0f9ff', borderRadius: '6px', fontSize: '11px', color: '#475569', lineHeight: 1.5, marginBottom: '6px', border: '1px solid #bae6fd' }}>
                       💬 {urlSnippet}
                     </div>
                   )}
-                  {!urlSnippet && <div style={{ marginBottom: '10px' }} />}
 
-                  <label style={{fontSize:'11px', color:'#666'}}>カテゴリ</label>
-                  <select value={editForm.category} onChange={e => setEditForm({...editForm, category: e.target.value})} style={s.inp}>
-                    {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                  </select>
+                  <div style={{display:'flex', gap:'8px', alignItems:'center'}}>
+                    <div style={{flex:1}}>
+                      <label style={{fontSize:'10px', color:'#666'}}>カテゴリ</label>
+                      <select value={editForm.category} onChange={e => setEditForm({...editForm, category: e.target.value})} style={s.inp}>
+                        {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                      </select>
+                    </div>
+                    <div style={{flex:1}}>
+                      <label style={{fontSize:'10px', color:'#666'}}>締切日時</label>
+                      <input type="datetime-local" value={editForm.end_date} onChange={e => setEditForm({...editForm, end_date: e.target.value})} style={s.inp} />
+                    </div>
+                    <div style={{flex:1}}>
+                      <label style={{fontSize:'10px', color:'#666'}}>判定日</label>
+                      <input type="datetime-local" value={editForm.resolution_date || ''} onChange={e => setEditForm({...editForm, resolution_date: e.target.value})} style={s.inp} />
+                    </div>
+                  </div>
 
-                  <label style={{fontSize:'11px', color:'#666'}}>締切日時（ベット受付終了）</label>
-                  <input type="datetime-local" value={editForm.end_date} onChange={e => setEditForm({...editForm, end_date: e.target.value})} style={s.inp} />
-
-                  <label style={{fontSize:'11px', color:'#666'}}>判定日（結果確定予定日）</label>
-                  <input type="datetime-local" value={editForm.resolution_date || ''} onChange={e => setEditForm({...editForm, resolution_date: e.target.value})} style={s.inp} />
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
                     <label style={{ fontSize: '11px', color: '#666', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <input type="checkbox" checked={editForm.auto_resolve || false} onChange={e => setEditForm({...editForm, auto_resolve: e.target.checked})} />
                       アンケート型（締切時に最多票を自動で正解にする）
                     </label>
                   </div>
 
-                  <label style={{fontSize:'11px', color:'#666'}}>画像</label>
+                  <label style={{fontSize:'10px', color:'#666'}}>画像</label>
                   {editForm.image_url
-                    ? <img src={editForm.image_url} alt="" style={{width:'100%', maxHeight:'120px', objectFit:'cover', borderRadius:'6px', marginBottom:'6px'}} />
-                    : <div style={{width:'100%', height:'60px', background:'#f1f5f9', borderRadius:'6px', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'11px', color:'#94a3b8', marginBottom:'6px'}}>画像なし</div>
+                    ? <img src={editForm.image_url} alt="" style={{width:'100%', maxHeight:'90px', objectFit:'cover', borderRadius:'6px', marginBottom:'4px'}} />
+                    : <div style={{width:'100%', height:'40px', background:'#f1f5f9', borderRadius:'6px', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'11px', color:'#94a3b8', marginBottom:'4px'}}>画像なし</div>
                   }
                   <div style={{display:'flex', gap:'6px', marginBottom:'8px', alignItems:'center'}}>
                     <button type="button" disabled={imageCandidateIdx <= 0} onClick={() => { const i = imageCandidateIdx - 1; setImageCandidateIdx(i); setEditForm((f: any) => ({ ...f, image_url: imageCandidates[i] })) }} style={{...s.btn, background: imageCandidateIdx <= 0 ? '#e2e8f0' : '#64748b', padding:'6px 10px', fontSize:'12px', flexShrink:0}}>◀ 前</button>
@@ -810,17 +815,17 @@ export default function Admin() {
                     </button>
                     <span style={{fontSize:'10px', color:'#94a3b8', whiteSpace:'nowrap', flexShrink:0}}>{imageCandidates.length > 0 ? `${imageCandidateIdx + 1}/${imageCandidates.length}` : '—'}</span>
                   </div>
-                  <div style={{marginBottom:'10px'}}><label style={{fontSize:'12px', color:'#666'}}>または画像ファイルをアップロード</label><br/><input type="file" onChange={e => uploadImage(e, true)} /></div>
+                  <div style={{marginBottom:'6px'}}><label style={{fontSize:'10px', color:'#666'}}>または画像ファイルをアップロード</label><br/><input type="file" onChange={e => uploadImage(e, true)} /></div>
 
-                  <label style={{fontSize:'11px', color:'#666'}}>選択肢</label>
+                  <label style={{fontSize:'10px', color:'#666'}}>選択肢</label>
                   {editForm.market_options.map((opt: any, idx: number) => (
                     <input key={opt.id} value={opt.name} onChange={e => { const newOpts = [...editForm.market_options]; newOpts[idx].name = e.target.value; setEditForm({ ...editForm, market_options: newOpts }) }} style={s.inp} />
                   ))}
                   <input placeholder="+ 選択肢追加" value={newOptionName} onChange={e => setNewOptionName(e.target.value)} style={{ ...s.inp, border: '1px solid #3b82f6' }} />
 
                   {!m.is_resolved && (
-                    <div style={{ marginBottom: '12px' }}>
-                      <label style={{fontSize:'11px', color:'#ef4444', display:'block', marginBottom:'6px'}}>結果確定</label>
+                    <div style={{ marginBottom: '6px' }}>
+                      <label style={{fontSize:'10px', color:'#ef4444', display:'block', marginBottom:'4px'}}>結果確定</label>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
                         {m.market_options.map((opt: any) => (
                           <button key={opt.id} onClick={() => handleResolve(m.id, opt.id, opt.name)} style={{fontSize:'12px', padding:'6px 14px', borderRadius:'6px', border:'1px solid #ef4444', color:'#ef4444', background:'#fff', cursor:'pointer'}}>
@@ -890,65 +895,63 @@ export default function Admin() {
       )}
 
       {activeTab === 'gacha' && (
-        <section style={{ background: '#fffbeb', padding: '24px', borderRadius: '16px' }}>
-          <h3 style={{ marginTop: 0, fontSize: '20px' }}>🎰 ガチャ投稿</h3>
-          <p style={{ fontSize: '13px', color: '#78350f', marginBottom: '16px', lineHeight: 1.7 }}>
-            ボタンを押すと最新ニュース・Xトレンドから<strong>10問の候補</strong>を生成します。<br />
-            気に入った問いを選び、必要なら編集してからX投稿できます。
+        <section style={{ background: '#fffbeb', padding: '12px', borderRadius: '16px' }}>
+          <h3 style={{ marginTop: 0, marginBottom: '4px', fontSize: '16px' }}>🎰 ガチャ投稿</h3>
+          <p style={{ fontSize: '12px', color: '#78350f', marginBottom: '8px', lineHeight: 1.5 }}>
+            ボタンを押すと最新ニュース・Xトレンドから<strong>10問の候補</strong>を生成。気に入った問いを選び、編集してX投稿できます。
           </p>
-          <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-            <div style={{ flex: 1, minWidth: '200px' }}>
-              <label style={{ fontSize: '12px', color: '#666', display: 'block', marginBottom: '4px' }}>管理パスワード</label>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <div style={{ flex: 1, minWidth: '160px' }}>
+              <label style={{ fontSize: '11px', color: '#666', display: 'block', marginBottom: '2px' }}>管理パスワード</label>
               <input type="password" value={pdcaPassword} onChange={e => setPdcaPassword(e.target.value)} placeholder="yosoru_admin" style={s.inp} />
             </div>
             <button
               onClick={handleTestAi}
               disabled={aiTestLoading}
-              style={{ ...s.btn, background: aiTestLoading ? '#9ca3af' : '#64748b', padding: '10px 16px', fontSize: '12px', marginBottom: '10px' }}
+              style={{ ...s.btn, background: aiTestLoading ? '#9ca3af' : '#64748b', fontSize: '12px', marginBottom: '6px' }}
             >
               {aiTestLoading ? '確認中…' : '🔍 AI接続テスト'}
             </button>
             <button
               onClick={handleDebugDraft}
               disabled={aiTestLoading}
-              style={{ ...s.btn, background: aiTestLoading ? '#9ca3af' : '#7c3aed', padding: '10px 16px', fontSize: '12px', marginBottom: '10px' }}
+              style={{ ...s.btn, background: aiTestLoading ? '#9ca3af' : '#7c3aed', fontSize: '12px', marginBottom: '6px' }}
             >
               {aiTestLoading ? '確認中…' : '🔬 ガチャ診断'}
             </button>
           </div>
           {aiTestResult != null && (
-            <div style={{ marginBottom: '16px', padding: '12px', background: '#1e293b', borderRadius: '10px' }}>
+            <div style={{ marginBottom: '8px', padding: '8px', background: '#1e293b', borderRadius: '10px' }}>
               <div style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '6px' }}>AI接続テスト結果：</div>
               <pre style={{ color: '#e2e8f0', fontSize: '12px', whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: 0 }}>
                 {JSON.stringify(aiTestResult, null, 2)}
               </pre>
             </div>
           )}
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ fontSize: '12px', color: '#78350f', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>
+          <div style={{ marginBottom: '8px' }}>
+            <label style={{ fontSize: '11px', color: '#78350f', fontWeight: 'bold', display: 'block', marginBottom: '2px' }}>
               💡 AIへの着眼点・指示（任意）
             </label>
             <textarea
               value={gachaHint}
               onChange={e => setGachaHint(e.target.value)}
-              placeholder={'例：今週の政治ネタで攻めたい&#10;例：エンタメ・アイドル系で若い人が食いつくもの&#10;例：円安・物価上昇で庶民が感じるリアルな問い&#10;例：AI・テクノロジーで近い未来が見えるもの'}
-              rows={3}
-              style={{ ...s.inp, resize: 'vertical', marginBottom: 0, fontSize: '13px', background: '#fffbeb', borderColor: '#fcd34d' }}
+              placeholder={'例：今週の政治ネタで攻めたい / エンタメ系 / AI・テクノロジー'}
+              rows={2}
+              style={{ ...s.inp, resize: 'vertical', marginBottom: 0, fontSize: '12px', background: '#fffbeb', borderColor: '#fcd34d' }}
             />
-            <p style={{ fontSize: '11px', color: '#92400e', marginTop: '4px' }}>空欄でもOK。入力するとAIがその方向性で問いを生成します。</p>
           </div>
-          <div style={{ marginBottom: '16px' }}>
+          <div style={{ marginBottom: '10px' }}>
             <button
               onClick={handleGacha}
               disabled={gachaLoading}
-              style={{ ...s.btn, background: gachaLoading ? '#9ca3af' : '#f59e0b', fontSize: '16px', padding: '12px 28px', minWidth: '160px' }}
+              style={{ ...s.btn, background: gachaLoading ? '#9ca3af' : '#f59e0b', fontSize: '15px', padding: '10px 24px', minWidth: '140px' }}
             >
               {gachaLoading ? '⏳ 生成中…' : '🎰 10問ガチャ！'}
             </button>
           </div>
 
           {gachaCards.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {gachaCards.map((card, idx) => {
                 const edit = gachaEdits[idx]
                 const postResult = gachaPostResults[idx]
@@ -963,8 +966,8 @@ export default function Admin() {
                 }
                 if (!edit) return null
                 return (
-                  <div key={idx} style={{ background: '#fff', border: posted ? '2px solid #10b981' : '1px solid #fcd34d', borderRadius: '14px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px', gap: '8px' }}>
+                  <div key={idx} style={{ background: '#fff', border: posted ? '2px solid #10b981' : '1px solid #fcd34d', borderRadius: '12px', padding: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px', gap: '8px' }}>
                       <span style={{ fontSize: '11px', color: '#9ca3af', flex: 1 }}>📰 {card.headline}</span>
                       <span style={{ fontSize: '11px', background: '#e0f2fe', color: '#0369a1', borderRadius: '20px', padding: '2px 10px', whiteSpace: 'nowrap' }}>{card.draft?.category}</span>
                     </div>
@@ -973,10 +976,10 @@ export default function Admin() {
                     {edit && (() => {
                       const currentImg = edit.imageHistory[edit.imageIdx]
                       return (
-                        <div style={{ marginBottom: '10px' }}>
+                        <div style={{ marginBottom: '6px' }}>
                           {currentImg
-                            ? <img src={currentImg} alt="" style={{ width: '100%', maxHeight: '120px', objectFit: 'cover', borderRadius: '8px', marginBottom: '6px' }} />
-                            : <div style={{ width: '100%', height: '60px', background: '#f1f5f9', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: '#94a3b8', marginBottom: '6px' }}>画像なし</div>
+                            ? <img src={currentImg} alt="" style={{ width: '100%', maxHeight: '100px', objectFit: 'cover', borderRadius: '8px', marginBottom: '4px' }} />
+                            : <div style={{ width: '100%', height: '48px', background: '#f1f5f9', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: '#94a3b8', marginBottom: '4px' }}>画像なし</div>
                           }
                           <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                             <button type="button" disabled={edit.imageIdx <= 0} onClick={() => setGachaEdits(prev => prev.map((ed, i) => i === idx ? { ...ed, imageIdx: ed.imageIdx - 1 } : ed))} style={{ ...s.btn, background: edit.imageIdx <= 0 ? '#e2e8f0' : '#64748b', padding: '5px 10px', fontSize: '11px' }}>◀ 前</button>
@@ -989,7 +992,7 @@ export default function Admin() {
 
                     {/* 参考記事 URL・引用 */}
                     {edit && (
-                      <div style={{ marginBottom: '10px' }}>
+                      <div style={{ marginBottom: '6px' }}>
                         <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '4px' }}>
                           <input
                             value={edit.sourceLink}
@@ -1012,19 +1015,19 @@ export default function Admin() {
                       </div>
                     )}
 
-                    <div style={{ marginBottom: '10px' }}>
-                      <label style={{ fontSize: '11px', color: '#666', display: 'block', marginBottom: '4px' }}>タイトル（編集可）</label>
+                    <div style={{ marginBottom: '6px' }}>
+                      <label style={{ fontSize: '10px', color: '#666', display: 'block', marginBottom: '2px' }}>タイトル（編集可）</label>
                       <textarea
                         value={edit.title}
                         onChange={e => setGachaEdits(prev => prev.map((ed, i) => i === idx ? { ...ed, title: e.target.value } : ed))}
                         rows={2}
-                        style={{ ...s.inp, resize: 'vertical', marginBottom: 0, fontWeight: 'bold', fontSize: '15px' }}
+                        style={{ ...s.inp, resize: 'vertical', marginBottom: 0, fontWeight: 'bold', fontSize: '14px' }}
                       />
                     </div>
 
-                    <div style={{ marginBottom: '12px' }}>
-                      <label style={{ fontSize: '11px', color: '#666', display: 'block', marginBottom: '6px' }}>選択肢（編集可）</label>
-                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <div style={{ marginBottom: '6px' }}>
+                      <label style={{ fontSize: '10px', color: '#666', display: 'block', marginBottom: '2px' }}>選択肢（編集可）</label>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                         {edit.options.map((opt, oi) => (
                           <input
                             key={oi}
@@ -1042,23 +1045,23 @@ export default function Admin() {
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <label style={{ fontSize: '11px', color: '#666' }}>締切</label>
                         <select
                           value={edit.endDays}
                           onChange={e => setGachaEdits(prev => prev.map((ed, i) => i === idx ? { ...ed, endDays: Number(e.target.value) } : ed))}
-                          style={{ padding: '6px 8px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '13px' }}
+                          style={{ padding: '5px 8px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '12px' }}
                         >
                           {[{d:3,l:'3日後'},{d:7,l:'1週間'},{d:14,l:'2週間'},{d:30,l:'1ヶ月'},{d:90,l:'3ヶ月'},{d:180,l:'6ヶ月'},{d:270,l:'9ヶ月'},{d:365,l:'12ヶ月'}].map(({d,l}) => <option key={d} value={d}>{l}</option>)}
                         </select>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <label style={{ fontSize: '11px', color: '#6366f1' }}>判定日</label>
                         <select
                           value={edit.resolutionDays}
                           onChange={e => setGachaEdits(prev => prev.map((ed, i) => i === idx ? { ...ed, resolutionDays: Number(e.target.value) } : ed))}
-                          style={{ padding: '6px 8px', border: '1px solid #c7d2fe', borderRadius: '6px', fontSize: '13px' }}
+                          style={{ padding: '5px 8px', border: '1px solid #c7d2fe', borderRadius: '6px', fontSize: '12px' }}
                         >
                           {[{d:3,l:'3日後'},{d:7,l:'1週間'},{d:14,l:'2週間'},{d:30,l:'1ヶ月'},{d:90,l:'3ヶ月'},{d:180,l:'6ヶ月'},{d:270,l:'9ヶ月'},{d:365,l:'12ヶ月'}].map(({d,l}) => <option key={d} value={d}>{l}</option>)}
                         </select>
@@ -1074,7 +1077,7 @@ export default function Admin() {
                         <button
                           onClick={() => handlePostGacha(idx)}
                           disabled={isPosting || gachaPosting !== null}
-                          style={{ ...s.btn, background: isPosting ? '#9ca3af' : '#0284c7', padding: '10px 20px' }}
+                          style={{ ...s.btn, background: isPosting ? '#9ca3af' : '#0284c7' }}
                         >
                           {isPosting ? '⏳ 投稿中…' : '📤 この問いを投稿'}
                         </button>
@@ -1405,8 +1408,8 @@ CREATE POLICY "select_own" ON user_proposals FOR SELECT TO authenticated USING (
             <input value={siteConfig.site_title} onChange={e => setSiteConfig({...siteConfig, site_title: e.target.value})} placeholder="タイトル" style={s.inp} />
           </div>
           <div style={{marginBottom:'15px'}}>
-            <label style={{fontSize:'12px', color:'#666'}}>サイト説明</label>
-            <input value={siteConfig.site_description} onChange={e => setSiteConfig({...siteConfig, site_description: e.target.value})} placeholder="説明" style={s.inp} />
+            <label style={{fontSize:'12px', color:'#666'}}>サブタイトル（トップページ タイトル下の一行）</label>
+            <input value={siteConfig.site_description} onChange={e => setSiteConfig({...siteConfig, site_description: e.target.value})} placeholder="✨ 未来をヨソって(予想して)楽しもう ✨" style={s.inp} />
           </div>
           <div style={{marginBottom:'15px'}}>
             <label style={{fontSize:'12px', color:'#666'}}>管理メッセージ</label>

@@ -157,13 +157,12 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key`}
       {showAuthModal && <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:'20px'}}><div style={{background:'white', padding:'24px', borderRadius:'20px', width:'100%', maxWidth:'380px', textAlign:'center'}}><h2 style={{fontSize:'20px', fontWeight:'900', marginBottom:'15px'}}>ヨソるを開始</h2><button onClick={() => supabase.auth.signInWithOAuth({provider:'google'})} style={{width:'100%', padding:'12px', marginBottom:'10px', borderRadius:'8px', border:'1px solid #ddd', background:'#fff', fontWeight:'bold', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'}}><img src="https://www.google.com/favicon.ico" alt="Google icon" width="16"/>Googleでつづける</button><div style={{margin:'15px 0', color:'#999', fontSize:'12px'}}>またはメールアドレスで</div><input type="email" placeholder="メール" value={email} onChange={e => setEmail(e.target.value)} style={{width:'100%', padding:'10px', marginBottom:'8px', borderRadius:'8px', border:'1px solid #eee'}} /><input type="password" placeholder="パス" value={password} onChange={e => setPassword(e.target.value)} style={{width:'100%', padding:'10px', marginBottom:'16px', borderRadius:'8px', border:'1px solid #eee'}} /><div style={{display:'flex', gap:'8px'}}><button onClick={() => supabase.auth.signInWithPassword({email, password}).then(()=>setShowAuthModal(false))} style={{flex:1, padding:'12px', background:'#3b82f6', color:'#fff', border:'none', borderRadius:'8px'}}>ログイン</button><button onClick={() => supabase.auth.signUp({email, password}).then(()=>setShowAuthModal(false))} style={{flex:1, padding:'12px', background:'#1f2937', color:'#fff', border:'none', borderRadius:'8px'}}>新規登録</button></div><button onClick={() => supabase.auth.signInAnonymously().then(()=>setShowAuthModal(false))} style={{background:'none', border:'none', color:'#999', fontSize:'12px', marginTop:'15px'}}>ゲスト利用（匿名）</button></div></div>}
 
       <header>
-        <div onClick={() => { setShakeTitle(true); setTimeout(() => setShakeTitle(false), 800) }} style={{cursor:'pointer', textAlign:'center', margin:'6px 0 4px', position:'relative', padding:'8px 0'}}>
+        <div style={{textAlign:'center', margin:'6px 0 4px', position:'relative', padding:'8px 0'}}>
           <div style={{position:'absolute', top:0, left:'50%', transform:'translateX(-50)', width:'200px', height:'100%', background:'radial-gradient(circle, rgba(139,92,246,0.1) 0%, transparent 70%)', pointerEvents:'none'}} />
-          <h1 style={{fontSize:'32px', fontWeight:'900', background:'linear-gradient(135deg, #2563eb, #7c3aed, #ec4899, #f59e0b)', backgroundSize:'200% 200%', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', margin:0, display:'inline-block', animation: shakeTitle ? 'bounce 0.6s ease' : 'gradientShift 4s ease infinite'}}>🔮 {config.site_title}</h1>
-          <div style={{fontSize:'11px', color:'#a78bfa', fontWeight:'bold', letterSpacing:'1px', marginTop:'2px'}}>✨ 未来をヨソって楽しもう！ ✨</div>
+          <h1 onClick={() => { setShakeTitle(true); fetchMarkets(); setTimeout(() => setShakeTitle(false), 800) }} style={{cursor:'pointer', fontSize:'32px', fontWeight:'900', background:'linear-gradient(135deg, #2563eb, #7c3aed, #ec4899, #f59e0b)', backgroundSize:'200% 200%', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', margin:0, display:'inline-block', animation: shakeTitle ? 'bounce 0.6s ease' : 'gradientShift 4s ease infinite'}}>🔮 {config.site_title}(予測マーケット)</h1>
+          <div style={{fontSize:'11px', color:'#a78bfa', fontWeight:'bold', letterSpacing:'1px', marginTop:'2px'}}>{config.site_description || '✨ 未来をヨソって(予想して)楽しもう ✨'}</div>
         </div>
         <style>{`@keyframes bounce{0%,100%{transform:translateY(0) scale(1)}25%{transform:translateY(-10px) scale(1.1) rotate(-3deg)}50%{transform:translateY(-5px) scale(1.05) rotate(2deg)}75%{transform:translateY(-2px) scale(1.02)}} @keyframes gradientShift{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}`}</style>
-        <div style={{ textAlign: 'center', fontSize: '11px', color: '#999', marginBottom: '6px' }}>{config.site_description}</div>
         {activeTab === 'home' && (
           <>{config.admin_message && <div style={{fontSize:'11px', background:'#fff', padding:'6px 8px', borderRadius:'8px', textAlign:'center', border:'1px solid #e2e8f0', color:'#64748b', marginBottom:'8px'}}>{config.admin_message}</div>}
             <div style={{display:'grid', gridTemplateColumns:'repeat(6, 1fr)', gap:'3px', margin:'8px 0'}}>{dbCategories.map(c => <button key={c.name} onClick={() => setActiveCategory(c.name)} style={{padding:'5px 0', fontSize:'9px', fontWeight:'bold', background:activeCategory===c.name?'#1f2937':'#fff', color:activeCategory===c.name?'#fff':'#64748b', border:'1px solid #e2e8f0', borderRadius:'6px'}}>{c.name}</button>)}</div>
@@ -176,11 +175,15 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key`}
       {activeTab === 'home' && (
         <div style={{marginTop:'15px'}}>{markets.filter(m => activeCategory === 'すべて' || m.category === activeCategory).map(m => {
           const active = !m.is_resolved && new Date(m.end_date) > new Date()
-          const days = Math.ceil((new Date(m.end_date).getTime() - new Date().getTime()) / 86400000)
+          const msLeft = new Date(m.end_date).getTime() - new Date().getTime()
+          const days = Math.ceil(msLeft / 86400000)
+          const hoursLeft = Math.floor(msLeft / 3600000)
+          const minsLeft = Math.floor((msLeft % 3600000) / 60000)
           const resDate = m.resolution_date ? new Date(m.resolution_date) : null
           const resDays = resDate ? Math.ceil((resDate.getTime() - new Date().getTime()) / 86400000) : null
           const isPopular = m.total_pool > 1000
           const isUrgent = active && days <= 2
+          const isVeryUrgent = active && msLeft > 0 && msLeft < 86400000
           const catColor = categoryMeta[m.category]?.color || '#374151'
           const topOpt = m.market_options.reduce((a: any, b: any) => (b.pool > a.pool ? b : a), m.market_options[0])
           const topPct = topOpt ? Math.round((topOpt.pool / (m.total_pool || 1)) * 100) : 0
@@ -199,7 +202,9 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key`}
                   <div style={{display:'flex', gap:'5px'}}>
                     {m.is_resolved && <div style={{background:'#10b981', color:'#fff', fontSize:'10px', padding:'3px 8px', borderRadius:'20px', fontWeight:'bold'}}>確定済み</div>}
                     {isPopular && !m.is_resolved && <div style={{background:'#f59e0b', color:'#fff', fontSize:'10px', padding:'3px 8px', borderRadius:'20px', fontWeight:'bold'}}>人気</div>}
-                    {active && <div style={{background:isUrgent?'#ef4444':'rgba(0,0,0,0.55)', backdropFilter:'blur(4px)', color:'#fff', fontSize:'10px', padding:'3px 8px', borderRadius:'20px', fontWeight:'bold'}}>{days <= 0 ? '本日締切' : `あと${days}日`}</div>}
+                    {active && <div style={{background:isVeryUrgent?'#dc2626':isUrgent?'#ef4444':'rgba(0,0,0,0.65)', backdropFilter:'blur(4px)', color:'#fff', fontSize:'11px', padding:'4px 10px', borderRadius:'20px', fontWeight:'bold', letterSpacing:'0.02em', boxShadow: isUrgent ? '0 2px 6px rgba(239,68,68,0.5)' : '0 1px 4px rgba(0,0,0,0.3)'}}>
+                      {msLeft <= 0 ? '⏰ 締切 本日' : isVeryUrgent ? `⏰ 締切 あと${hoursLeft}時間${minsLeft}分` : `⏰ 締切 あと${days}日`}
+                    </div>}
                   </div>
                 </div>
 
