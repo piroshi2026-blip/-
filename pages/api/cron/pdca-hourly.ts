@@ -54,8 +54,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   await logPdcaPayload('pdca_hourly', { market1, market2, xAutoPostEnabled: xEnabled }, ok)
 
-  // 遅延サクラ投票のフォールバック（auto-sakura cron が止まっていても毎時実行）
-  const sakura = await applyPendingSakura().catch(() => ({ applied: 0 }))
+  // レスポンスをブロックしないようバックグラウンドで実行
+  // Vercel は res.end() 後もイベントループが空になるまで関数を保持するため完了できる
+  void applyPendingSakura().catch(() => {})
 
-  return res.status(200).json({ market1, market2, xAutoPostEnabled: xEnabled, sakuraApplied: sakura.applied })
+  return res.status(200).json({ market1, market2, xAutoPostEnabled: xEnabled })
 }
