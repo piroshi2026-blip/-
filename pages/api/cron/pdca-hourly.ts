@@ -38,9 +38,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   await logPdcaPayload('pdca_hourly_start', { stage: 'preloaded' }, true)
 
-  const [r1, r2] = await Promise.allSettled([
+  // 市場生成とサクラチェックを並列実行（合計時間を増やさずサクラを確実に完了させる）
+  const [r1, r2, r3] = await Promise.allSettled([
     createQuickMarket(preloaded, false),
     createQuickMarket(preloaded, false),
+    applyPendingSakura(),
   ])
 
   const toResult = (r: PromiseSettledResult<QuickMarketResult>) =>
@@ -51,12 +53,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const market1 = toResult(r1)
   const market2 = toResult(r2)
   const ok = !(market1 as any).error && !(market2 as any).error
+  const sakuraApplied = r3.status === 'fulfilled' ? r3.value.applied : 0
 
-  await logPdcaPayload('pdca_hourly', { market1, market2, xAutoPostEnabled: xEnabled }, ok)
+  await logPdcaPayload('pdca_hourly', { market1, market2, xAutoPostEnabled: xEnabled, sakuraApplied }, ok)
 
-  // レスポンスをブロックしないようバックグラウンドで実行
-  // Vercel は res.end() 後もイベントループが空になるまで関数を保持するため完了できる
-  void applyPendingSakura().catch(() => {})
-
-  return res.status(200).json({ market1, market2, xAutoPostEnabled: xEnabled })
+  return res.status(200).json({ market1, market2, xAutoPostEnabled: xEnabled, sakuraApplied })
 }
