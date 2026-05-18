@@ -1,8 +1,9 @@
 import { fetchTrendHeadlines, fetchOhtaniDodgersHeadlines, fetchTechAiHeadlines, fetchScienceCultureHeadlines, fetchTavilyTopicItems, MLB_TOPIC_RE, buildDailyMlbFallbackItem, type TrendItem } from './fetchTrends'
 import { draftMarketFromTrend, type DraftMarket } from './draftMarket'
 import { fetchMarketImage } from './fetchImage'
-import { loadCategories, pickSportsCategory } from './pdcaHelpers'
+import { loadCategories, pickSportsCategory, recentTitlesSample } from './pdcaHelpers'
 import { fetchWorldContext, formatWorldContextForPrompt, type WorldContext } from './fetchContext'
+import { getThemePool } from './themePool'
 
 export type DraftCandidate = {
   draft: DraftMarket
@@ -19,6 +20,7 @@ export type PreloadedDraftData = {
   allowedCategories: string[]
   defaultCategory: string
   sportsDefault: string
+  recentTitles: string[]
 }
 
 /**
@@ -36,7 +38,7 @@ const GACHA_CURATED_QUERIES = [
 /** worldCtx・トレンドプール・カテゴリを一括プリロード（generate-drafts で1回だけ呼ぶ）*/
 export async function preloadDraftData(hint?: string, opts?: { enrichWithTavily?: boolean }): Promise<PreloadedDraftData> {
   void hint
-  const [worldCtx, genResult, mlbResult, techResult, sciResult, catData, tavilyItems] = await Promise.all([
+  const [worldCtx, genResult, mlbResult, techResult, sciResult, catData, tavilyItems, recentTitles] = await Promise.all([
     fetchWorldContext(),
     fetchTrendHeadlines(20),
     fetchOhtaniDodgersHeadlines(10),
@@ -44,10 +46,11 @@ export async function preloadDraftData(hint?: string, opts?: { enrichWithTavily?
     fetchScienceCultureHeadlines(8),
     loadCategories(),
     opts?.enrichWithTavily ? fetchTavilyTopicItems(GACHA_CURATED_QUERIES, 2) : Promise.resolve([] as TrendItem[]),
+    recentTitlesSample(),
   ])
 
   // キュレートトピック優先で前方に配置 → シャッフル後も先頭カードがトレンド系になりやすい
-  const combined = [
+  const newsItems = [
     ...tavilyItems,                      // AI/宇宙/核融合/芸術/科学（最大10件）
     ...mlbResult.items.slice(0, 3),      // MLB
     ...techResult.items.slice(0, 8),     // テック/IT
@@ -56,19 +59,30 @@ export async function preloadDraftData(hint?: string, opts?: { enrichWithTavily?
   ]
   // 重複タイトルを除去（先頭15文字で判定）
   const seen = new Set<string>()
-  const pool: TrendItem[] = []
-  for (const item of combined) {
+  const newsPool: TrendItem[] = []
+  for (const item of newsItems) {
     const key = item.title.slice(0, 15).toLowerCase()
     if (seen.has(key)) continue
     seen.add(key)
-    pool.push(item)
+    newsPool.push(item)
   }
-  if (!pool.length) pool.push(buildDailyMlbFallbackItem())
+  if (!newsPool.length) newsPool.push(buildDailyMlbFallbackItem())
+
+  // テーマを約25%の割合で混入（4件に1件がテーマになるよう挿入）
+  const themes = getThemePool()
+  const pool: TrendItem[] = []
+  let themeIdx = 0
+  for (let i = 0; i < newsPool.length; i++) {
+    if (i > 0 && i % 3 === 0 && themeIdx < themes.length) {
+      pool.push(themes[themeIdx++])
+    }
+    pool.push(newsPool[i])
+  }
 
   const { names: allowedCategories, defaultCategory } = catData
   const sportsDefault = pickSportsCategory(allowedCategories, defaultCategory)
 
-  return { worldCtx, pool, allowedCategories, defaultCategory, sportsDefault }
+  return { worldCtx, pool, allowedCategories, defaultCategory, sportsDefault, recentTitles }
 }
 
 /** プリロード済みデータから1候補を生成（Claude API呼び出しのみ）*/
@@ -84,18 +98,21 @@ export async function generateDraftCandidate(
   let allowedCategories: string[]
   let defaultCategory: string
   let sportsDefault: string
+  let recentTitles: string[]
 
   if (preloaded) {
-    ;({ pool, worldCtx, allowedCategories, defaultCategory, sportsDefault } = preloaded)
+    ;({ pool, worldCtx, allowedCategories, defaultCategory, sportsDefault, recentTitles } = preloaded)
   } else {
-    const [genResult, mlbResult, techResult, sciResult, ctx] = await Promise.all([
+    const [genResult, mlbResult, techResult, sciResult, ctx, recent] = await Promise.all([
       fetchTrendHeadlines(20),
       fetchOhtaniDodgersHeadlines(10),
       fetchTechAiHeadlines(10),
       fetchScienceCultureHeadlines(8),
       preloadedContext ? Promise.resolve(preloadedContext) : fetchWorldContext(),
+      recentTitlesSample(),
     ])
     worldCtx = ctx
+    recentTitles = recent
     const combined = [
       ...mlbResult.items.slice(0, 3),
       ...techResult.items.slice(0, 8),
@@ -120,14 +137,14 @@ export async function generateDraftCandidate(
   const worldContext = formatWorldContextForPrompt(worldCtx)
 
   const item = forcedItem ?? pool[Math.floor(Math.random() * pool.length)]
-  const isMlb = MLB_TOPIC_RE.test(item.title)
+  const isMlb = !item.isTheme && MLB_TOPIC_RE.test(item.title)
   const kind: 'mlb' | 'general' = isMlb ? 'mlb' : 'general'
 
   let draft = await draftMarketFromTrend(
     item,
     kind === 'mlb' ? sportsDefault : defaultCategory,
     allowedCategories,
-    { flavor: kind, worldContext, hint }
+    { flavor: kind, worldContext, hint, recentTitles }
   )
   const catOk = allowedCategories.includes(draft.category)
     ? draft.category

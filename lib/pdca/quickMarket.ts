@@ -6,6 +6,7 @@ import {
   buildTweetBody,
   getPublicBaseUrl,
   insertMarket,
+  isTooSimilar,
   logPdcaPayload,
   resolveNewMarketId,
 } from './pdcaHelpers'
@@ -48,20 +49,39 @@ export type QuickMarketResult = {
  * preloaded を渡すと RSS/worldCtx 取得をスキップできる（pdca-hourly で2並列時に効果的）。
  */
 export async function createQuickMarket(preloaded?: PreloadedDraftData, skipImage = false): Promise<QuickMarketResult> {
-  const { pool, worldCtx, allowedCategories, defaultCategory, sportsDefault } =
-    preloaded ?? (await preloadDraftData())
+  const loaded = preloaded ?? (await preloadDraftData())
+  const { pool, worldCtx, allowedCategories, defaultCategory, sportsDefault, recentTitles } = loaded
   const worldContext = formatWorldContextForPrompt(worldCtx)
 
-  const item = pool[Math.floor(Math.random() * pool.length)]
-  const isMlb = MLB_TOPIC_RE.test(item.title)
+  // ランダムにアイテムを選ぶ（重複なら別のアイテムで1回リトライ）
+  const pickItem = () => pool[Math.floor(Math.random() * pool.length)]
+  let item = pickItem()
+  if (isTooSimilar(item.title, recentTitles)) {
+    const alt = pickItem()
+    if (!isTooSimilar(alt.title, recentTitles)) item = alt
+  }
+
+  const isMlb = !item.isTheme && MLB_TOPIC_RE.test(item.title)
   const kind: 'mlb' | 'general' = isMlb ? 'mlb' : 'general'
 
   let draft = await draftMarketFromTrend(
     item,
     kind === 'mlb' ? sportsDefault : defaultCategory,
     allowedCategories,
-    { flavor: kind, worldContext }
+    { flavor: kind, worldContext, recentTitles }
   )
+  // 生成後も重複チェック（タイトルレベル）
+  if (isTooSimilar(draft.title, recentTitles)) {
+    const altItem = pickItem()
+    const altDraft = await draftMarketFromTrend(
+      altItem,
+      !altItem.isTheme && MLB_TOPIC_RE.test(altItem.title) ? sportsDefault : defaultCategory,
+      allowedCategories,
+      { flavor: kind, worldContext, recentTitles }
+    ).catch(() => draft)
+    if (!isTooSimilar(altDraft.title, recentTitles)) draft = altDraft
+  }
+
   const catOk = allowedCategories.includes(draft.category)
     ? draft.category
     : kind === 'mlb'

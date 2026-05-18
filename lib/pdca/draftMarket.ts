@@ -202,7 +202,7 @@ endDays: 3〜30の整数（AI/宇宙/科学/核融合は14〜30、速報系は3�
 出力例:
 {"title":"大谷翔平、今季65本塁打の新記録を更新するか？","description":"2026年シーズン終了時点の本塁打数で判定。公式記録を根拠に、運営判断で確定します。","category":"スポーツ","options":["更新する","届かず","怪我・規定変更で無効"],"endDays":7}`
 
-async function callClaudeForDraft(userContent: string): Promise<Partial<DraftMarket>> {
+async function callClaudeForDraft(userContent: string, systemPrompt?: string): Promise<Partial<DraftMarket>> {
   const key = process.env.ANTHROPIC_API_KEY?.trim()
   if (!key) throw new Error('ANTHROPIC_API_KEY未設定')
 
@@ -211,7 +211,7 @@ async function callClaudeForDraft(userContent: string): Promise<Partial<DraftMar
   const msg = await client.messages.create({
     model,
     max_tokens: 1024,
-    system: CLAUDE_JSON_SYSTEM,
+    system: systemPrompt ?? CLAUDE_JSON_SYSTEM,
     messages: [{ role: 'user', content: userContent }],
   })
   const textBlock = msg.content.find((b) => b.type === 'text')
@@ -289,11 +289,28 @@ async function rewriteEchoingTitle(
   }
 }
 
+const CLAUDE_THEME_SYSTEM = `あなたは予測市場「ヨソる」の編集長です。社会・哲学・科学テーマを「読んだ瞬間に意見が出る問い」に変換します。
+JSONオブジェクト1つのみ返す。配列・コードブロック・説明文は不要。
+
+【最優先】争点がくっきり分かれ、Xで二極化するような問いにする。
+「どちらが正しいか」「どうすべきか」など価値観・世界観の対立が浮き彫りになる選択肢を作ること。
+テーマに示唆された選択肢を参考にしつつ、より鋭く磨くこと。
+
+必須キー:
+title: 問いのタイトル。60文字以内・「〜すべきか？」「〜はどうなるか？」「〜は正当化されるか？」形式
+description: 判定基準1〜2文。「公式の公表・実績・主要報道・社会的コンセンサスを根拠に、運営判断で確定します。」趣旨を含む
+category: 利用可能なカテゴリ一覧から完全一致で1つ選ぶ
+options: 3つの選択肢（各15文字以内・体言止め）。賛成/反対/条件付き、または三択の価値観対立を表現
+endDays: 哲学・社会テーマは30、科学・技術予測は90〜180（3〜180の整数）
+
+出力例:
+{"title":"AIとロボットが労働を代替すると社会は豊かになるか？","description":"2030年時点の主要経済指標・雇用統計・社会的議論の帰結で運営判断します。","category":"テクノロジー","options":["豊かになる","格差が拡大する","人間の役割が変わる"],"endDays":90}`
+
 export async function draftMarketFromTrend(
   item: TrendItem,
   defaultCategory: string,
   allowedCategories: string[],
-  opts?: { flavor?: 'general' | 'mlb'; worldContext?: string; hint?: string }
+  opts?: { flavor?: 'general' | 'mlb'; worldContext?: string; hint?: string; recentTitles?: string[] }
 ): Promise<DraftMarket> {
   const flavor = opts?.flavor ?? 'general'
   const pickCategory = (raw: string) => {
@@ -311,20 +328,38 @@ export async function draftMarketFromTrend(
   }
 
   const catList = allowedCategories.length ? allowedCategories.join(' / ') : defaultCategory
-  const flavorNote =
-    flavor === 'mlb'
-      ? '\nこの見出しは大谷翔平・ドジャース、村上宗隆・鈴木誠也・今永 など、メジャーリーグの日本人選手・球団に関するスポーツ予想です。category は「スポーツ」が利用可能なら優先してください。'
-      : ''
-  const contextPrefix = opts?.worldContext ? `${opts.worldContext}\n\n` : ''
-  const hintSection = opts?.hint ? `\n\n【編集者からの着眼点・方向性】\n${opts.hint}\n上記の着眼点を意識しながら、ニュース見出しを題材に問いを作ること。` : ''
-  const userContent = `${contextPrefix}利用可能な category（このいずれかと完全一致）: ${catList}\n\nニュース見出し（題材。これをそのまま問いのタイトルにしないこと）:\n${item.title}${flavorNote}${hintSection}`
+
+  // 直近タイトル（重複回避用）
+  const recentBlock = opts?.recentTitles && opts.recentTitles.length > 0
+    ? `\n\n【重複禁止】以下と重複・類似した問いは絶対に作らないこと（直近の問いリスト）:\n${opts.recentTitles.slice(0, 20).map(t => `- ${t}`).join('\n')}`
+    : ''
+
+  let userContent: string
+  let systemPrompt: string
+
+  if (item.isTheme) {
+    // テーマ（哲学・社会・科学）モード
+    systemPrompt = CLAUDE_THEME_SYSTEM
+    const hintNote = item.snippet ? `\n参考とする選択肢の方向性: ${item.snippet}` : ''
+    userContent = `利用可能な category（このいずれかと完全一致）: ${catList}\n\n議論テーマ（これをベースに問いを作ること。タイトルはより鋭く磨くこと）:\n${item.title}${hintNote}${recentBlock}`
+  } else {
+    // ニュースモード（従来）
+    systemPrompt = CLAUDE_JSON_SYSTEM
+    const flavorNote =
+      flavor === 'mlb'
+        ? '\nこの見出しは大谷翔平・ドジャース、村上宗隆・鈴木誠也・今永 など、メジャーリーグの日本人選手・球団に関するスポーツ予想です。category は「スポーツ」が利用可能なら優先してください。'
+        : ''
+    const contextPrefix = opts?.worldContext ? `${opts.worldContext}\n\n` : ''
+    const hintSection = opts?.hint ? `\n\n【編集者からの着眼点・方向性】\n${opts.hint}\n上記の着眼点を意識しながら、ニュース見出しを題材に問いを作ること。` : ''
+    userContent = `${contextPrefix}利用可能な category（このいずれかと完全一致）: ${catList}\n\nニュース見出し（題材。これをそのまま問いのタイトルにしないこと）:\n${item.title}${flavorNote}${hintSection}${recentBlock}`
+  }
 
   let parsed: Partial<DraftMarket> | null = null
 
   // Claude 優先（日本語品質が高い）
   if (claudeKey) {
     try {
-      parsed = await callClaudeForDraft(userContent)
+      parsed = await callClaudeForDraft(userContent, systemPrompt)
     } catch {
       /* fallbackDraft below */
     }
@@ -359,15 +394,18 @@ export async function draftMarketFromTrend(
 
   if (!parsed) return fallbackDraft(item.title, defaultCategory, opts)
 
-  const endDays = Math.min(30, Math.max(3, Number(parsed.endDays) || 7))
+  const endDays = Math.min(180, Math.max(3, Number(parsed.endDays) || 7))
 
   let titleRaw = String(parsed.title || '').slice(0, 100).trim()
-  if (!isBlackburnAwardsTopic(item.title) && titleRaw && isLikelyHeadlineEcho(titleRaw, item.title)) {
-    const repaired = await rewriteEchoingTitle(item, titleRaw, catList, flavorNote)
+  // テーマ項目はニュース見出しとのecho判定不要
+  if (!item.isTheme && !isBlackburnAwardsTopic(item.title) && titleRaw && isLikelyHeadlineEcho(titleRaw, item.title)) {
+    const flavorNoteForRewrite = flavor === 'mlb'
+      ? '\nこの見出しはメジャーリーグの日本人選手・球団に関するスポーツ予想です。'
+      : ''
+    const repaired = await rewriteEchoingTitle(item, titleRaw, catList, flavorNoteForRewrite)
     if (repaired && !isLikelyHeadlineEcho(repaired, item.title)) {
       titleRaw = repaired
     }
-    // 修正失敗時はAIが生成したtitleRawをそのまま使う（テンプレートより遥かにマシ）
   }
 
   const descRaw = String(parsed.description || '').trim()

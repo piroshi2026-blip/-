@@ -35,7 +35,7 @@ const SCIENCE_CULTURE_FEEDS = [
   'https://www.nhk.or.jp/rss/news/cat7.xml',  // NHK スポーツ
 ]
 
-export type TrendItem = { title: string; link?: string; source: string; snippet?: string }
+export type TrendItem = { title: string; link?: string; source: string; snippet?: string; isTheme?: boolean }
 
 /**
  * 見出しが MLB / 大谷・ドジャース / 大リーグの日本人選手 等かどうか。
