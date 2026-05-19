@@ -39,15 +39,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: 'draft が不正です（title と options が必要）' })
   }
 
-  // imageUrl が未指定の場合は sourceLink から OGP 取得を試みる
-  let finalImageUrl: string | null = imageUrl ?? null
-  if (!finalImageUrl) {
-    finalImageUrl = await fetchMarketImage(
-      { title: draft.title, category: draft.category ?? '' },
-      kind ?? 'general',
-      sourceLink ?? undefined
-    ).catch(() => null)
-  }
+  const baseUrl = getPublicBaseUrl()
+
+  // 画像取得・ツイート文生成・市場挿入を並列実行してタイムアウトを防ぐ
+  const imagePromise = imageUrl != null
+    ? Promise.resolve(imageUrl)
+    : fetchMarketImage(
+        { title: draft.title, category: draft.category ?? '' },
+        kind ?? 'general',
+        sourceLink ?? undefined
+      ).catch(() => null)
+  const tweetBodyPromise = generateNewMarketTweet(draft.title, draft.category ?? 'その他').catch(() => null)
+
+  const [finalImageUrl, generatedBody] = await Promise.all([imagePromise, tweetBodyPromise])
+  const body = generatedBody ?? buildTweetBody(kind ?? 'general', draft.title, baseUrl)
 
   const ins = await insertMarket(draft, finalImageUrl)
   if (ins.error) return res.status(500).json({ error: ins.error })
@@ -68,10 +73,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       await sb.from('markets').update(updateData).eq('id', marketId)
     }
   }
-
-  const baseUrl = getPublicBaseUrl()
-  const generatedBody = await generateNewMarketTweet(draft.title, draft.category ?? 'その他').catch(() => null)
-  const body = generatedBody ?? buildTweetBody(kind ?? 'general', draft.title, baseUrl)
 
   let tweetId: string | null = null
   let tweetError: string | null = null
