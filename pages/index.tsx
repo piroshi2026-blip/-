@@ -44,6 +44,14 @@ export default function Home() {
         sortedData = data.filter(m => !m.is_resolved && new Date(m.end_date) <= new Date())
       } else if (sortBy === 'random') {
         sortedData = [...data].sort(() => Math.random() - 0.5)
+      } else if (sortBy === 'deadline') {
+        const now = new Date()
+        sortedData = data
+          .filter(m => m.is_resolved || new Date(m.end_date) > now)
+          .sort((a, b) => {
+            if (a.is_resolved === b.is_resolved) return 0
+            return a.is_resolved ? 1 : -1
+          })
       } else {
         sortedData = data.sort((a, b) => {
           if (a.is_resolved === b.is_resolved) return 0;

@@ -35,10 +35,13 @@ const GACHA_CURATED_QUERIES = [
   '科学的発見 医療革命 バイオテクノロジー 量子コンピュータ 長寿研究 最新',
 ]
 
+/** 大谷翔平の先発登板スケジュール専用クエリ */
+const OHTANI_PITCHING_QUERY = '大谷翔平 先発登板 投球 マウンド ドジャース スタート 次回'
+
 /** worldCtx・トレンドプール・カテゴリを一括プリロード（generate-drafts で1回だけ呼ぶ）*/
 export async function preloadDraftData(hint?: string, opts?: { enrichWithTavily?: boolean }): Promise<PreloadedDraftData> {
   void hint
-  const [worldCtx, genResult, mlbResult, techResult, sciResult, catData, tavilyItems, recentTitles] = await Promise.all([
+  const [worldCtx, genResult, mlbResult, techResult, sciResult, catData, tavilyItems, ohtaniPitching, recentTitles] = await Promise.all([
     fetchWorldContext(),
     fetchTrendHeadlines(20),
     fetchOhtaniDodgersHeadlines(10),
@@ -46,11 +49,13 @@ export async function preloadDraftData(hint?: string, opts?: { enrichWithTavily?
     fetchScienceCultureHeadlines(8),
     loadCategories(),
     opts?.enrichWithTavily ? fetchTavilyTopicItems(GACHA_CURATED_QUERIES, 2) : Promise.resolve([] as TrendItem[]),
+    fetchTavilyTopicItems([OHTANI_PITCHING_QUERY], 2).catch(() => [] as TrendItem[]),
     recentTitlesSample(),
   ])
 
-  // キュレートトピック優先で前方に配置 → シャッフル後も先頭カードがトレンド系になりやすい
+  // 大谷登板日アイテムを最優先で先頭に配置
   const newsItems = [
+    ...ohtaniPitching,                   // 大谷先発登板情報（登板日のみTavilyがヒット）
     ...tavilyItems,                      // AI/宇宙/核融合/芸術/科学（最大10件）
     ...mlbResult.items.slice(0, 3),      // MLB
     ...techResult.items.slice(0, 8),     // テック/IT
@@ -68,12 +73,12 @@ export async function preloadDraftData(hint?: string, opts?: { enrichWithTavily?
   }
   if (!newsPool.length) newsPool.push(buildDailyMlbFallbackItem())
 
-  // テーマを約25%の割合で混入（4件に1件がテーマになるよう挿入）
+  // テーマを約33%の割合で混入（3件に1件がテーマになるよう挿入）
   const themes = getThemePool()
   const pool: TrendItem[] = []
   let themeIdx = 0
   for (let i = 0; i < newsPool.length; i++) {
-    if (i > 0 && i % 3 === 0 && themeIdx < themes.length) {
+    if (i > 0 && i % 2 === 0 && themeIdx < themes.length) {
       pool.push(themes[themeIdx++])
     }
     pool.push(newsPool[i])

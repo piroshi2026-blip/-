@@ -11,10 +11,6 @@ const DEFAULT_FEEDS = [
   'https://news.yahoo.co.jp/rss/topics/entertainment.xml', // エンタメ
   'https://news.yahoo.co.jp/rss/topics/it.xml',          // テクノロジー
   'https://news.yahoo.co.jp/rss/topics/world.xml',       // 国際
-  'https://www.nhk.or.jp/rss/news/cat0.xml',             // NHK総合
-  'https://www.nhk.or.jp/rss/news/cat4.xml',             // NHK政治
-  'https://www.nhk.or.jp/rss/news/cat5.xml',             // NHK経済
-  'https://www.nhk.or.jp/rss/news/cat1.xml',             // NHK社会
 ]
 
 /** 大谷・ドジャース・MLB 関連を拾うための追加RSS（スポーツ総合からキーワード抽出） */
@@ -28,12 +24,8 @@ const TECH_AI_FEEDS = [
   'https://ascii.jp/rss.xml',                              // ASCII（テック/ガジェット）
 ]
 
-/** 科学・医療・文化・スポーツ系フィード */
-const SCIENCE_CULTURE_FEEDS = [
-  'https://www.nhk.or.jp/rss/news/cat3.xml',  // NHK 科学・医療
-  'https://www.nhk.or.jp/rss/news/cat6.xml',  // NHK 生活・文化
-  'https://www.nhk.or.jp/rss/news/cat7.xml',  // NHK スポーツ
-]
+/** 科学・医療・文化・スポーツ系フィード（NHK除外 → Tavilyキュレートクエリで補完） */
+const SCIENCE_CULTURE_FEEDS: string[] = []
 
 export type TrendItem = { title: string; link?: string; source: string; snippet?: string; isTheme?: boolean }
 
