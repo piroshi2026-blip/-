@@ -10,7 +10,7 @@ export default function Admin() {
   const [markets, setMarkets] = useState<any[]>([])
   /** '' = すべて表示 */
   const [marketCategoryFilter, setMarketCategoryFilter] = useState<string>('')
-  const [marketSortBy, setMarketSortBy] = useState<'new' | 'deadline' | 'popular'>('new')
+  const [marketSortBy, setMarketSortBy] = useState<'new' | 'deadline' | 'popular' | 'judging'>('new')
   const [proposals, setProposals] = useState<any[]>([])
   const [proposalsLoading, setProposalsLoading] = useState(false)
   const [proposalsTableMissing, setProposalsTableMissing] = useState(false)
@@ -115,6 +115,12 @@ export default function Admin() {
     let list = markets
     if (marketCategoryFilter) {
       list = list.filter((m: any) => m.category === marketCategoryFilter)
+    }
+    if (marketSortBy === 'judging') {
+      const now = new Date()
+      return list
+        .filter((m: any) => !m.is_resolved && new Date(m.end_date) <= now)
+        .sort((a: any, b: any) => new Date(a.end_date).getTime() - new Date(b.end_date).getTime())
     }
     return [...list].sort((a: any, b: any) => {
       if (Boolean(a.is_resolved) !== Boolean(b.is_resolved)) return a.is_resolved ? 1 : -1
@@ -645,9 +651,9 @@ export default function Admin() {
             </div>
             <div style={{ display: 'flex', gap: '5px', marginTop: '5px', alignItems: 'center' }}>
               <span style={{ fontSize: '11px', color: '#64748b', marginRight: '4px' }}>並び順:</span>
-              {(['new', 'deadline', 'popular'] as const).map(v => (
+              {(['new', 'deadline', 'judging', 'popular'] as const).map(v => (
                 <button key={v} type="button" onClick={() => setMarketSortBy(v)} style={s.sortBtn(marketSortBy === v)}>
-                  {v === 'new' ? '新着順' : v === 'deadline' ? '締切順' : '人気順'}
+                  {v === 'new' ? '新着順' : v === 'deadline' ? '締切順' : v === 'judging' ? '判定中' : '人気順'}
                 </button>
               ))}
               <span style={{ fontSize: '11px', color: '#94a3b8', marginLeft: '6px' }}>確定済みは後ろに表示</span>
