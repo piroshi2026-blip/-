@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { loadRecentPosts, saveAnalysisInsights } from './xStorage'
 
-const MODEL = 'claude-sonnet-4-20250514'
+const MODEL = 'claude-sonnet-4-6'
 
 export async function runAnalyze(): Promise<{ insights: string; analyzed: number }> {
   const posts = await loadRecentPosts(100)

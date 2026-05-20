@@ -3,7 +3,7 @@ import { postPromotionTweet } from '../pdca/postX'
 import { loadRecentPosts, loadAnalysisInsights, savePost, type XPost } from './xStorage'
 import { pickTopic } from './xTopics'
 
-const MODEL = 'claude-sonnet-4-20250514'
+const MODEL = 'claude-sonnet-4-6'
 
 function buildSystemPrompt(recentPosts: XPost[], insights: string | null): string {
   const withScore = recentPosts.filter(p => p.score != null && (p.impressions ?? 0) > 0)
