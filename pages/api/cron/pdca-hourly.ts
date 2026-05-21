@@ -9,8 +9,8 @@ import { applyPendingSakura } from '../../../lib/pdca/sakuraVote'
 export const maxDuration = 60
 
 /**
- * JST 9:00〜23:00 毎時実行（cron-job.org から呼ばれる）。
- * RSS/worldCtx を1回プリロードし、2問を並列生成・公開・X投稿。
+ * JST 9/12/15/18/21時 実行（cron-job.org から呼ばれる）。
+ * RSS/worldCtx を1回プリロードし、1問を生成・公開・X投稿。
  * 画像はタイムアウト防止のためスキップ（後で batch-add-images で補完）。
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -38,24 +38,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   await logPdcaPayload('pdca_hourly_start', { stage: 'preloaded' }, true)
 
-  // 市場生成とサクラチェックを並列実行（合計時間を増やさずサクラを確実に完了させる）
-  const [r1, r2, r3] = await Promise.allSettled([
-    createQuickMarket(preloaded, false),
+  // 市場生成とサクラチェックを並列実行
+  const [r1, r2] = await Promise.allSettled([
     createQuickMarket(preloaded, false),
     applyPendingSakura(),
   ])
 
-  const toResult = (r: PromiseSettledResult<QuickMarketResult>) =>
-    r.status === 'fulfilled'
-      ? r.value
-      : { error: (r.reason as Error)?.message ?? String(r.reason) }
+  const market = r1.status === 'fulfilled'
+    ? r1.value
+    : { error: (r1.reason as Error)?.message ?? String(r1.reason) }
+  const ok = !(market as any).error
+  const sakuraApplied = r2.status === 'fulfilled' ? r2.value.applied : 0
 
-  const market1 = toResult(r1)
-  const market2 = toResult(r2)
-  const ok = !(market1 as any).error && !(market2 as any).error
-  const sakuraApplied = r3.status === 'fulfilled' ? r3.value.applied : 0
+  await logPdcaPayload('pdca_hourly', { market, xAutoPostEnabled: xEnabled, sakuraApplied }, ok)
 
-  await logPdcaPayload('pdca_hourly', { market1, market2, xAutoPostEnabled: xEnabled, sakuraApplied }, ok)
-
-  return res.status(200).json({ market1, market2, xAutoPostEnabled: xEnabled, sakuraApplied })
+  return res.status(200).json({ market, xAutoPostEnabled: xEnabled, sakuraApplied })
 }
