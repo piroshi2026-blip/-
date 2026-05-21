@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { TwitterApi } from 'twitter-api-v2'
 import { getPublicBaseUrl } from '../pdca/pdcaHelpers'
+import { fetchImageViaSearch } from '../pdca/fetchImage'
 import { loadRecentPosts, loadAnalysisInsights, savePost, type XPost } from './xStorage'
 import { pickTopic } from './xTopics'
 
@@ -85,11 +86,26 @@ async function generateContent(topic: { title: string; hint?: string }, recentPo
   return parsed
 }
 
-async function postThreadWithPoll(content: PostContent): Promise<{ tweetId: string; fullText: string }> {
+async function uploadImage(client: TwitterApi, imageUrl: string): Promise<string | null> {
+  try {
+    const res = await fetch(imageUrl)
+    if (!res.ok) return null
+    const buffer = Buffer.from(await res.arrayBuffer())
+    const mimeType = imageUrl.includes('.png') ? 'image/png' : 'image/jpeg'
+    return await client.v1.uploadMedia(buffer, { mimeType })
+  } catch {
+    return null
+  }
+}
+
+async function postThreadWithPoll(
+  content: PostContent,
+  imageUrl: string | null
+): Promise<{ tweetId: string; fullText: string }> {
   const client = getTwitterClient()
   const baseUrl = getPublicBaseUrl()
 
-  // ツイート1: 問い + ハッシュタグ + ポーリング
+  // ツイート1: 問い + ハッシュタグ + ポーリング（画像なし）
   const tweet1Text = `${content.poll_question}\n\n${content.hashtags}`.slice(0, 280)
   const { data: tweet1 } = await client.v2.tweet({
     text: tweet1Text,
@@ -100,12 +116,14 @@ async function postThreadWithPoll(content: PostContent): Promise<{ tweetId: stri
   })
   if (!tweet1?.id) throw new Error('ツイートIDが取得できませんでした')
 
-  // ツイート2（リプライ）: 本質的考察 + 締め + URL
+  // ツイート2（リプライ）: 本質的考察 + 締め + URL + 画像
+  const mediaId = imageUrl ? await uploadImage(client, imageUrl) : null
   const urlPart = baseUrl ? `\n▶ ${baseUrl}` : ''
   const tweet2Text = `${content.insight}\n\n${content.closing}${urlPart}`.slice(0, 280)
   await client.v2.tweet({
     text: tweet2Text,
     reply: { in_reply_to_tweet_id: tweet1.id },
+    ...(mediaId ? { media: { media_ids: [mediaId] } } : {}),
   })
 
   return { tweetId: tweet1.id, fullText: `${tweet1Text}\n---\n${tweet2Text}` }
@@ -123,14 +141,18 @@ export async function runPost(dryRun = false): Promise<{
     pickTopic(),
   ])
 
-  const postContent = await generateContent(topic, recentPosts, insights)
+  // 投稿生成と画像取得を並列実行
+  const [postContent, imageUrl] = await Promise.all([
+    generateContent(topic, recentPosts, insights),
+    fetchImageViaSearch(topic.title).catch(() => null),
+  ])
 
   if (dryRun) {
-    const preview = `【ツイート1（Poll）】\n${postContent.poll_question}\n選択肢: ${postContent.poll_options.join(' / ')}\n${postContent.hashtags}\n\n【ツイート2（リプライ）】\n${postContent.insight}\n\n${postContent.closing}`
+    const preview = `【ツイート1（Poll）】\n${postContent.poll_question}\n選択肢: ${postContent.poll_options.join(' / ')}\n${postContent.hashtags}\n\n【ツイート2（リプライ＋画像）】\n${postContent.insight}\n\n${postContent.closing}\n\n画像: ${imageUrl ?? 'なし'}`
     return { content: preview, tweetId: null, topic: topic.title, dryRun: true }
   }
 
-  const { tweetId, fullText } = await postThreadWithPoll(postContent)
+  const { tweetId, fullText } = await postThreadWithPoll(postContent, imageUrl)
   await savePost({
     tweet_id: tweetId,
     posted_at: new Date().toISOString(),
