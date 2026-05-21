@@ -298,6 +298,14 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key`}
                     {m.is_resolved ? `正解: ${m.market_options.find((o:any) => o.id === m.result_option_id)?.name || '未設定'}` : '判定中'}
                   </div>
                 )}
+                {/* シェアボタン */}
+                <a
+                  href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`「${m.title}」\nあなたはどう予測する？\n\n#ヨソる #予測市場`)}`}
+                  target="_blank" rel="noopener noreferrer"
+                  style={{display:'flex', alignItems:'center', justifyContent:'center', gap:'5px', marginTop:'8px', padding:'8px', background:'#000', color:'#fff', borderRadius:'10px', fontSize:'12px', fontWeight:'bold', textDecoration:'none'}}
+                >
+                  𝕏 この問いをシェア
+                </a>
               </div>
             </div>
           )
