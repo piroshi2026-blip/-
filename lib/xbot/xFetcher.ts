@@ -10,12 +10,14 @@ function calcScore(m: {
   bookmark_count: number
 }): number {
   if (!m.impression_count) return 0
+  // 2026年Xアルゴリズム (Phoenix Scorer) に基づく重み順:
+  // いいね > 引用 > リツイート > リプライ > ブックマーク(影響限定的)
   const raw =
-    m.like_count * 3 +
-    m.bookmark_count * 5 +
+    m.like_count * 5 +
     m.quote_count * 4 +
+    m.retweet_count * 3 +
     m.reply_count * 2 +
-    m.retweet_count * 2
+    m.bookmark_count * 1
   return Math.round((raw / m.impression_count) * 1000 * 100) / 100
 }
 
