@@ -86,6 +86,14 @@ async function generateContent(topic: { title: string; hint?: string }, recentPo
   return parsed
 }
 
+async function getImageUrl(topic: string): Promise<string | null> {
+  const tavilyUrl = await fetchImageViaSearch(topic).catch(() => null)
+  if (tavilyUrl) return tavilyUrl
+  // Tavilyで見つからなければ Pollinations.ai (Flux) で生成
+  const prompt = encodeURIComponent(`${topic} future society prediction abstract`)
+  return `https://image.pollinations.ai/prompt/${prompt}?width=1200&height=630&nologo=true`
+}
+
 async function uploadImage(client: TwitterApi, imageUrl: string): Promise<string | null> {
   try {
     const res = await fetch(imageUrl)
@@ -141,10 +149,10 @@ export async function runPost(dryRun = false): Promise<{
     pickTopic(),
   ])
 
-  // 投稿生成と画像取得を並列実行
+  // 投稿生成と画像取得を並列実行（Tavilyで見つからなければFluxで生成）
   const [postContent, imageUrl] = await Promise.all([
     generateContent(topic, recentPosts, insights),
-    fetchImageViaSearch(topic.title).catch(() => null),
+    getImageUrl(topic.title).catch(() => null),
   ])
 
   if (dryRun) {
