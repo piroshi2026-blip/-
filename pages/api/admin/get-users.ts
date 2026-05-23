@@ -10,16 +10,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
   const { adminPassword } = req.body as { adminPassword?: string }
   if (!adminPassword || adminPassword !== ADMIN_PASSWORD) {
-    return res.status(401).json({ error: 'パスワードが違います' })
+    return res.status(401).json({ error: 'Unauthorized' })
   }
 
   const sb = getServiceSupabase()
-  const { data, error } = await sb
-    .from('pdca_runs')
-    .select('id, ok, payload, created_at')
-    .order('created_at', { ascending: false })
-    .limit(30)
+  const [profilesRes, authRes] = await Promise.all([
+    sb.from('profiles').select('*').order('point_balance', { ascending: false }),
+    sb.auth.admin.listUsers({ perPage: 1000 }),
+  ])
 
-  if (error) return res.status(200).json({ runs: null, tableError: error.message })
-  return res.status(200).json({ runs: data ?? [] })
+  const profiles = profilesRes.data ?? []
+  const emailMap: Record<string, string> = {}
+  for (const u of authRes.data?.users ?? []) {
+    emailMap[u.id] = u.email ?? ''
+  }
+
+  return res.status(200).json({
+    users: profiles.map(p => ({ ...p, email: emailMap[p.id] ?? '' })),
+  })
 }

@@ -16,6 +16,7 @@ export default function Admin() {
   const [proposalsTableMissing, setProposalsTableMissing] = useState(false)
   const [categories, setCategories] = useState<any[]>([])
   const [users, setUsers] = useState<any[]>([])
+  const [userEmails, setUserEmails] = useState<Record<string, string>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [siteConfig, setSiteConfig] = useState<any>({ 
     id: 1, site_title: '', site_description: '', admin_message: '', show_ranking: true, share_text_base: '' 
@@ -67,6 +68,20 @@ export default function Admin() {
     } catch { /* ignore */ }
   }
 
+  async function fetchUserEmails() {
+    try {
+      const res = await fetch('/api/admin/get-users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminPassword: ADMIN_PASSWORD }),
+      })
+      const data = await res.json()
+      const map: Record<string, string> = {}
+      for (const u of data.users ?? []) map[u.id] = u.email ?? ''
+      setUserEmails(map)
+    } catch { /* ignore */ }
+  }
+
   useEffect(() => {
     const authStatus = localStorage.getItem('yosoru_admin_auth')
     if (authStatus === 'true') setIsAuthenticated(true)
@@ -104,7 +119,7 @@ export default function Admin() {
     setIsLoading(false)
   }, [isAuthenticated])
 
-  useEffect(() => { fetchData(); fetchXPostStatus() }, [fetchData])
+  useEffect(() => { fetchData(); fetchXPostStatus(); fetchUserEmails() }, [fetchData])
 
   useEffect(() => {
     setUrlCandidates([])
@@ -730,6 +745,7 @@ export default function Admin() {
                   <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
                     <span>{m.category}</span>
                     <span>{new Date(m.end_date).toLocaleDateString()}</span>
+                    {m.created_at && <span style={{ color: '#b0b8c8' }}>投稿: {new Date(m.created_at).toLocaleString('ja-JP', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>}
                     {m.is_resolved && <span style={{ color: '#10b981', fontWeight: 'bold' }}>✓確定済</span>}
                     {m.source_url && <a href={m.source_url} target="_blank" rel="noopener noreferrer" style={{ color: '#0284c7', textDecoration: 'none', fontSize: '11px' }}>🔗{(() => { try { const h = new URL(m.source_url).hostname.replace(/^www\./, ''); return h.includes('news.google.com') ? 'ニュース' : h.length > 20 ? h.slice(0, 17) + '…' : h } catch { return '参考' } })()}</a>}
                     {m.source_url && m.source_title && <span style={{ fontSize: '10px', color: '#64748b' }}>{m.source_title.length > 60 ? m.source_title.slice(0, 57) + '…' : m.source_title}</span>}
@@ -903,11 +919,12 @@ export default function Admin() {
 
       {activeTab === 'users' && (
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr style={{ background: '#eee', textAlign:'left' }}><th style={{padding:'10px'}}>ユーザー</th><th>ポイント</th><th>ランキング</th><th>操作</th></tr></thead>
+          <thead><tr style={{ background: '#eee', textAlign:'left' }}><th style={{padding:'10px'}}>ユーザー</th><th>Email</th><th>ポイント</th><th>ランキング</th><th>操作</th></tr></thead>
           <tbody>
             {users.map(u => (
               <tr key={u.id} style={{ borderBottom: '1px solid #eee' }}>
                 <td style={{padding:'10px'}}>{u.username || '匿名'}</td>
+                <td style={{ fontSize: '11px', color: '#64748b' }}>{userEmails[u.id] ?? '…'}</td>
                 <td><input type="number" defaultValue={u.point_balance} onBlur={e => supabase.from('profiles').update({ point_balance: Number(e.target.value) }).eq('id', u.id).then(()=>fetchData())} style={{ width: '80px' }} /></td>
                 <td><button onClick={() => supabase.from('profiles').update({ is_hidden_from_ranking: !u.is_hidden_from_ranking }).eq('id', u.id).then(()=>fetchData())}>{u.is_hidden_from_ranking ? '隠し中' : '表示中'}</button></td>
                 <td><button onClick={() => { if(confirm('削除？')) supabase.from('profiles').delete().eq('id', u.id).then(()=>fetchData()) }} style={{ color: 'red', border:'none', background:'none' }}>削除</button></td>
@@ -1255,7 +1272,7 @@ export default function Admin() {
           {/* 実行ログ */}
           <div style={{ padding: '16px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', marginTop: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-              <strong style={{ fontSize: '14px' }}>📋 自動投稿ログ（直近20件）</strong>
+              <strong style={{ fontSize: '14px' }}>📋 自動投稿ログ（直近30件）</strong>
               <button
                 onClick={fetchPdcaRuns}
                 disabled={pdcaRunsLoading}
