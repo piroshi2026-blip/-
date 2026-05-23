@@ -17,6 +17,8 @@ export default function Admin() {
   const [categories, setCategories] = useState<any[]>([])
   const [users, setUsers] = useState<any[]>([])
   const [userEmails, setUserEmails] = useState<Record<string, string>>({})
+  const [analytics, setAnalytics] = useState<{ today: number; yesterday: number; total7days: number; byDay: Record<string, number> } | null>(null)
+  const [analyticsLoading, setAnalyticsLoading] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [siteConfig, setSiteConfig] = useState<any>({ 
     id: 1, site_title: '', site_description: '', admin_message: '', show_ranking: true, share_text_base: '' 
@@ -80,6 +82,20 @@ export default function Admin() {
       for (const u of data.users ?? []) map[u.id] = u.email ?? ''
       setUserEmails(map)
     } catch { /* ignore */ }
+  }
+
+  async function fetchAnalytics() {
+    setAnalyticsLoading(true)
+    try {
+      const res = await fetch('/api/admin/get-analytics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminPassword: ADMIN_PASSWORD }),
+      })
+      const data = await res.json()
+      if (!data.error) setAnalytics(data)
+    } catch { /* ignore */ }
+    setAnalyticsLoading(false)
   }
 
   useEffect(() => {
@@ -924,7 +940,7 @@ export default function Admin() {
             {users.map(u => (
               <tr key={u.id} style={{ borderBottom: '1px solid #eee' }}>
                 <td style={{padding:'10px'}}>{u.username || '匿名'}</td>
-                <td style={{ fontSize: '11px', color: '#64748b' }}>{userEmails[u.id] ?? '…'}</td>
+                <td style={{ fontSize: '11px', color: '#64748b' }}>{Object.keys(userEmails).length === 0 ? '読込中…' : (userEmails[u.id] || '未登録')}</td>
                 <td><input type="number" defaultValue={u.point_balance} onBlur={e => supabase.from('profiles').update({ point_balance: Number(e.target.value) }).eq('id', u.id).then(()=>fetchData())} style={{ width: '80px' }} /></td>
                 <td><button onClick={() => supabase.from('profiles').update({ is_hidden_from_ranking: !u.is_hidden_from_ranking }).eq('id', u.id).then(()=>fetchData())}>{u.is_hidden_from_ranking ? '隠し中' : '表示中'}</button></td>
                 <td><button onClick={() => { if(confirm('削除？')) supabase.from('profiles').delete().eq('id', u.id).then(()=>fetchData()) }} style={{ color: 'red', border:'none', background:'none' }}>削除</button></td>
@@ -1267,6 +1283,54 @@ export default function Admin() {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* アクセス解析 */}
+          <div style={{ padding: '16px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', marginTop: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <strong style={{ fontSize: '14px' }}>📊 アクセス解析（過去7日間）</strong>
+              <button onClick={fetchAnalytics} disabled={analyticsLoading} style={{ ...s.btn, background: analyticsLoading ? '#9ca3af' : '#0891b2', padding: '5px 14px', fontSize: '12px' }}>
+                {analyticsLoading ? '読込中…' : '🔄 取得'}
+              </button>
+            </div>
+            {analytics === null && !analyticsLoading && (
+              <p style={{ fontSize: '12px', color: '#94a3b8' }}>「取得」を押すと表示されます。※ 計測開始以降のデータのみ表示されます。</p>
+            )}
+            {analytics && (
+              <div>
+                <div style={{ display: 'flex', gap: '16px', marginBottom: '12px', flexWrap: 'wrap' }}>
+                  <div style={{ background: '#f0f9ff', padding: '10px 16px', borderRadius: '8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#0369a1' }}>{analytics.today}</div>
+                    <div style={{ fontSize: '11px', color: '#64748b' }}>今日のPV</div>
+                  </div>
+                  <div style={{ background: '#f8fafc', padding: '10px 16px', borderRadius: '8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#475569' }}>{analytics.yesterday}</div>
+                    <div style={{ fontSize: '11px', color: '#64748b' }}>昨日のPV</div>
+                  </div>
+                  <div style={{ background: '#f0fdf4', padding: '10px 16px', borderRadius: '8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#15803d' }}>{analytics.total7days}</div>
+                    <div style={{ fontSize: '11px', color: '#64748b' }}>7日合計PV</div>
+                  </div>
+                </div>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                  <thead><tr style={{ background: '#f1f5f9' }}><th style={{ padding: '6px 8px', textAlign: 'left' }}>日付</th><th style={{ padding: '6px 8px', textAlign: 'right' }}>PV数</th><th style={{ padding: '6px 8px', textAlign: 'left' }}>バー</th></tr></thead>
+                  <tbody>
+                    {Object.entries(analytics.byDay).sort(([a], [b]) => b.localeCompare(a)).map(([date, count]) => {
+                      const max = Math.max(...Object.values(analytics.byDay), 1)
+                      return (
+                        <tr key={date} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '5px 8px', color: '#475569' }}>{date}</td>
+                          <td style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 'bold' }}>{count}</td>
+                          <td style={{ padding: '5px 8px' }}>
+                            <div style={{ background: '#bfdbfe', height: '8px', borderRadius: '4px', width: `${Math.round((count / max) * 100)}%`, minWidth: '4px' }} />
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
           {/* 実行ログ */}

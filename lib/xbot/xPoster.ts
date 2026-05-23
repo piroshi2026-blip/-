@@ -120,7 +120,7 @@ async function uploadImage(client: TwitterApi, imageUrl: string): Promise<string
 async function postThreadWithPoll(
   content: PostContent,
   imageUrl: string | null
-): Promise<{ tweetId: string; fullText: string }> {
+): Promise<{ tweetId: string; fullText: string; imageAttached: boolean; imageSource: string | null }> {
   const client = getTwitterClient()
   const baseUrl = getPublicBaseUrl()
 
@@ -145,7 +145,11 @@ async function postThreadWithPoll(
     ...(mediaId ? { media: { media_ids: [mediaId] } } : {}),
   })
 
-  return { tweetId: tweet1.id, fullText: `${tweet1Text}\n---\n${tweet2Text}` }
+  const imageSource = imageUrl
+    ? (imageUrl.includes('pollinations.ai') ? 'flux(pollinations)' : 'tavily')
+    : null
+
+  return { tweetId: tweet1.id, fullText: `${tweet1Text}\n---\n${tweet2Text}`, imageAttached: !!mediaId, imageSource }
 }
 
 export async function runPost(dryRun = false): Promise<{
@@ -153,6 +157,8 @@ export async function runPost(dryRun = false): Promise<{
   tweetId: string | null
   topic: string
   dryRun: boolean
+  imageAttached?: boolean
+  imageSource?: string | null
 }> {
   const [recentPosts, insights, topic] = await Promise.all([
     loadRecentPosts(30),
@@ -171,7 +177,7 @@ export async function runPost(dryRun = false): Promise<{
     return { content: preview, tweetId: null, topic: topic.title, dryRun: true }
   }
 
-  const { tweetId, fullText } = await postThreadWithPoll(postContent, imageUrl)
+  const { tweetId, fullText, imageAttached, imageSource } = await postThreadWithPoll(postContent, imageUrl)
   await savePost({
     tweet_id: tweetId,
     posted_at: new Date().toISOString(),
@@ -179,5 +185,5 @@ export async function runPost(dryRun = false): Promise<{
     content: fullText,
   })
 
-  return { content: fullText, tweetId, topic: topic.title, dryRun: false }
+  return { content: fullText, tweetId, topic: topic.title, dryRun: false, imageAttached, imageSource }
 }

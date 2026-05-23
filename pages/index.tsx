@@ -82,6 +82,7 @@ export default function Home() {
       if (r) setRanking(r)
     }
     init()
+    fetch('/api/track-view', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ page: '/' }) }).catch(() => {})
     const { data: authListener } = supabase.auth.onAuthStateChange((_, s) => { 
       setSession(s); if (s) initUserData(s.user.id); else { setSession(null); setProfile(null); setMyBets([]); }
     })
