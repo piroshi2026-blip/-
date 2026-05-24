@@ -337,11 +337,16 @@ export async function draftMarketFromTrend(
   let userContent: string
   let systemPrompt: string
 
+  // ヒントは最優先指示としてプロンプト冒頭に配置
+  const hintPrefix = opts?.hint
+    ? `【最重要指示 - 必ず従うこと】\n${opts.hint}\n以下の問いはこの指示を最優先して作成すること。\n\n`
+    : ''
+
   if (item.isTheme) {
     // テーマ（哲学・社会・科学）モード
     systemPrompt = CLAUDE_THEME_SYSTEM
     const hintNote = item.snippet ? `\n参考とする選択肢の方向性: ${item.snippet}` : ''
-    userContent = `利用可能な category（このいずれかと完全一致）: ${catList}\n\n議論テーマ（これをベースに問いを作ること。タイトルはより鋭く磨くこと）:\n${item.title}${hintNote}${recentBlock}`
+    userContent = `${hintPrefix}利用可能な category（このいずれかと完全一致）: ${catList}\n\n議論テーマ（これをベースに問いを作ること。タイトルはより鋭く磨くこと）:\n${item.title}${hintNote}${recentBlock}`
   } else {
     // ニュースモード（従来）
     systemPrompt = CLAUDE_JSON_SYSTEM
@@ -350,8 +355,7 @@ export async function draftMarketFromTrend(
         ? '\nこの見出しは大谷翔平・ドジャース、村上宗隆・鈴木誠也・今永 など、メジャーリーグの日本人選手・球団に関するスポーツ予想です。category は「スポーツ」が利用可能なら優先してください。'
         : ''
     const contextPrefix = opts?.worldContext ? `${opts.worldContext}\n\n` : ''
-    const hintSection = opts?.hint ? `\n\n【編集者からの着眼点・方向性】\n${opts.hint}\n上記の着眼点を意識しながら、ニュース見出しを題材に問いを作ること。` : ''
-    userContent = `${contextPrefix}利用可能な category（このいずれかと完全一致）: ${catList}\n\nニュース見出し（題材。これをそのまま問いのタイトルにしないこと）:\n${item.title}${flavorNote}${hintSection}${recentBlock}`
+    userContent = `${hintPrefix}${contextPrefix}利用可能な category（このいずれかと完全一致）: ${catList}\n\nニュース見出し（題材。これをそのまま問いのタイトルにしないこと）:\n${item.title}${flavorNote}${recentBlock}`
   }
 
   let parsed: Partial<DraftMarket> | null = null
