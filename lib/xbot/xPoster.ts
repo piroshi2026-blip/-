@@ -152,7 +152,7 @@ async function postThreadWithPoll(
   return { tweetId: tweet1.id, fullText: `${tweet1Text}\n---\n${tweet2Text}`, imageAttached: !!mediaId, imageSource }
 }
 
-export async function runPost(dryRun = false): Promise<{
+export async function runPost(dryRun = false, forceTopic?: { title: string; hint?: string }): Promise<{
   content: string
   tweetId: string | null
   topic: string
@@ -163,7 +163,7 @@ export async function runPost(dryRun = false): Promise<{
   const [recentPosts, insights, topic] = await Promise.all([
     loadRecentPosts(30),
     loadAnalysisInsights(),
-    pickTopic(),
+    forceTopic ? Promise.resolve(forceTopic) : pickTopic(),
   ])
 
   // 投稿生成と画像取得を並列実行（Tavilyで見つからなければFluxで生成）
