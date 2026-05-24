@@ -11,6 +11,7 @@ export default function Admin() {
   /** '' = すべて表示 */
   const [marketCategoryFilter, setMarketCategoryFilter] = useState<string>('')
   const [marketSortBy, setMarketSortBy] = useState<'new' | 'deadline' | 'popular' | 'judging'>('new')
+  const [marketSearch, setMarketSearch] = useState<string>('')
   const [proposals, setProposals] = useState<any[]>([])
   const [proposalsLoading, setProposalsLoading] = useState(false)
   const [proposalsTableMissing, setProposalsTableMissing] = useState(false)
@@ -147,6 +148,9 @@ export default function Admin() {
     if (marketCategoryFilter) {
       list = list.filter((m: any) => m.category === marketCategoryFilter)
     }
+    if (marketSearch) {
+      list = list.filter((m: any) => m.title?.includes(marketSearch))
+    }
     if (marketSortBy === 'judging') {
       const now = new Date()
       return list
@@ -163,7 +167,7 @@ export default function Admin() {
       }
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     })
-  }, [markets, marketCategoryFilter, marketSortBy])
+  }, [markets, marketCategoryFilter, marketSortBy, marketSearch])
 
   async function handleResolve(marketId: number, optionId: number, optionName: string) {
     if(!confirm(`「${optionName}」の結果で確定させますか？`)) return;
@@ -688,6 +692,11 @@ export default function Admin() {
                 </button>
               ))}
               <span style={{ fontSize: '11px', color: '#94a3b8', marginLeft: '6px' }}>確定済みは後ろに表示</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '5px 10px', marginTop: '6px', gap: '6px' }}>
+              <span style={{ color: '#94a3b8', fontSize: '13px' }}>🔍</span>
+              <input value={marketSearch} onChange={e => setMarketSearch(e.target.value)} placeholder="問いを検索…" style={{ border: 'none', outline: 'none', fontSize: '13px', flex: 1, background: 'transparent' }} />
+              {marketSearch && <button onClick={() => setMarketSearch('')} style={{ border: 'none', background: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '13px', padding: 0 }}>✕</button>}
             </div>
           </div>
 

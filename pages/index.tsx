@@ -16,6 +16,7 @@ export default function Home() {
   const [email, setEmail] = useState(''); const [password, setPassword] = useState('')
   const [newUsername, setNewUsername] = useState(''); const [isEditingName, setIsEditingName] = useState(false)
   const [activeCategory, setActiveCategory] = useState('すべて')
+  const [searchQuery, setSearchQuery] = useState('')
 
   const [sortBy, setSortBy] = useState<'new' | 'deadline' | 'popular' | 'judging' | 'random'>('new')
   const [shakeTitle, setShakeTitle] = useState(false)
@@ -174,7 +175,12 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key`}
         <style>{`@keyframes bounce{0%,100%{transform:translateY(0) scale(1)}25%{transform:translateY(-10px) scale(1.1) rotate(-3deg)}50%{transform:translateY(-5px) scale(1.05) rotate(2deg)}75%{transform:translateY(-2px) scale(1.02)}} @keyframes gradientShift{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}`}</style>
         {activeTab === 'home' && (
           <>{config.admin_message && <div style={{fontSize:'11px', background:'#fff', padding:'6px 8px', borderRadius:'8px', textAlign:'center', border:'1px solid #e2e8f0', color:'#64748b', marginBottom:'8px'}}>{config.admin_message}</div>}
-            <div style={{display:'grid', gridTemplateColumns:'repeat(6, 1fr)', gap:'3px', margin:'8px 0'}}>{dbCategories.map(c => <button key={c.name} onClick={() => setActiveCategory(c.name)} style={{padding:'5px 0', fontSize:'9px', fontWeight:'bold', background:activeCategory===c.name?'#1f2937':'#fff', color:activeCategory===c.name?'#fff':'#64748b', border:'1px solid #e2e8f0', borderRadius:'6px'}}>{c.name}</button>)}</div>
+            <div style={{display:'flex', alignItems:'center', background:'#fff', border:'1px solid #e2e8f0', borderRadius:'10px', padding:'6px 10px', margin:'6px 0', gap:'6px'}}>
+              <span style={{color:'#94a3b8', fontSize:'14px'}}>🔍</span>
+              <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="問いを検索…" style={{border:'none', outline:'none', fontSize:'13px', flex:1, background:'transparent', color:'#1f2937'}} />
+              {searchQuery && <button onClick={() => setSearchQuery('')} style={{border:'none', background:'none', color:'#94a3b8', cursor:'pointer', fontSize:'14px', padding:'0'}}>✕</button>}
+            </div>
+            <div style={{display:'grid', gridTemplateColumns:'repeat(6, 1fr)', gap:'3px', margin:'4px 0'}}>{dbCategories.map(c => <button key={c.name} onClick={() => setActiveCategory(c.name)} style={{padding:'5px 0', fontSize:'9px', fontWeight:'bold', background:activeCategory===c.name?'#1f2937':'#fff', color:activeCategory===c.name?'#fff':'#64748b', border:'1px solid #e2e8f0', borderRadius:'6px'}}>{c.name}</button>)}</div>
             <div style={{display:'flex', justifyContent:'center', gap:'5px', overflowX:'auto', whiteSpace:'nowrap', padding:'2px 0'}}>{[
               {k:'new',l:'✨新着'},{k:'deadline',l:'⏰締切'},{k:'popular',l:'🔥人気'},{k:'judging',l:'⚖️判定中'},{k:'random',l:'🎲ガチャ'}
             ].map(({k,l}) => <button key={k} onClick={() => { setSortBy(k as any); if(k==='random') fetchMarkets() }} style={{padding:'5px 10px', borderRadius:'20px', border:'none', background:sortBy===k?'#3b82f6':'#e2e8f0', color:sortBy===k?'#fff':'#64748b', fontSize:'11px', fontWeight:'bold', transition:'all 0.15s', flexShrink:0}}>{l}</button>)}</div></>
@@ -182,7 +188,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key`}
       </header>
 
       {activeTab === 'home' && (
-        <div style={{marginTop:'15px'}}>{markets.filter(m => activeCategory === 'すべて' || m.category === activeCategory).map(m => {
+        <div style={{marginTop:'15px'}}>{markets.filter(m => (activeCategory === 'すべて' || m.category === activeCategory) && (!searchQuery || m.title.includes(searchQuery))).map(m => {
           const active = !m.is_resolved && new Date(m.end_date) > new Date()
           const msLeft = new Date(m.end_date).getTime() - new Date().getTime()
           const days = Math.ceil(msLeft / 86400000)
