@@ -20,6 +20,8 @@ export default function Admin() {
   const [userEmails, setUserEmails] = useState<Record<string, string>>({})
   const [analytics, setAnalytics] = useState<{ today: number; yesterday: number; total7days: number; byDay: Record<string, number> } | null>(null)
   const [analyticsLoading, setAnalyticsLoading] = useState(false)
+  const [xAnalysis, setXAnalysis] = useState<{ insights: string | null; lastAnalyzed: string | null; posts: any[] } | null>(null)
+  const [xAnalysisLoading, setXAnalysisLoading] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [siteConfig, setSiteConfig] = useState<any>({ 
     id: 1, site_title: '', site_description: '', admin_message: '', show_ranking: true, share_text_base: '' 
@@ -97,6 +99,20 @@ export default function Admin() {
       if (!data.error) setAnalytics(data)
     } catch { /* ignore */ }
     setAnalyticsLoading(false)
+  }
+
+  async function fetchXAnalysis() {
+    setXAnalysisLoading(true)
+    try {
+      const res = await fetch('/api/admin/get-x-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminPassword: ADMIN_PASSWORD }),
+      })
+      const data = await res.json()
+      if (!data.error) setXAnalysis(data)
+    } catch { /* ignore */ }
+    setXAnalysisLoading(false)
   }
 
   useEffect(() => {
@@ -1292,6 +1308,84 @@ export default function Admin() {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* X 投稿分析 */}
+          <div style={{ padding: '16px', background: '#fff', border: '1px solid #e0e7ff', borderRadius: '10px', marginTop: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <strong style={{ fontSize: '14px', color: '#4338ca' }}>𝕏 投稿分析・学習インサイト</strong>
+              <button onClick={fetchXAnalysis} disabled={xAnalysisLoading} style={{ ...s.btn, background: xAnalysisLoading ? '#9ca3af' : '#4338ca', padding: '5px 14px', fontSize: '12px' }}>
+                {xAnalysisLoading ? '読込中…' : '🔄 取得'}
+              </button>
+            </div>
+            {xAnalysis === null && !xAnalysisLoading && (
+              <p style={{ fontSize: '12px', color: '#94a3b8' }}>「取得」を押すと表示されます。</p>
+            )}
+            {xAnalysis && (
+              <div>
+                {/* インサイト */}
+                <div style={{ marginBottom: '16px' }}>
+                  <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '6px' }}>
+                    📊 Claude分析インサイト
+                    {xAnalysis.lastAnalyzed && (
+                      <span style={{ marginLeft: '8px', color: '#94a3b8' }}>
+                        （{new Date(xAnalysis.lastAnalyzed).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}）
+                      </span>
+                    )}
+                  </div>
+                  {xAnalysis.insights ? (
+                    <div style={{ background: '#f0f4ff', border: '1px solid #c7d2fe', borderRadius: '8px', padding: '12px', fontSize: '12px', lineHeight: 1.8, color: '#1e1b4b', whiteSpace: 'pre-wrap' }}>
+                      {xAnalysis.insights}
+                    </div>
+                  ) : (
+                    <p style={{ fontSize: '12px', color: '#94a3b8' }}>まだ分析データがありません（5件以上のエンゲージメントデータが必要）。</p>
+                  )}
+                </div>
+                {/* 投稿スコア一覧 */}
+                {xAnalysis.posts.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '6px' }}>📋 直近投稿スコア（直近{xAnalysis.posts.length}件）</div>
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                        <thead>
+                          <tr style={{ background: '#f1f5f9' }}>
+                            <th style={{ padding: '5px 8px', textAlign: 'left', whiteSpace: 'nowrap' }}>投稿日時</th>
+                            <th style={{ padding: '5px 8px', textAlign: 'left' }}>内容</th>
+                            <th style={{ padding: '5px 8px', textAlign: 'right', whiteSpace: 'nowrap' }}>スコア</th>
+                            <th style={{ padding: '5px 8px', textAlign: 'right', whiteSpace: 'nowrap' }}>❤️</th>
+                            <th style={{ padding: '5px 8px', textAlign: 'right', whiteSpace: 'nowrap' }}>🔁</th>
+                            <th style={{ padding: '5px 8px', textAlign: 'right', whiteSpace: 'nowrap' }}>💬</th>
+                            <th style={{ padding: '5px 8px', textAlign: 'right', whiteSpace: 'nowrap' }}>👁️</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {xAnalysis.posts.map((p: any) => {
+                            const hasData = p.impressions != null
+                            return (
+                              <tr key={p.tweet_id} style={{ borderBottom: '1px solid #f1f5f9', background: hasData && p.score >= 2 ? '#f0fdf4' : 'transparent' }}>
+                                <td style={{ padding: '5px 8px', color: '#64748b', whiteSpace: 'nowrap' }}>
+                                  {new Date(p.posted_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                </td>
+                                <td style={{ padding: '5px 8px', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#374151' }}>
+                                  {p.content.slice(0, 50)}…
+                                </td>
+                                <td style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 'bold', color: hasData ? (p.score >= 2 ? '#15803d' : '#64748b') : '#94a3b8' }}>
+                                  {hasData ? (p.score?.toFixed(1) ?? '―') : '未取得'}
+                                </td>
+                                <td style={{ padding: '5px 8px', textAlign: 'right', color: '#64748b' }}>{p.likes ?? '―'}</td>
+                                <td style={{ padding: '5px 8px', textAlign: 'right', color: '#64748b' }}>{p.retweets ?? '―'}</td>
+                                <td style={{ padding: '5px 8px', textAlign: 'right', color: '#64748b' }}>{p.replies ?? '―'}</td>
+                                <td style={{ padding: '5px 8px', textAlign: 'right', color: '#64748b' }}>{p.impressions != null ? p.impressions.toLocaleString() : '―'}</td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* アクセス解析 */}

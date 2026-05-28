@@ -7,6 +7,7 @@ export type DraftMarket = {
   category: string
   options: string[]
   endDays: number
+  auto_resolve?: boolean
 }
 
 /** 問いの判定基準（将来の予想の正誤をどう決めるか）。UI・自動生成の既定文。 */
@@ -171,6 +172,26 @@ category（利用可能な一覧から完全一致で選ぶ）
 options（ちょうど3つ・各15文字以内・体言止め）
 endDays（3〜30の整数。トレンド・科学・宇宙・AI系は14〜30、速報系は3〜7）`
 
+/**
+ * タイトル・descriptionに記載された年が判定日（endDays+21日後）より先なら
+ * 判定基準日と整合しないためアンケート型（auto_resolve=true）にする。
+ * 例: endDays=14 なのに description に「2030年のデータで判定」→ true
+ */
+export function shouldBeAutoResolve(draft: Pick<DraftMarket, 'title' | 'description' | 'endDays'>): boolean {
+  const now = new Date()
+  const resolutionDate = new Date(now)
+  // quickMarket は endDate+21日を resolution_date にするのでその分を考慮
+  resolutionDate.setDate(resolutionDate.getDate() + draft.endDays + 21)
+
+  const text = `${draft.title} ${draft.description}`
+  const years = (text.match(/20[2-9]\d/g) ?? []).map(Number)
+  for (const year of years) {
+    // 対象年の1月1日が判定日より後なら整合しない
+    if (new Date(year, 0, 1) > resolutionDate) return true
+  }
+  return false
+}
+
 function ensureResolutionDescription(desc: string): string {
   const d = desc.trim().slice(0, 500)
   if (!d) return DEFAULT_RESOLUTION_DESCRIPTION
@@ -204,9 +225,16 @@ description: 判定基準1〜2文。「公式の公表・実績・主要報道�
 category: 利用可能なカテゴリ一覧から完全一致で1つ選ぶ
 options: ちょうど3つの選択肢（各15文字以内・体言止め）
 endDays: 3〜30の整数（AI/宇宙/科学/核融合は14〜30、速報系は3〜7）
+auto_resolve: 【重要】以下のいずれかに該当する場合は true、それ以外は false
+  - descriptionが「〜年のデータで判定」「〜年時点で」など、endDaysの期間内に入手できない将来データを根拠にしている
+  - 嗜好・価値観・考え方を問う問い（「〜すべきか」「〜は正しいか」「好みはどちら」など）
+  - 正誤が客観的事実で決まらない問い
 
-出力例:
-{"title":"大谷翔平、今季65本塁打の新記録を更新するか？","description":"2026年シーズン終了時点の本塁打数で判定。公式記録を根拠に、運営判断で確定します。","category":"スポーツ","options":["更新する","届かず","怪我・規定変更で無効"],"endDays":7}`
+出力例（近い未来に結果が出る問い → auto_resolve: false）:
+{"title":"大谷翔平、今季65本塁打の新記録を更新するか？","description":"2026年シーズン終了時点の本塁打数で判定。公式記録を根拠に、運営判断で確定します。","category":"スポーツ","options":["更新する","届かず","怪我・規定変更で無効"],"endDays":7,"auto_resolve":false}
+
+出力例（2028年以降のデータが必要 → auto_resolve: true）:
+{"title":"核融合発電、2030年までに商用化されるか？","description":"2030年時点の商用炉稼働データで判定します。","category":"テクノロジー","options":["商用化成功","研究段階止まり","別方式で実現"],"endDays":30,"auto_resolve":true}`
 
 async function callClaudeForDraft(userContent: string, systemPrompt?: string): Promise<Partial<DraftMarket>> {
   const key = process.env.ANTHROPIC_API_KEY?.trim()
@@ -308,9 +336,10 @@ description: 判定基準1〜2文。「公式の公表・実績・主要報道�
 category: 利用可能なカテゴリ一覧から完全一致で1つ選ぶ
 options: 3つの選択肢（各15文字以内・体言止め）。賛成/反対/条件付き、または三択の価値観対立を表現
 endDays: 哲学・社会テーマは30、科学・技術予測は90〜180（3〜180の整数）
+auto_resolve: 哲学・価値観・嗜好・社会テーマは常に true（客観的な正誤が1年以内に出ないため）
 
 出力例:
-{"title":"AIとロボットが労働を代替すると社会は豊かになるか？","description":"2030年時点の主要経済指標・雇用統計・社会的議論の帰結で運営判断します。","category":"テクノロジー","options":["豊かになる","格差が拡大する","人間の役割が変わる"],"endDays":90}`
+{"title":"AIとロボットが労働を代替すると社会は豊かになるか？","description":"参加者の投票結果で判定するアンケート型問いです。","category":"テクノロジー","options":["豊かになる","格差が拡大する","人間の役割が変わる"],"endDays":30,"auto_resolve":true}`
 
 export async function draftMarketFromTrend(
   item: TrendItem,
@@ -431,11 +460,16 @@ export async function draftMarketFromTrend(
     ? BLACKBURN_TITLE
     : titleRaw || predictionFallbackTitle(item.title)
 
-  return {
+  const draft: DraftMarket = {
     title: finalTitle,
     description: finalDescription,
     category: pickCategory(String(parsed.category || defaultCategory)),
     options: optsRaw.length >= 3 ? optsRaw.slice(0, 3) : fallbackDraft(item.title, defaultCategory, opts).options,
     endDays,
+    // テーマ型は常にアンケート型。ニュース型はClaude判定+日付整合性チェックで決定
+    auto_resolve: item.isTheme
+      ? true
+      : !!(parsed as any).auto_resolve || shouldBeAutoResolve({ title: finalTitle, description: finalDescription, endDays }),
   }
+  return draft
 }
