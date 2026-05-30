@@ -167,15 +167,19 @@ export default function Admin() {
     if (marketSearch) {
       list = list.filter((m: any) => m.title?.includes(marketSearch))
     }
+    const getEffResDate = (m: any): Date => {
+      if (m.resolution_date) return new Date(m.resolution_date)
+      const d = new Date(m.end_date); d.setDate(d.getDate() + 21); return d
+    }
     if (marketSortBy === 'judging') {
       const now = new Date()
       return list
         .filter((m: any) => !m.is_resolved && new Date(m.end_date) <= now)
-        .sort((a: any, b: any) => new Date(a.end_date).getTime() - new Date(b.end_date).getTime())
+        .sort((a: any, b: any) => getEffResDate(a).getTime() - getEffResDate(b).getTime())
     }
     return [...list].sort((a: any, b: any) => {
       if (Boolean(a.is_resolved) !== Boolean(b.is_resolved)) return a.is_resolved ? 1 : -1
-      if (marketSortBy === 'deadline') return new Date(a.end_date).getTime() - new Date(b.end_date).getTime()
+      if (marketSortBy === 'deadline') return getEffResDate(a).getTime() - getEffResDate(b).getTime()
       if (marketSortBy === 'popular') {
         const aPool = (a.market_options ?? []).reduce((s: number, o: any) => s + (o.pool ?? 0), 0)
         const bPool = (b.market_options ?? []).reduce((s: number, o: any) => s + (o.pool ?? 0), 0)
@@ -778,16 +782,25 @@ export default function Admin() {
             <button onClick={handleCreateMarket} style={{ ...s.btn, width: '100%', background: '#3b82f6' }}>公開</button>
           </section>
 
-          {displayedMarkets.map(m => (
-            <div key={m.id} style={{ border: '1px solid #e2e8f0', padding: '10px 14px', marginBottom: '6px', borderRadius: '10px', background: m.is_resolved ? '#f8fafc' : '#fff' }}>
+          {displayedMarkets.map(m => {
+            const now = new Date()
+            const effResDate = m.resolution_date ? new Date(m.resolution_date) : (() => { const d = new Date(m.end_date); d.setDate(d.getDate() + 21); return d })()
+            const isOverdue = !m.is_resolved && !m.auto_resolve && effResDate < now
+            const opts: any[] = (m.market_options ?? []).slice().sort((a: any, b: any) => (b.pool ?? 0) - (a.pool ?? 0))
+            const totalPool = opts.reduce((s: number, o: any) => s + (o.pool ?? 0), 0)
+            const optColors = ['#3b82f6', '#ef4444', '#10b981']
+            return (
+            <div key={m.id} style={{ border: isOverdue ? '2px solid #fb923c' : '1px solid #e2e8f0', padding: '10px 14px', marginBottom: '6px', borderRadius: '10px', background: isOverdue ? '#fffbf5' : m.is_resolved ? '#f8fafc' : '#fff' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 'bold', fontSize: '13px', lineHeight: 1.4 }}>{m.title}</div>
                   <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
                     <span>{m.category}</span>
-                    <span>{new Date(m.end_date).toLocaleDateString()}</span>
+                    <span>締切: {new Date(m.end_date).toLocaleDateString('ja-JP')}</span>
+                    {m.resolution_date && <span style={{ color: isOverdue ? '#c2410c' : '#6366f1', fontWeight: isOverdue ? 'bold' : 'normal' }}>判定日: {new Date(m.resolution_date).toLocaleDateString('ja-JP')}</span>}
                     {m.created_at && <span style={{ color: '#b0b8c8' }}>投稿: {new Date(m.created_at).toLocaleString('ja-JP', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>}
                     {m.is_resolved && <span style={{ color: '#10b981', fontWeight: 'bold' }}>✓確定済</span>}
+                    {isOverdue && <span style={{ background: '#fb923c', color: '#fff', padding: '1px 7px', borderRadius: '10px', fontWeight: 'bold', fontSize: '10px' }}>⚠️ 判定待ち</span>}
                     {m.source_url && <a href={m.source_url} target="_blank" rel="noopener noreferrer" style={{ color: '#0284c7', textDecoration: 'none', fontSize: '11px' }}>🔗{(() => { try { const h = new URL(m.source_url).hostname.replace(/^www\./, ''); return h.includes('news.google.com') ? 'ニュース' : h.length > 20 ? h.slice(0, 17) + '…' : h } catch { return '参考' } })()}</a>}
                     {m.source_url && m.source_title && <span style={{ fontSize: '10px', color: '#64748b' }}>{m.source_title.length > 60 ? m.source_title.slice(0, 57) + '…' : m.source_title}</span>}
                   </div>
@@ -799,6 +812,35 @@ export default function Admin() {
                   <button onClick={() => handleDeleteMarket(m.id, m.title)} style={{...s.btn, background:'#ef4444', padding:'5px 10px', fontSize:'12px'}}>削除</button>
                 </div>
               </div>
+
+              {/* 判定待ちの場合：票数内訳＋ワンクリック確定 */}
+              {isOverdue && (
+                <div style={{ marginTop: '10px', padding: '10px 12px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '8px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#c2410c', marginBottom: '8px' }}>
+                    票の内訳（合計 {totalPool.toLocaleString()} pt）― ワンクリックで確定
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {opts.map((opt: any, i: number) => {
+                      const pct = Math.round((opt.pool ?? 0) / (totalPool || 1) * 100)
+                      return (
+                        <div key={opt.id} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <button
+                            onClick={() => handleResolve(m.id, opt.id, opt.name)}
+                            style={{ ...s.btn, background: '#10b981', padding: '4px 10px', fontSize: '11px', flexShrink: 0, minWidth: '58px' }}
+                          >
+                            ✓ 確定
+                          </button>
+                          <span style={{ fontSize: '12px', flex: 1, minWidth: 0, fontWeight: i === 0 ? 'bold' : 'normal', color: i === 0 ? '#1e293b' : '#475569' }}>{opt.name}</span>
+                          <span style={{ fontSize: '11px', color: '#64748b', flexShrink: 0, whiteSpace: 'nowrap' }}>{pct}% <span style={{ color: '#94a3b8' }}>({(opt.pool ?? 0).toLocaleString()}pt)</span></span>
+                          <div style={{ width: '70px', height: '7px', background: '#e2e8f0', borderRadius: '4px', flexShrink: 0 }}>
+                            <div style={{ width: `${pct}%`, height: '100%', background: optColors[i % 3], borderRadius: '4px' }} />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
               {editingId === m.id && (
                 <div style={{ marginTop: '6px', padding: '8px', background: '#f9f9f9', borderRadius: '8px', border:'1px solid #ddd' }}>
                   <label style={{fontSize:'10px', color:'#666'}}>タイトル</label>
@@ -940,7 +982,8 @@ export default function Admin() {
                 </div>
               )}
             </div>
-          ))}
+          )
+        })}
         </>
       )}
 

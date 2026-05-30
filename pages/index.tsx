@@ -33,6 +33,10 @@ export default function Home() {
   const categoryMeta: any = { 'こども': { color: '#f43f5e' }, '経済・投資': { color: '#3b82f6' }, 'エンタメ': { color: '#a855f7' }, 'スポーツ': { color: '#22c55e' }, '旅・生活': { color: '#f59e0b' }, 'ゲーム': { color: '#10b981' }, '恋愛': { color: '#ec4899' }, '芸術・デザイン': { color: '#8b5cf6' }, '自然・科学': { color: '#06b6d4' }, '政治・思想': { color: '#6366f1' }, 'その他': { color: '#6b7280' } }
 
   const fetchMarkets = useCallback(async () => {
+    const getEffResDate = (m: any): Date => {
+      if (m.resolution_date) return new Date(m.resolution_date)
+      const d = new Date(m.end_date); d.setDate(d.getDate() + 21); return d
+    }
     let query = supabase.from('markets').select('*, market_options(*)')
     if (sortBy === 'new' || sortBy === 'random') query = query.order('created_at', { ascending: false })
     else if (sortBy === 'deadline') query = query.order('end_date', { ascending: true })
@@ -42,7 +46,9 @@ export default function Home() {
     if (data) {
       let sortedData = data
       if (sortBy === 'judging') {
-        sortedData = data.filter(m => !m.is_resolved && new Date(m.end_date) <= new Date())
+        sortedData = data
+          .filter(m => !m.is_resolved && new Date(m.end_date) <= new Date())
+          .sort((a, b) => getEffResDate(a).getTime() - getEffResDate(b).getTime())
       } else if (sortBy === 'random') {
         sortedData = [...data].sort(() => Math.random() - 0.5)
       } else if (sortBy === 'deadline') {
@@ -50,8 +56,8 @@ export default function Home() {
         sortedData = data
           .filter(m => m.is_resolved || new Date(m.end_date) > now)
           .sort((a, b) => {
-            if (a.is_resolved === b.is_resolved) return 0
-            return a.is_resolved ? 1 : -1
+            if (a.is_resolved !== b.is_resolved) return a.is_resolved ? 1 : -1
+            return getEffResDate(a).getTime() - getEffResDate(b).getTime()
           })
       } else {
         sortedData = data.sort((a, b) => {
