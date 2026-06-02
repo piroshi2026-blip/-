@@ -135,10 +135,10 @@ async function postThreadWithPoll(
   })
   if (!tweet1?.id) throw new Error('ツイートIDが取得できませんでした')
 
-  // ツイート2（リプライ）: 本質的考察 + 締め + URL + 画像
+  // ツイート2（リプライ）: 本質的考察 + 締め + CTA + 画像
   const mediaId = imageUrl ? await uploadImage(client, imageUrl) : null
-  const urlPart = baseUrl ? `\n▶ ${baseUrl}` : ''
-  const tweet2Text = `${content.insight}\n\n${content.closing}${urlPart}`.slice(0, 280)
+  const ctaPart = '\n\nアプリで予測してみる→ https://minna-eta.vercel.app/ 登録で1000pt！'
+  const tweet2Text = `${content.insight}\n\n${content.closing}${ctaPart}`.slice(0, 280)
   await client.v2.tweet({
     text: tweet2Text,
     reply: { in_reply_to_tweet_id: tweet1.id },
