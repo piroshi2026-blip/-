@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { assertCronAuthorized } from '../../../lib/pdca/cronGuard'
 import { runWeekly } from '../../../lib/xbot/xWeekly'
 import { logPdcaPayload } from '../../../lib/pdca/pdcaHelpers'
+import { getServiceSupabase } from '../../../lib/pdca/supabaseAdmin'
 
 export const maxDuration = 30
 
@@ -15,6 +16,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' })
   }
   if (!assertCronAuthorized(req, res)) return
+
+  // 6日以内に成功済みの週次投稿があればスキップ（二重投稿防止）
+  const sb = getServiceSupabase()
+  const since = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString()
+  const { data: recent } = await sb
+    .from('pdca_runs')
+    .select('id')
+    .eq('ok', true)
+    .gte('created_at', since)
+    .filter('payload->>kind', 'eq', 'x_weekly')
+    .limit(1)
+    .maybeSingle()
+
+  if (recent) {
+    return res.status(200).json({ skipped: true, reason: '6日以内に既に実行済み' })
+  }
 
   try {
     const result = await runWeekly()
