@@ -18,7 +18,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const result = await runReply()
-    await logPdcaPayload('x_reply', result as unknown as Record<string, unknown>, result.replied)
+    // replied=false でもスキップは正常動作。エラーがない限り ok=true
+    await logPdcaPayload('x_reply', result as unknown as Record<string, unknown>, !('error' in result))
     return res.status(200).json(result)
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)

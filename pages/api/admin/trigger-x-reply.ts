@@ -15,7 +15,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const result = await runReply()
-    await logPdcaPayload('x_reply', result as unknown as Record<string, unknown>, result.replied)
+    await logPdcaPayload('x_reply', result as unknown as Record<string, unknown>, !('error' in result))
     return res.status(200).json(result)
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
