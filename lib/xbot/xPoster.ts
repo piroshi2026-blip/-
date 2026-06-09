@@ -8,11 +8,10 @@ import { pickTopic } from './xTopics'
 const MODEL = 'claude-sonnet-4-6'
 
 type PostContent = {
-  poll_question: string   // 短い問い（ポーリングツイート用）
-  poll_options: string[]  // 2〜4択、各25字以内
-  insight: string         // 3〜5行の本質的考察
-  closing: string         // リプライ誘引の締め文
-  hashtags: string        // #ヨソる + 関連タグ
+  question: string   // 読者を引き込む問い（ポールなし）
+  insight: string    // 3〜5行の本質的考察
+  closing: string    // リプライ誘引の締め文
+  hashtags: string   // #ヨソる + 人気検索タグ
 }
 
 function getTwitterClient(): TwitterApi {
@@ -37,21 +36,18 @@ function buildSystemPrompt(recentPosts: XPost[], insights: string | null): strin
       : '（まだデータなし）'
 
   return `あなたは予測市場アプリ「ヨソる」の公式Xアカウントの中の人です。
-2026年Xアルゴリズム（Phoenix Scorer）に完全最適化した「スレッド投稿」用コンテンツをJSON形式で生成します。
+2026年Xアルゴリズム（Phoenix Scorer）に最適化した「スレッド投稿」用コンテンツをJSON形式で生成します。
 
 投稿は2ツイートのスレッド構成です：
-- ツイート1（メイン）: poll_question + hashtags + Xポーリング
+- ツイート1（メイン）: question + hashtags（ポールなし）
 - ツイート2（リプライ）: insight + closing + サイトURL + 画像
 
 【2026年アルゴリズム重要シグナル（優先順）】
 ① いいね → 「わかる」「驚き」「鋭い」と感じさせる感情的共鳴が最重要
 ② 引用ツイート → 「自分の意見を言いたくなる」独自視点・逆張り・強い主張
-③ リツイート → 「友人に見せたい」拡散価値のある洞察・まとめ
-④ リプライ → 明確な問いかけ・意見が割れる設問（Pollで誘導）
-⑤ シェア／DMシェア → 「秘密を共有したい」インサイト
-⑥ プロフィールクリック → 「この人は誰？」と思わせる独自の知性・視点
-⑦ 滞留時間 → 読み応えのある内容で最後まで読ませる
-✕ ブックマークはアルゴリズムへの影響が限定的なので狙わない
+③ リツイート → 「友人に見せたい」拡散価値のある洞察
+④ リプライ → 「答えたくなる」明確な問いかけ
+⑤ プロフィールクリック → 「この人は誰？」と思わせる独自の知性・視点
 ✕ ブロック・ミュート・通報を誘発するような極端・攻撃的表現は厳禁
 
 【高パフォーマンス投稿】\n${fmt(top5)}
@@ -60,11 +56,10 @@ ${insights ? `\n【学習インサイト】\n${insights}` : ''}
 
 必ず以下のJSONのみ出力（説明文・コードブロック不要）：
 {
-  "poll_question": "「えっ、どっちだ」と思わず投票したくなる鋭い問い。引用したくなるほど独自視点。60字以内。",
-  "poll_options": ["選択肢1（25字以内）", "選択肢2（25字以内）", "選択肢3（25字以内）"],
+  "question": "「えっ、どっちだ」「これ気になる」と思わず止まる鋭い問い。60字以内。",
   "insight": "驚き・矛盾・逆説を含む3〜5行の考察。改行で読みやすく。「この人すごい」と思わせる知性。150字以内。",
   "closing": "毎回まったく違う言い回しで、自分の意見を言いたくなるよう自然に誘う1文。40字以内。",
-  "hashtags": "#ヨソる #関連タグ1〜2個"
+  "hashtags": "#ヨソる と、このトピックでXで実際に検索されている具体的なハッシュタグ1〜2個（人名・球団・ブランド・イベント名など。#予測市場 より #大谷翔平 #日経平均 のような具体語を優先）"
 }`
 }
 
@@ -91,7 +86,7 @@ async function generateContent(topic: { title: string; hint?: string }, recentPo
   if (start === -1 || end === -1) throw new Error('ClaudeがJSON形式で返しませんでした')
   const parsed = JSON.parse(raw.slice(start, end + 1)) as PostContent
 
-  if (!parsed.poll_question || !Array.isArray(parsed.poll_options) || parsed.poll_options.length < 2) {
+  if (!parsed.question || !parsed.insight) {
     throw new Error('生成されたJSONが不正です')
   }
   return parsed
@@ -117,22 +112,15 @@ async function uploadImage(client: TwitterApi, imageUrl: string): Promise<string
   }
 }
 
-async function postThreadWithPoll(
+async function postThread(
   content: PostContent,
   imageUrl: string | null
 ): Promise<{ tweetId: string; fullText: string; imageAttached: boolean; imageSource: string | null }> {
   const client = getTwitterClient()
-  const baseUrl = getPublicBaseUrl()
 
-  // ツイート1: 問い + ハッシュタグ + ポーリング（画像なし）
-  const tweet1Text = `${content.poll_question}\n\n${content.hashtags}`.slice(0, 280)
-  const { data: tweet1 } = await client.v2.tweet({
-    text: tweet1Text,
-    poll: {
-      options: content.poll_options.slice(0, 4).map(o => o.slice(0, 25)),
-      duration_minutes: 1440,
-    },
-  })
+  // ツイート1: 問い + ハッシュタグ（ポールなし）
+  const tweet1Text = `${content.question}\n\n${content.hashtags}`.slice(0, 280)
+  const { data: tweet1 } = await client.v2.tweet({ text: tweet1Text })
   if (!tweet1?.id) throw new Error('ツイートIDが取得できませんでした')
 
   // ツイート2（リプライ）: 本質的考察 + 締め + CTA + 画像
@@ -173,11 +161,11 @@ export async function runPost(dryRun = false, forceTopic?: { title: string; hint
   ])
 
   if (dryRun) {
-    const preview = `【ツイート1（Poll）】\n${postContent.poll_question}\n選択肢: ${postContent.poll_options.join(' / ')}\n${postContent.hashtags}\n\n【ツイート2（リプライ＋画像）】\n${postContent.insight}\n\n${postContent.closing}\n\n画像: ${imageUrl ?? 'なし'}`
+    const preview = `【ツイート1】\n${postContent.question}\n${postContent.hashtags}\n\n【ツイート2（リプライ＋画像）】\n${postContent.insight}\n\n${postContent.closing}\n\n画像: ${imageUrl ?? 'なし'}`
     return { content: preview, tweetId: null, topic: topic.title, dryRun: true }
   }
 
-  const { tweetId, fullText, imageAttached, imageSource } = await postThreadWithPoll(postContent, imageUrl)
+  const { tweetId, fullText, imageAttached, imageSource } = await postThread(postContent, imageUrl)
   await savePost({
     tweet_id: tweetId,
     posted_at: new Date().toISOString(),
