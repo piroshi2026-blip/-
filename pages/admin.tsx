@@ -1275,6 +1275,29 @@ export default function Admin() {
                 {pdcaRunning ? '⏳ 実行中…' : '▶ 今すぐ1問投稿'}
               </button>
             </div>
+            <div style={{ marginTop: '10px', borderTop: '1px solid #e2e8f0', paddingTop: '10px' }}>
+              <button
+                disabled={pdcaRunning}
+                onClick={async () => {
+                  setPdcaRunning(true); setPdcaResult(null)
+                  try {
+                    const res = await fetch('/api/admin/trigger-x-reply', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ adminPassword: pdcaPassword || ADMIN_PASSWORD }),
+                    })
+                    setPdcaResult(await res.json())
+                  } catch (e) { setPdcaResult({ error: e instanceof Error ? e.message : String(e) }) }
+                  setPdcaRunning(false)
+                }}
+                style={{ ...s.btn, background: pdcaRunning ? '#9ca3af' : '#0891b2', width: '100%' }}
+              >
+                {pdcaRunning ? '⏳ 実行中…' : '💬 リプライ試験実行（1件）'}
+              </button>
+              <p style={{ fontSize: '11px', color: '#94a3b8', margin: '4px 0 0' }}>
+                アクティブな問いのキーワードでXを検索し、関連ツイートに1件リプライします。結果はログに表示されます。
+              </p>
+            </div>
           </div>
 
           {pdcaResult != null && (
